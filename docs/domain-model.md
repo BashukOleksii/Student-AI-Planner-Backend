@@ -1,9 +1,9 @@
 # Conceptual Domain Model
 
 Status: conceptual model synchronized with the approved Stage 02 design\
-Important: this document defines **domain concepts and ownership**. The approved physical MySQL design and Eloquent relationship intent are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml), not duplicated here. Domain migrations and model relationships have not been implemented.
+Important: this document defines **domain concepts and ownership**. The approved physical MySQL design and Eloquent relationship intent are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml), not duplicated here. Migration Groups 1–2 implement `users.timezone`, planning preferences, recurring availability windows, and their Eloquent relationships; remaining domain persistence is design-only.
 
-Only the default `User` model is currently implemented. References below to an earlier SQL/ER draft come from the supplied Stage 01 review; that source draft is not present in this repository and its details have not been independently verified. See [database review notes](database-review-notes.md).
+The implemented models are `User`, `PlanningPreference`, and `StudyAvailabilityWindow`; this slice provides persistence, not planning APIs or business Services. References below to an earlier SQL/ER draft come from the supplied Stage 01 review; that source draft is not present in this repository and its details have not been independently verified. See [database review notes](database-review-notes.md).
 
 ## 1. Domain boundaries
 

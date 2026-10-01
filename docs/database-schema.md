@@ -1,8 +1,20 @@
 # Physical Database Schema
 
-Status: **design baseline approved for implementation planning**\
+Status: **approved Stage 02 design; Migration Groups 1–2 implemented**\
 Scope: Laravel backend + MySQL + Eloquent\
-Important: this is the canonical repository adaptation of the approved `stage-02-database-schema-spec.md`. **Domain migrations, model relationships, and the user timezone field have not been implemented.** The current application still contains only its Laravel/Sanctum scaffold.
+Important: this is the canonical repository adaptation of the approved `stage-02-database-schema-spec.md`. The first approved persistence slice is implemented alongside the Laravel/Sanctum scaffold; the remaining groups are design-only.
+
+**Implemented now (Migration Groups 1–2):**
+
+- `users.timezone`;
+- `planning_preferences` and `study_availability_windows`;
+- `PlanningPreference` and `StudyAvailabilityWindow` models, their `belongsTo(User::class)` relationships, and `User::planningPreference()` / `User::studyAvailabilityWindows()`;
+- the approved primary/foreign keys, indexes, uniqueness constraints, cascade deletes, and nine enforced MySQL CHECK constraints for these two domain tables;
+- factories and focused MySQL-backed migration/persistence tests.
+
+**Still design-only / not implemented:** education institutions, academic periods, subjects, teachers, schedule import, lessons, tasks/subtasks, study sessions, reminders, and AI conversation/message persistence (Migration Groups 3–9). Their table/column designs and Eloquent relationships below remain approved intent, not implemented code.
+
+This slice implements persistence only. Planning-preference APIs, application lifecycle creation of preference rows, availability-overlap detection, and planning business features remain unimplemented; product defaults remain undecided.
 
 The companion [DBML source](database-schema.dbml) preserves the supplied `student-ai-planner.dbml` diagram. It uses numeric shorthand and omits SQL CHECK expressions; the MySQL types and constraints below remain authoritative. See [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [the earlier draft review](database-review-notes.md) for context. Known implementation issues are recorded in section 8 without changing approved tables, columns, keys, or delete actions.
 
@@ -879,13 +891,13 @@ These can be added later only if a concrete audit, retention or performance requ
 
 ## 7. Migration implementation order
 
-When implementation is approved, migrations should be created in small dependency-safe groups rather than one large migration.
+Continue implementation in small dependency-safe groups rather than one large migration.
 
 Recommended sequence:
 
-1. extend `users` with `timezone`;
-2. `planning_preferences`, `study_availability_windows`;
-3. `education_institutions`, `academic_periods`, `subjects`, `teachers`;
+1. **Completed:** extend `users` with `timezone`;
+2. **Completed:** `planning_preferences`, `study_availability_windows`;
+3. **Next implementation slice (not implemented):** `education_institutions`, `academic_periods`, `subjects`, `teachers`;
 4. `schedule_import_batches`, `schedule_import_rows`;
 5. `lessons`;
 6. `tasks`, `subtasks`;
@@ -904,7 +916,11 @@ Each group should include:
 
 ## 8. Implementation issues and gate
 
-The approved persistence decisions above are documented, not implemented. The following issues require explicit resolution before the affected migration groups; this document preserves the approved checks and FK actions rather than silently selecting alternatives.
+Migration Groups 1–2 are implemented and verified; Groups 3–9 remain design-only. MySQL version support for the completed slice's enforced CHECK constraints has been verified. The minimum constraint-enforcement baseline is **MySQL >= 8.0.16**; the currently verified development/test server is **MySQL 8.4.10**, using the dedicated `student_planner_testing` database. The verified local version is not an exact production-version pin.
+
+Completed-slice verification passed 38 focused tests, the full suite of 40 tests / 271 assertions, Pint, `git diff --check`, and rollback/reapply verification. These are the completed implementation's verification results, not tests rerun for this documentation update.
+
+The following issues remain unresolved and require explicit resolution before the later affected migration groups; this document preserves the approved checks and FK actions rather than silently selecting alternatives.
 
 ### 8.1 Self-reference CHECK restrictions
 
@@ -922,9 +938,8 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
 
 ### 8.4 Remaining implementation questions
 
-- Select and verify the supported MySQL version for constraint enforcement.
 - Fix deterministic fingerprint normalization/serialization before import implementation; the identity fields and SHA-256 algorithm are already approved.
 - Define product defaults and any conflict override policy in Stage 03; no defaults or override behavior are introduced here.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup.
 
-Review this specification, the [companion DBML](database-schema.dbml), and the recorded issues before migration implementation is authorized. A later implementation task should start with groups 1-2 (user timezone, planning preferences, availability), use focused MySQL tests, and stop for review before continuing. **This documentation task creates no migrations, models, or application features.**
+Review this specification, the [companion DBML](database-schema.dbml), and the recorded issues before each later migration slice. Groups 1–2 are complete; the next implementation slice is Group 3 (`education_institutions`, `academic_periods`, `subjects`, `teachers`), with focused MySQL tests and review before continuing. **This documentation synchronization creates no migrations, models, or application features and does not begin Group 3.**

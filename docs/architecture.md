@@ -33,18 +33,19 @@ Microservices are intentionally not used at this stage. The domain is broad, but
 
 ## 2.1 Current repository baseline (2026-10-01)
 
-At the start of Stage 01, the repository is intentionally close to a fresh Laravel application rather than an implemented domain backend:
+The repository now includes the first Stage 02 persistence slice (Migration Groups 1–2) alongside its Laravel/Sanctum scaffold:
 
 - Laravel `^13.17` on PHP `^8.3`;
 - Laravel Sanctum `^4.0` is installed;
-- only the default `User` model, framework users/cache/jobs migrations, and Sanctum's `personal_access_tokens` migration are present;
+- framework users/cache/jobs migrations and Sanctum's `personal_access_tokens` migration remain present; three additional migrations implement `users.timezone`, typed `planning_preferences`, and recurring `study_availability_windows`;
+- `User`, `PlanningPreference`, and `StudyAvailabilityWindow` models provide the corresponding user relationships, numeric casts, and factories; MySQL enforces the approved keys, indexes, uniqueness constraints, cascade deletes, and CHECK constraints;
 - `routes/api.php` currently defines only `/user`, mounted at `GET /api/user` and protected with `auth:sanctum`; API versioning is not implemented;
 - `.env.example` selects MySQL (`student_planner`), and `phpunit.xml` selects a separate MySQL test database (`student_planner_testing`);
 - `config/database.php` retains Laravel's default SQLite fallback when `DB_CONNECTION` is absent. This fallback does not override the explicit MySQL environment configuration and does not need to be changed in Stage 01;
-- feature modules and domain migrations have not yet been implemented.
-- existing tests are scaffold examples (a basic assertion and the welcome-page response), not coverage of authentication or domain capabilities.
+- only persistence is implemented for this slice; planning-preference APIs, planning business Services, and the remaining domain persistence groups are not implemented;
+- MySQL-backed `PlanningPersistenceTest` and `PlanningMigrationTest` cover schema definitions, relationships, constraints, user-data separation, and rollback/reapply behavior; scaffold examples remain, while authentication and planning API behavior are not yet covered.
 
-Architecture sections below describe the intended direction. Suggested directories/classes are created only when a concrete feature requires them.
+Architecture sections below describe the intended direction. Their implementation-pending statements now apply to the remaining persistence groups and application capabilities; the completed Groups 1–2 scope is recorded here and in [database-schema.md](database-schema.md). Suggested directories/classes are created only when a concrete feature requires them.
 
 The architectural decision and alternatives are recorded in [ADR-001](decisions/ADR-001-backend-architecture.md). Domain concepts, rule IDs, and persistence questions are recorded in [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [database review notes](database-review-notes.md).
 

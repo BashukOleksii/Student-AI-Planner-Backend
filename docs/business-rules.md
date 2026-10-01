@@ -1,9 +1,9 @@
 # Business Rules
 
 Status: baseline synchronized with the approved Stage 02 design\
-Rule IDs are stable references for implementation and tests. Physical persistence details are recorded in [database-schema.md](database-schema.md); domain migrations and business capabilities are not yet implemented.
+Rule IDs are stable references for implementation and tests. Physical persistence details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–2 implement `users.timezone`, typed planning preferences, recurring availability windows, their Eloquent relationships, MySQL constraints, and persistence tests. Remaining domain persistence and planning API/business capabilities are not yet implemented.
 
-These are intended requirements, not a claim that the scaffold implements them. References to "V1" mean the initial product release, not an implemented `/api/v1` route prefix. Deterministic rules must be shared by REST and AI-tool entry points through application Services. Preserve rule IDs when refining requirements so implementation and tests can trace them.
+These are intended requirements, not a claim that the backend implements all of them. References to "V1" mean the initial product release, not an implemented `/api/v1` route prefix. Deterministic rules must be shared by REST and AI-tool entry points through application Services. Preserve rule IDs when refining requirements so implementation and tests can trace them.
 
 ## 1. Global and ownership rules
 
