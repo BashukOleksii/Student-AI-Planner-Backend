@@ -1,6 +1,6 @@
 # Backend Architecture
 
-Status: Stage 01 architecture baseline  
+Status: Stage 01 architecture baseline with documented Stage 02 persistence design\
 Scope: Laravel backend only  
 Persistence target: MySQL through Eloquent ORM  
 Frontend: independent Vue application communicating through REST API
@@ -138,7 +138,7 @@ database/seeders/
 
 Eloquent models represent persistence state and relationships. Complex planning rules should not be hidden in model events or accessors. Query scopes may be used for reusable query constraints, but orchestration belongs in Services.
 
-The exact tables, columns, foreign keys, indexes, enum representation, and delete behavior are deferred to Stage 02.
+The approved Stage 02 tables, columns, foreign keys, indexes, enum representation, and delete behavior are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml). Domain migrations and model relationships are not yet implemented; known constraint-enforcement issues are recorded there for resolution before affected migrations.
 
 ### 4.4 Infrastructure / integrations
 
@@ -259,13 +259,14 @@ Planning is time-sensitive, so time handling is an architectural concern.
 
 Rules:
 
-- store instants consistently, preferably in UTC;
+- store concrete domain instants as UTC DATETIME values;
 - store the user's IANA timezone in the profile;
+- store recurring local availability as TIME values;
 - interpret "today", "tomorrow", day boundaries, weekly limits, and reminder time in the user's timezone;
 - convert to presentation timezone only at the API/application boundary;
 - never use server-local timezone as a business rule.
 
-The exact MySQL column types are a Stage 02 decision.
+The approved MySQL column types are recorded in [database-schema.md](database-schema.md). Existing framework/audit timestamp types are preserved as specified; these design decisions have not yet been implemented.
 
 ## 11. Transactions and consistency
 
@@ -398,17 +399,13 @@ For a student project, start simpler and add infrastructure only when Stage 07 b
 - no physical database schema changes yet;
 - no AWS provisioning yet.
 
-## 20. Decisions deferred to later stages
+## 20. Persistence design and later stages
 
 Stage 02:
 
-- final entity-to-table mapping;
-- field names and types;
-- foreign keys and delete behavior;
-- indexes;
-- enum storage strategy;
-- polymorphic relations;
-- migrations and factories.
+- physical mapping, fields/types, foreign keys, delete behavior, indexes, scalar enum storage, and explicit target relationships are approved and documented in [database-schema.md](database-schema.md);
+- migrations, model relationships, and factories remain unimplemented;
+- resolve the documented MySQL enforcement issues before implementing affected migration groups.
 
 Stage 03:
 

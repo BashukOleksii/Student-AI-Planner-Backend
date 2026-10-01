@@ -1,0 +1,348 @@
+// Repository companion: database-schema.md (canonical MySQL types and CHECKs).
+// Design only; domain migrations and model relationships are not implemented.
+// Preserve the approved diagram's numeric shorthand: all BIGINT keys are
+// UNSIGNED; unsigned minute/count/day/position fields follow the Markdown.
+// reminders.offset_minutes is signed. CHECKs and Service invariants are
+// documented in Markdown, including unresolved MySQL enforcement issues.
+
+// Student AI Planner — Stage 02 approved design baseline
+// Target: MySQL + Laravel Eloquent
+// Framework/system tables such as password_reset_tokens, sessions,
+// cache, jobs and personal_access_tokens are intentionally omitted.
+
+Table users {
+  id bigint [pk, increment]
+  name varchar(255) [not null]
+  email varchar(255) [not null, unique]
+  email_verified_at timestamp
+  password varchar(255) [not null]
+  remember_token varchar(100)
+  timezone varchar(64) [not null, default: 'UTC']
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table planning_preferences {
+  user_id bigint [pk, not null]
+  max_daily_study_minutes smallint
+  max_weekly_study_minutes smallint
+  preferred_break_minutes smallint
+  min_session_minutes smallint
+  max_session_minutes smallint
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'All minute values are UNSIGNED in MySQL. NULL means system default.'
+}
+
+Table study_availability_windows {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  day_of_week tinyint [not null]
+  starts_at time [not null]
+  ends_at time [not null]
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (user_id, day_of_week)
+    (user_id, day_of_week, starts_at, ends_at) [unique]
+  }
+
+  Note: 'day_of_week: ISO 1=Monday..7=Sunday. Overnight windows are split into two rows.'
+}
+
+Table education_institutions {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  name varchar(255) [not null]
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (user_id, name) [unique]
+  }
+}
+
+Table academic_periods {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  education_institution_id bigint
+  name varchar(255) [not null]
+  starts_on date [not null]
+  ends_on date [not null]
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (user_id, starts_on, ends_on)
+    (user_id, name, starts_on) [unique]
+  }
+}
+
+Table subjects {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  education_institution_id bigint
+  name varchar(255) [not null]
+  code varchar(50)
+  color char(7)
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (user_id, name) [unique]
+  }
+
+  Note: 'color is nullable #RRGGBB.'
+}
+
+Table teachers {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  education_institution_id bigint
+  name varchar(255) [not null]
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (user_id, name)
+  }
+}
+
+Table schedule_import_batches {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  academic_period_id bigint [not null]
+  status varchar(20) [not null, default: 'uploaded']
+  original_filename varchar(255) [not null]
+  file_hash char(64) [not null]
+  total_rows int [not null, default: 0]
+  valid_rows int [not null, default: 0]
+  invalid_rows int [not null, default: 0]
+  duplicate_rows int [not null, default: 0]
+  error_message text
+  committed_at datetime
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (user_id, academic_period_id, created_at)
+    (user_id, file_hash)
+  }
+
+  Note: 'Row counters are UNSIGNED in MySQL. Status: uploaded|validated|committed|failed|cancelled.'
+}
+
+Table schedule_import_rows {
+  id bigint [pk, increment]
+  schedule_import_batch_id bigint [not null]
+  row_number int [not null]
+  status varchar(16) [not null]
+  raw_data json [not null]
+  normalized_data json
+  validation_errors json
+  fingerprint char(64)
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (schedule_import_batch_id, row_number) [unique]
+    (schedule_import_batch_id, status)
+  }
+
+  Note: 'row_number is UNSIGNED in MySQL. Status: valid|invalid|duplicate.'
+}
+
+Table lessons {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  academic_period_id bigint
+  subject_id bigint [not null]
+  teacher_id bigint
+  schedule_import_batch_id bigint
+  replaces_lesson_id bigint
+  type varchar(32) [not null, default: 'lecture']
+  room varchar(100)
+  starts_at datetime [not null]
+  ends_at datetime [not null]
+  status varchar(20) [not null, default: 'active']
+  import_fingerprint char(64)
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+
+  indexes {
+    (user_id, status, starts_at)
+    (academic_period_id, starts_at)
+    replaces_lesson_id [unique]
+    (user_id, academic_period_id, import_fingerprint) [unique]
+  }
+
+  Note: 'Type: lecture|practical|laboratory|seminar|consultation|exam|other. Status: active|cancelled|replaced. Imported rows require academic_period_id when import_fingerprint is set.'
+}
+
+Table tasks {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  subject_id bigint
+  title varchar(255) [not null]
+  description text
+  status varchar(20) [not null, default: 'pending']
+  priority tinyint [not null, default: 2]
+  estimated_minutes smallint
+  deadline_at datetime
+  completed_at datetime
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+
+  indexes {
+    (user_id, status, deadline_at)
+    (user_id, subject_id, status)
+  }
+
+  Note: 'priority is UNSIGNED: 1=LOW,2=NORMAL,3=HIGH. estimated_minutes is UNSIGNED. Status: pending|completed. Overdue is derived.'
+}
+
+Table subtasks {
+  id bigint [pk, increment]
+  task_id bigint [not null]
+  title varchar(255) [not null]
+  description text
+  position smallint [not null]
+  status varchar(20) [not null, default: 'pending']
+  estimated_minutes smallint
+  deadline_at datetime
+  completed_at datetime
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+
+  indexes {
+    (task_id, position)
+    (task_id, status, deadline_at)
+  }
+
+  Note: 'position and estimated_minutes are UNSIGNED in MySQL. Status: pending|completed.'
+}
+
+Table study_sessions {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  task_id bigint [not null]
+  subtask_id bigint
+  rescheduled_from_session_id bigint
+  starts_at datetime [not null]
+  ends_at datetime [not null]
+  status varchar(20) [not null, default: 'planned']
+  completed_at datetime
+  actual_minutes smallint
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (user_id, status, starts_at)
+    (task_id, starts_at)
+    (subtask_id, starts_at)
+    rescheduled_from_session_id [unique]
+  }
+
+  Note: 'actual_minutes is UNSIGNED in MySQL. Status: planned|completed|missed|rescheduled|cancelled.'
+}
+
+Table reminders {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  task_id bigint
+  subtask_id bigint
+  study_session_id bigint
+  message varchar(500)
+  trigger_at datetime [not null]
+  anchor varchar(32)
+  offset_minutes smallint
+  status varchar(20) [not null, default: 'scheduled']
+  sent_at datetime
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (status, trigger_at)
+    (user_id, status, trigger_at)
+  }
+
+  Note: 'At most one target FK is non-null. Anchor: task_deadline|subtask_deadline|session_start. offset_minutes is signed; negative means before anchor. Status: scheduled|sent|cancelled.'
+}
+
+Table ai_conversations {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (user_id, updated_at)
+  }
+}
+
+Table ai_messages {
+  id bigint [pk, increment]
+  conversation_id bigint [not null]
+  role varchar(20) [not null]
+  content longtext
+  tool_calls json
+  tool_call_id varchar(255)
+  created_at timestamp
+
+  indexes {
+    (conversation_id, created_at)
+    tool_call_id
+  }
+
+  Note: 'Role: system|user|assistant|tool. Append-oriented message log.'
+}
+
+// Relationships + delete behavior
+
+Ref: planning_preferences.user_id > users.id [delete: cascade]
+Ref: study_availability_windows.user_id > users.id [delete: cascade]
+
+Ref: education_institutions.user_id > users.id [delete: cascade]
+
+Ref: academic_periods.user_id > users.id [delete: cascade]
+Ref: academic_periods.education_institution_id > education_institutions.id [delete: set null]
+
+Ref: subjects.user_id > users.id [delete: cascade]
+Ref: subjects.education_institution_id > education_institutions.id [delete: set null]
+
+Ref: teachers.user_id > users.id [delete: cascade]
+Ref: teachers.education_institution_id > education_institutions.id [delete: set null]
+
+Ref: schedule_import_batches.user_id > users.id [delete: cascade]
+Ref: schedule_import_batches.academic_period_id > academic_periods.id [delete: restrict]
+Ref: schedule_import_rows.schedule_import_batch_id > schedule_import_batches.id [delete: cascade]
+
+Ref: lessons.user_id > users.id [delete: cascade]
+Ref: lessons.academic_period_id > academic_periods.id [delete: restrict]
+Ref: lessons.subject_id > subjects.id [delete: restrict]
+Ref: lessons.teacher_id > teachers.id [delete: set null]
+Ref: lessons.schedule_import_batch_id > schedule_import_batches.id [delete: set null]
+Ref: lessons.replaces_lesson_id > lessons.id [delete: set null]
+
+Ref: tasks.user_id > users.id [delete: cascade]
+Ref: tasks.subject_id > subjects.id [delete: set null]
+
+Ref: subtasks.task_id > tasks.id [delete: cascade]
+
+Ref: study_sessions.user_id > users.id [delete: cascade]
+Ref: study_sessions.task_id > tasks.id [delete: cascade]
+Ref: study_sessions.subtask_id > subtasks.id [delete: set null]
+Ref: study_sessions.rescheduled_from_session_id > study_sessions.id [delete: set null]
+
+Ref: reminders.user_id > users.id [delete: cascade]
+Ref: reminders.task_id > tasks.id [delete: set null]
+Ref: reminders.subtask_id > subtasks.id [delete: set null]
+Ref: reminders.study_session_id > study_sessions.id [delete: set null]
+
+Ref: ai_conversations.user_id > users.id [delete: cascade]
+Ref: ai_messages.conversation_id > ai_conversations.id [delete: cascade]

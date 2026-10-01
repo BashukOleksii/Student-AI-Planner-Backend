@@ -1,7 +1,7 @@
 # Conceptual Domain Model
 
-Status: Stage 01 conceptual model  
-Important: this document defines **domain concepts and ownership**, not the final MySQL schema. Table names, columns, foreign keys, indexes, enum storage, and Eloquent relationship details are intentionally deferred to Stage 02.
+Status: conceptual model synchronized with the approved Stage 02 design\
+Important: this document defines **domain concepts and ownership**. The approved physical MySQL design and Eloquent relationship intent are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml), not duplicated here. Domain migrations and model relationships have not been implemented.
 
 Only the default `User` model is currently implemented. References below to an earlier SQL/ER draft come from the supplied Stage 01 review; that source draft is not present in this repository and its details have not been independently verified. See [database review notes](database-review-notes.md).
 
@@ -13,70 +13,73 @@ Only the default `User` model is currently implemented. References below to an e
 Authenticated owner of private planning data.
 
 **Planning Preferences**  
-User-defined constraints such as study windows, maximum daily/weekly workload, preferred breaks, and timezone-related planning behavior. This may become one or several persistence structures in Stage 02.
+User-defined constraints such as maximum daily/weekly workload, breaks, and session bounds. Stage 02 uses one typed planning-preferences row per user, not an opaque planning JSON column. Nullable numeric values use system defaults once those defaults are decided.
+
+**Study Availability Window**\
+A recurring local study window for an ISO day of the week. Windows are separate from numeric preferences; overnight availability is split into two windows. The user's IANA timezone belongs to the profile. Concrete domain instants are UTC, while recurring windows use local wall-clock times.
 
 ### Academic Context
 
 **Subject**  
-Academic course/subject used to group lessons and tasks.
+User-owned academic course/subject used to group lessons and optionally tasks. It may reference the user's education institution; it is not a shared global catalog in V1.
 
 **Teacher**  
-Teacher metadata attached to lessons when available.
+User-owned teacher metadata attached to lessons when available. It may reference the user's education institution; it is not a shared global catalog in V1.
 
 **Education Institution**  
-An intended supporting backend concept already listed in the repository instructions and described in the earlier draft review. Stage 02 must still decide its ownership, required attributes, and exact relationship to users, subjects, and teachers; those persistence details are not fixed here.
+A user-owned supporting academic concept. Subjects, teachers, and academic periods may optionally reference an institution owned by the same user. V1 does not use shared institution reference data.
 
 **Academic Period / Semester**  
-A candidate concept useful for repeated schedule imports and separating schedules across semesters. The supplied review reports no explicit semester structure in the earlier draft. Decide persistence in Stage 02.
+A persisted, user-owned semester/academic-period boundary and explicit target for schedule imports. Importing a new semester must not implicitly delete historical periods. Periods with schedule/import history are protected from destructive deletion.
 
 ### Schedule
 
 **Lesson**  
-A scheduled academic class with a subject, start/end time, type, and optional teacher/room metadata.
+A concrete, user-owned scheduled occurrence with a subject, start/end time, type, and optional teacher/room metadata. Its lifecycle distinguishes active, cancelled, and replaced entries; normal deletion is soft deletion.
 
 **Lesson Replacement / Schedule Change**  
-Represents cancellation, substitution, or replacement behavior without losing the history of the original lesson. Whether this is a separate entity or a relation/state on `Lesson` is a Stage 02 decision.
+A replacement is another lesson linked to its original through the approved self-reference. The original becomes `replaced` and the replacement is `active`; both resolve to the same owner. Cancelled, replaced, and soft-deleted lessons do not block free time.
 
 **Schedule Import Batch**  
-A candidate process entity/value that represents one Excel import attempt, its source file, validation state, preview, and commit result. Useful if import history/audit is retained.
+A persisted process entity representing one Excel import attempt, its academic period, source-file identity, validation state, and commit history. Persisted import rows retain preview data and row-level errors. Imported lessons use deterministic SHA-256 identity from normalized subject identity/name and start/end instants; teacher, room, and type are excluded.
 
 ### Tasks
 
 **Task / Assignment**  
-A user-owned academic work item with a title, optional subject, deadline, priority, estimated effort, and completion lifecycle.
+A user-owned academic work item with a title, optional subject, deadline, priority, estimated effort, and completion lifecycle. Completion timing is retained for on-time/late statistics; normal deletion is soft deletion.
 
 **Subtask**  
-A smaller ordered step belonging to exactly one task. It may have its own estimate and deadline.
+A smaller ordered step belonging to exactly one task and inheriting its ownership. Its position gives deterministic ordering; it may have its own estimate and deadline. Active (non-soft-deleted) subtasks are authoritative schedulable work; when none exist, the task estimate is used. Parent and subtask estimates are never counted for the same work. Normal deletion is soft deletion.
 
 ### Planning
 
 **Study Session**  
-A concrete reserved time block allocated to a task or subtask.
+A concrete reserved time block with a required task and optional subtask belonging to that same task. It retains scheduled timing, optional completion timing, and actual minutes separately. Rescheduling creates a new session linked to its predecessor; history uses lifecycle states rather than soft deletes.
 
 **Free Time Slot**  
-A calculated value object, not necessarily persisted. It is produced by subtracting blocking events and constraints from the user's allowed study windows.
+A calculated result, not persisted in V1. It is produced by subtracting blocking events and constraints from the user's allowed study windows.
 
 **Planning Result / Planning Run**  
-A candidate transient or persisted result representing generated sessions, warnings, unscheduled work, and feasibility. Persist only if the product needs history/audit of plan generations.
+A transient result representing generated sessions, warnings, unscheduled work, and feasibility. V1 has no planning-run history table; a later concrete audit requirement would be needed to add one.
 
 **Planning Conflict**  
-A calculated result describing an overlap, insufficient capacity, deadline violation, or user-constraint violation. Usually returned by Services rather than stored as a permanent entity.
+A calculated result describing an overlap, insufficient capacity, deadline violation, or user-constraint violation. Returned by Services and not persisted in V1.
 
 ### Reminders
 
 **Reminder**  
-A user-owned instruction to notify the user at a specific instant or relative to a task/session deadline.
+A user-owned instruction to notify the user at a specific instant. It has at most one explicit target: task, subtask, or study session; all targets may be absent for a general reminder. Relative reminders use a task deadline, subtask deadline, or session start as their anchor and retain the signed offset and resolved trigger instant. Absolute reminders have no anchor/offset.
 
 **Reminder Delivery**  
-Optional future concept if delivery attempts, retries, channels, and delivery status need auditability. It is not required for the first persistence design unless notification delivery is implemented deeply.
+Delivery status belongs to the reminder lifecycle in V1. Separate delivery-attempt history is deferred until a concrete audit requirement justifies it.
 
 ### Progress & Reporting
 
 **Progress Metrics**  
-Mostly derived read data: counts, completion percentage, planned vs actual workload, late completion, subject workload.
+Derived read data: counts, completion percentage, planned vs actual workload, late completion, subject workload. V1 does not persist general metric snapshots.
 
 **Progress Report**  
-A generated view/document for a selected period. It does not need to be a persistent domain entity unless report history or generated files must be retained.
+A generated view/document for a selected period. V1 has no report-history table; retaining reports requires a later concrete requirement.
 
 ### AI Agent
 
@@ -84,7 +87,7 @@ A generated view/document for a selected period. It does not need to be a persis
 User-owned conversational context.
 
 **AI Message**  
-A message within a conversation, including user/assistant role and optional structured tool metadata.
+A persisted message within a conversation, with a `system`, `user`, `assistant`, or `tool` role. Structured tool-call metadata may remain JSON because it describes orchestration, not deterministic planning state.
 
 **Agent Tool Call**  
 Conceptually an orchestration action. It may live inside message metadata initially; a separate audit entity is only justified if tool-level auditing becomes a requirement.
@@ -93,27 +96,39 @@ Conceptually an orchestration action. It may live inside message metadata initia
 
 ```mermaid
 erDiagram
+    USER ||--o{ EDUCATION_INSTITUTION : owns
+    USER ||--o{ SUBJECT : owns
+    USER ||--o{ TEACHER : owns
+    USER ||--o{ ACADEMIC_PERIOD : owns
     USER ||--o{ LESSON : owns
     USER ||--o{ TASK : owns
     USER ||--o{ STUDY_SESSION : owns
     USER ||--o{ REMINDER : owns
     USER ||--o{ AI_CONVERSATION : owns
     USER ||--|| PLANNING_PREFERENCES : configures
+    USER ||--o{ STUDY_AVAILABILITY_WINDOW : defines
+
+    EDUCATION_INSTITUTION o|--o{ SUBJECT : contextualizes
+    EDUCATION_INSTITUTION o|--o{ TEACHER : contextualizes
+    EDUCATION_INSTITUTION o|--o{ ACADEMIC_PERIOD : contextualizes
+    ACADEMIC_PERIOD o|--o{ LESSON : groups
+    ACADEMIC_PERIOD ||--o{ SCHEDULE_IMPORT_BATCH : receives
+    SCHEDULE_IMPORT_BATCH ||--o{ SCHEDULE_IMPORT_ROW : contains
 
     SUBJECT ||--o{ LESSON : classifies
-    SUBJECT ||--o{ TASK : groups
-    TEACHER ||--o{ LESSON : teaches
+    SUBJECT o|--o{ TASK : groups
+    TEACHER o|--o{ LESSON : teaches
 
     TASK ||--o{ SUBTASK : decomposes_into
     TASK ||--o{ STUDY_SESSION : planned_as
-    SUBTASK ||--o{ STUDY_SESSION : may_be_planned_as
+    SUBTASK o|--o{ STUDY_SESSION : may_be_planned_as
 
     AI_CONVERSATION ||--o{ AI_MESSAGE : contains
 ```
 
-This diagram is conceptual. It intentionally does not choose polymorphic foreign keys, nullable columns, pivot tables, or concrete cardinality for every optional concept.
+This diagram summarizes conceptual associations, not physical columns or constraints. See [database-schema.md](database-schema.md) for the approved persistence details, including lesson replacement and session rescheduling self-references.
 
-The task and subtask links to study sessions represent possible planning targets, not a requirement for every session to reference both. Optional subject/teacher associations and default planning preferences must not be inferred as mandatory physical relationships from the diagram.
+Every study session references a task; its subtask reference is optional and must belong to that task. Reminder target associations are mutually exclusive and are described above rather than expanded into the diagram.
 
 ## 3. Aggregate / consistency boundaries
 
@@ -151,27 +166,37 @@ The following concepts should be represented explicitly in code when their behav
 - planning warning/conflict;
 - progress percentage.
 
-Prefer simple PHP enums/value objects only when they make rules safer or clearer. Do not create value-object classes for every scalar field.
+Lifecycle states use PHP string-backed enums over bounded scalar columns when implemented; priority uses an integer-backed enum. MySQL ENUM is not the baseline strategy. Introduce value objects only when they make rules safer or clearer, not for every scalar field.
 
 ## 5. State semantics to preserve
 
-### Task
+### Task and Subtask
 
-The requirements distinguish planned/open work, completed work, and unfinished work. The exact persisted status vocabulary must be normalized in Stage 02.
+Both persist only `pending` or `completed`. Completion requires a completion instant; pending work has none. Task priority is LOW = 1, NORMAL = 2, HIGH = 3.
 
-Important semantic rule: **overdue is primarily derivable from deadline + completion state + current time and should not automatically require a separate persisted status**.
+**Overdue is derived from deadline, completion state, and current time, never persisted as another V1 status or flag.**
 
 ### Study Session
 
-A session needs to distinguish at least future/planned, completed, missed, and rescheduled/cancelled behavior. Exact enum values are Stage 02 work.
+Persisted states are `planned`, `completed`, `missed`, `rescheduled`, and `cancelled`. A successor records its predecessor, whose state becomes `rescheduled`. Completed sessions retain completion timing and may retain actual minutes.
 
 ### Lesson
 
-A lesson needs to distinguish active schedule entries from cancelled/replaced entries. Replacements must not cause both original and replacement to block the same time unintentionally.
+Persisted states are `active`, `cancelled`, and `replaced`. Only active, non-soft-deleted lessons block planning.
+
+### Reminder
+
+Persisted states are `scheduled`, `sent`, and `cancelled`. Sent reminders retain delivery timing; relative reminders must be recalculated when the associated deadline/session changes.
+
+### Deletion and history
+
+Lessons, tasks, and subtasks use soft deletion. Deleting a task also soft-deletes its subtasks and cancels affected future planned sessions, while completed/missed/rescheduled history remains. Scheduled reminders targeting that task are cancelled or removed by the Reminder service. Study sessions retain history through lifecycle states.
+
+Teacher removal may clear lesson teacher references. Subjects referenced by lessons cannot be hard-deleted; task subject references may become null. Academic periods with schedule/import history are protected. Normal domain deletion is distinct from administrative/account hard purges; the physical schema records the approved FK actions.
 
 ## 6. Derived data
 
-Avoid persisting data that can be deterministically recalculated unless there is a performance/audit reason.
+V1 does not persist data solely for deterministic calculated results.
 
 Derived examples:
 
@@ -183,19 +208,10 @@ Derived examples:
 - feasibility warnings;
 - most statistics and report aggregates.
 
-If later performance testing proves repeated calculation too expensive, introduce caching/materialized summaries deliberately.
+Planning runs, generated report history, and reminder-delivery history are also excluded from V1. A later concrete performance, retention, or audit requirement is needed to introduce additional persistence.
 
-## 7. Open questions for Stage 02
+## 7. Resolved design and remaining work
 
-1. Is `Subject` strictly user-owned, institution-owned, or shared reference data?
-2. Is `Teacher` user-specific or institution-wide?
-3. What role and ownership should `EducationInstitution` have in the MVP schema, given that it is an intended backend responsibility but is only lightly specified by the user stories?
-4. Should an explicit `AcademicPeriod/Semester` be persisted?
-5. How should a `StudySession` reference either a task or a subtask without invalid multiple foreign keys?
-6. How should reminders target tasks/sessions/subtasks: Laravel polymorphic relation, explicit nullable FKs, or another model?
-7. Should schedule replacement be self-reference on lessons or a separate change entity?
-8. Which status and priority values become PHP enums?
-9. Which soft deletes are required and what should deletion mean for historical reports?
-10. Which data should be hard-deleted versus retained for progress history?
+The former Stage 02 ownership, academic-period, target-reference, replacement, enum, and deletion/history questions are resolved by [the approved physical schema](database-schema.md). Its implementation issues section records MySQL constraint enforcement questions without reopening those domain decisions.
 
-These questions should be answered before migrations are written.
+Stage 03 still needs to define product defaults for study hours, breaks, and session bounds; conflict handling/override policy; and the exact normalization/serialization of the approved fingerprint identity. No domain migrations or application behavior are introduced by this documentation.
