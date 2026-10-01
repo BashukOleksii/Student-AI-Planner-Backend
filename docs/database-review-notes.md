@@ -2,7 +2,13 @@
 
 Status: review only. Do not apply schema changes during Stage 01.
 
-The provided SQL/ER draft is useful as an early inventory of concepts, but it should not be treated as the final Laravel/MySQL schema.
+## Source and current repository baseline
+
+The supplied Stage 01 review refers to an earlier SQL/ER draft, but no source SQL draft or ER image is present in this repository. Draft-specific observations below are carried forward from that review and remain unverified against the original artifacts. They describe possible design issues, not defects in the current migrations.
+
+The inspected repository contains the default Laravel users (including password-reset tokens and sessions), cache, and jobs migrations, plus Sanctum's `personal_access_tokens` migration. It has no domain tables or domain Eloquent relationships yet. `.env.example` and `phpunit.xml` explicitly select MySQL; Laravel's SQLite fallback in `config/database.php` remains unchanged during Stage 01.
+
+The earlier SQL/ER draft is useful as an inventory of concepts, but must not be treated as the final Laravel/MySQL schema. Obtain it for comparison if it is to inform Stage 02.
 
 ## 1. Useful concepts already present
 
@@ -33,7 +39,7 @@ A normal relational foreign-key column cannot safely mean "either table A or tab
 - a polymorphic target if justified;
 - or planning sessions only against one canonical schedulable-work entity.
 
-Do not reproduce the current dual-FK design in Laravel migrations.
+Do not reproduce the reported dual-FK design in Laravel migrations.
 
 ### 2.2 Reminder polymorphism is expressed as incompatible foreign keys
 
@@ -80,7 +86,7 @@ Do not default to JSON merely to avoid modeling decisions.
 
 ### 2.8 Import lifecycle is not represented
 
-The requirements require preview, validation errors, and re-import behavior. The current schema has no import batch/history concept. It may be acceptable to keep previews ephemeral, but Stage 02 should make that decision explicitly.
+The requirements require preview, validation errors, and re-import behavior. The reviewed draft reportedly has no import batch/history concept. It may be acceptable to keep previews ephemeral, but Stage 02 should make that decision explicitly.
 
 ### 2.9 Completion history may be insufficient for some statistics
 
@@ -104,4 +110,19 @@ Final indexes should be derived from actual query patterns after the final colum
 
 ## 4. Stage 02 objective
 
-Use `architecture.md`, `domain-model.md`, `business-rules.md`, this review, the existing SQL, and the ER image to produce a new normalized schema rather than patching the current draft mechanically.
+Use [architecture](architecture.md), [the conceptual domain model](domain-model.md), [business rules](business-rules.md), this review, and the actual repository to design the physical MySQL schema. Compare the earlier SQL/ER artifacts if available; their absence must not be filled with invented schema facts.
+
+Before writing domain migrations, resolve:
+
+- final tables/columns, Eloquent relationships, foreign keys, indexes, and unique constraints;
+- status/priority values and their persistence representation;
+- ownership and access rules for Subject, Teacher, and EducationInstitution;
+- academic period/semester persistence and schedule replacement/history;
+- StudySession task/subtask targeting and authoritative effort estimates;
+- reminder targeting and integrity enforcement;
+- typed planning preferences versus JSON, including timezone/time storage;
+- import preview/history retention and duplicate identity;
+- completion timestamps/history needed for late completion and actual workload;
+- soft deletes, hard deletes, and preservation of historical references.
+
+These are Stage 02 decisions. This review does not choose physical relationships or authorize changes to the existing framework migrations.

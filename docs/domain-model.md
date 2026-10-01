@@ -3,6 +3,8 @@
 Status: Stage 01 conceptual model  
 Important: this document defines **domain concepts and ownership**, not the final MySQL schema. Table names, columns, foreign keys, indexes, enum storage, and Eloquent relationship details are intentionally deferred to Stage 02.
 
+Only the default `User` model is currently implemented. References below to an earlier SQL/ER draft come from the supplied Stage 01 review; that source draft is not present in this repository and its details have not been independently verified. See [database review notes](database-review-notes.md).
+
 ## 1. Domain boundaries
 
 ### Identity & Profile
@@ -22,10 +24,10 @@ Academic course/subject used to group lessons and tasks.
 Teacher metadata attached to lessons when available.
 
 **Education Institution**  
-Present in the existing draft database model, but not strongly required by the main user stories. Treat it as a candidate supporting concept, not as a mandatory root of the MVP until Stage 02 confirms the requirement.
+An intended supporting backend concept already listed in the repository instructions and described in the earlier draft review. Stage 02 must still decide its ownership, required attributes, and exact relationship to users, subjects, and teachers; those persistence details are not fixed here.
 
 **Academic Period / Semester**  
-A candidate concept useful for repeated schedule imports and separating schedules across semesters. The requirements mention importing a new semester, but the current SQL draft has no explicit semester structure. Decide persistence in Stage 02.
+A candidate concept useful for repeated schedule imports and separating schedules across semesters. The supplied review reports no explicit semester structure in the earlier draft. Decide persistence in Stage 02.
 
 ### Schedule
 
@@ -111,6 +113,8 @@ erDiagram
 
 This diagram is conceptual. It intentionally does not choose polymorphic foreign keys, nullable columns, pivot tables, or concrete cardinality for every optional concept.
 
+The task and subtask links to study sessions represent possible planning targets, not a requirement for every session to reference both. Optional subject/teacher associations and default planning preferences must not be inferred as mandatory physical relationships from the diagram.
+
 ## 3. Aggregate / consistency boundaries
 
 These are reasoning boundaries, not mandatory Laravel class structures.
@@ -185,7 +189,7 @@ If later performance testing proves repeated calculation too expensive, introduc
 
 1. Is `Subject` strictly user-owned, institution-owned, or shared reference data?
 2. Is `Teacher` user-specific or institution-wide?
-3. Is `EducationInstitution` required by MVP user stories or only by the current draft schema?
+3. What role and ownership should `EducationInstitution` have in the MVP schema, given that it is an intended backend responsibility but is only lightly specified by the user stories?
 4. Should an explicit `AcademicPeriod/Semester` be persisted?
 5. How should a `StudySession` reference either a task or a subtask without invalid multiple foreign keys?
 6. How should reminders target tasks/sessions/subtasks: Laravel polymorphic relation, explicit nullable FKs, or another model?

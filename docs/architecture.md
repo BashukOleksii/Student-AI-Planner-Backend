@@ -31,11 +31,28 @@ This means:
 
 Microservices are intentionally not used at this stage. The domain is broad, but the project does not currently justify distributed transactions, multiple deployments, independent teams, or duplicated infrastructure.
 
+## 2.1 Current repository baseline (2026-10-01)
+
+At the start of Stage 01, the repository is intentionally close to a fresh Laravel application rather than an implemented domain backend:
+
+- Laravel `^13.17` on PHP `^8.3`;
+- Laravel Sanctum `^4.0` is installed;
+- only the default `User` model, framework users/cache/jobs migrations, and Sanctum's `personal_access_tokens` migration are present;
+- `routes/api.php` currently defines only `/user`, mounted at `GET /api/user` and protected with `auth:sanctum`; API versioning is not implemented;
+- `.env.example` selects MySQL (`student_planner`), and `phpunit.xml` selects a separate MySQL test database (`student_planner_testing`);
+- `config/database.php` retains Laravel's default SQLite fallback when `DB_CONNECTION` is absent. This fallback does not override the explicit MySQL environment configuration and does not need to be changed in Stage 01;
+- feature modules and domain migrations have not yet been implemented.
+- existing tests are scaffold examples (a basic assertion and the welcome-page response), not coverage of authentication or domain capabilities.
+
+Architecture sections below describe the intended direction. Suggested directories/classes are created only when a concrete feature requires them.
+
+The architectural decision and alternatives are recorded in [ADR-001](decisions/ADR-001-backend-architecture.md). Domain concepts, rule IDs, and persistence questions are recorded in [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [database review notes](database-review-notes.md).
+
 ## 3. High-level system boundary
 
 ```mermaid
 flowchart LR
-    FE[Vue 3 Frontend\nseparate repository] -->|HTTPS REST /api/v1| API[Laravel Backend]
+    FE[Vue 3 Frontend\nseparate repository] -->|HTTPS REST /api/*| API[Laravel Backend]
     API --> DB[(MySQL)]
     API --> FS[File Storage]
     API --> Q[Queue]
@@ -64,7 +81,7 @@ Responsibilities:
 Typical locations:
 
 ```text
-app/Http/Controllers/Api/V1/
+app/Http/Controllers/Api/  # introduce version namespace only if/when API versioning is adopted
 app/Http/Requests/
 app/Http/Resources/
 app/Policies/
@@ -164,7 +181,7 @@ sequenceDiagram
     participant M as Eloquent Models
     participant D as MySQL
 
-    F->>C: POST /api/v1/tasks
+    F->>C: POST /api/tasks (illustrative; exact endpoint deferred)
     C->>R: validate input
     C->>P: authorize action
     C->>S: create task
@@ -226,7 +243,7 @@ Tools are thin application adapters over Services. They receive structured argum
 
 ## 9. Authentication and authorization
 
-For the first-party Vue SPA, use Laravel's standard authentication stack and Sanctum unless the existing repository already has another deliberate solution.
+The current repository already includes Laravel Sanctum and the default API user route is protected with `auth:sanctum`. This establishes Sanctum as the current authentication package baseline, but full registration/login/logout/password-reset and SPA authentication behavior are not implemented by Stage 01. Their exact flow belongs to the authentication implementation stage.
 
 Authorization is resource-based:
 
@@ -295,7 +312,8 @@ The parser does not write directly to final schedule records during preview. Dup
 
 ## 15. API design baseline
 
-- version prefix: `/api/v1`;
+- REST/JSON endpoints under Laravel's API routing boundary;
+- do not require a version prefix yet; API versioning can be introduced deliberately when the public contract is designed;
 - JSON request/response contract;
 - resource-oriented endpoints for normal CRUD;
 - action endpoints only for real use cases such as preview import, plan generation, reschedule, and reports;
@@ -316,7 +334,7 @@ app/
 ├── Events/
 ├── Exceptions/
 ├── Http/
-│   ├── Controllers/Api/V1/
+│   ├── Controllers/Api/      # optional V1 namespace only after an API-versioning decision
 │   ├── Requests/
 │   └── Resources/
 ├── Jobs/

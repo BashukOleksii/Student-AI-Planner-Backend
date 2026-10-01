@@ -439,3 +439,17 @@ Requirements and documentation describe intended behavior, but existing
 code must be examined before proposing modifications.
 
 Do not silently change critical architectural decisions.
+
+## Architecture and project documentation
+
+Before architectural, database, planning, or AI-tool changes, read the relevant project documentation:
+
+- `docs/architecture.md`
+- `docs/domain-model.md`
+- `docs/business-rules.md`
+- `docs/database-review-notes.md` when working on persistence/database design
+- relevant ADRs under `docs/decisions/`
+
+The current repository remains the primary source of truth for implemented code. The documents above define intended architecture and business constraints; if implementation and documentation materially conflict, report the conflict instead of silently changing a critical decision.
+
+Stage boundary: Stage 01 is documentation/architecture only. Physical MySQL schema design, Eloquent relationship details, indexes, and application migrations belong to Stage 02 unless explicitly requested otherwise.

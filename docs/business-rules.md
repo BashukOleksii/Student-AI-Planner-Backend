@@ -3,6 +3,8 @@
 Status: Stage 01 baseline  
 Rule IDs are stable references for implementation and tests. Exact persistence details are deferred to Stage 02.
 
+These are intended requirements, not a claim that the scaffold implements them. References to "V1" mean the initial product release, not an implemented `/api/v1` route prefix. Deterministic rules must be shared by REST and AI-tool entry points through application Services. Preserve rule IDs when refining requirements so implementation and tests can trace them.
+
 ## 1. Global and ownership rules
 
 **BR-GEN-001 — Ownership isolation**  

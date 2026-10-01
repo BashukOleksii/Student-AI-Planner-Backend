@@ -1,6 +1,6 @@
 # ADR-001: Laravel Layered Modular Monolith for Backend
 
-- Status: Proposed baseline for Stage 01
+- Status: Stage 01 architecture baseline; domain implementation pending
 - Date: 2026-10-01
 
 ## Context
@@ -19,12 +19,16 @@ Build the backend as a **Laravel layered modular monolith** with:
 - thin Controllers;
 - Form Requests;
 - Policies/Gates;
-- API Resources;
+- API Resources where useful;
 - business Services grouped by capability;
-- Jobs/queues for asynchronous work;
+- Jobs/queues for asynchronous work where appropriate;
 - AI agent as an orchestrator over structured tools that call Services.
 
 Use Laravel conventions before adding custom architectural abstractions.
+
+This decision defines the intended architecture. The current repository remains a Laravel scaffold with Sanctum installed and the default authenticated `GET /api/user` route; full authentication and domain capabilities are not implemented. API versioning and the physical MySQL domain schema are deferred. Stage 01 creates no placeholder application classes or directories and changes no runtime behavior or migrations.
+
+See [backend architecture](../architecture.md), [the conceptual domain model](../domain-model.md), [business rules](../business-rules.md), and [Stage 02 database review questions](../database-review-notes.md).
 
 ## Alternatives considered
 
