@@ -1,20 +1,23 @@
 # Physical Database Schema
 
-Status: **approved Stage 02 design; Migration Groups 1–2 implemented**\
+Status: **approved Stage 02 design; Migration Groups 1–3 implemented**\
 Scope: Laravel backend + MySQL + Eloquent\
-Important: this is the canonical repository adaptation of the approved `stage-02-database-schema-spec.md`. The first approved persistence slice is implemented alongside the Laravel/Sanctum scaffold; the remaining groups are design-only.
+Important: this is the canonical repository adaptation of the approved `stage-02-database-schema-spec.md`. The first three approved persistence groups are implemented alongside the Laravel/Sanctum scaffold; Groups 4–9 remain design-only.
 
-**Implemented now (Migration Groups 1–2):**
+**Implemented now (Migration Groups 1–3):**
 
 - `users.timezone`;
 - `planning_preferences` and `study_availability_windows`;
+- user-owned `education_institutions`, explicit `academic_periods`, `subjects`, and `teachers`;
 - `PlanningPreference` and `StudyAvailabilityWindow` models, their `belongsTo(User::class)` relationships, and `User::planningPreference()` / `User::studyAvailabilityWindows()`;
-- the approved primary/foreign keys, indexes, uniqueness constraints, cascade deletes, and nine enforced MySQL CHECK constraints for these two domain tables;
-- factories and focused MySQL-backed migration/persistence tests.
+- `EducationInstitution`, `AcademicPeriod`, `Subject`, and `Teacher` models with `belongsTo(User::class)`; `AcademicPeriod`, `Subject`, and `Teacher` also have optional `belongsTo(EducationInstitution::class)` relationships; academic-period dates use Laravel date casts;
+- `User::educationInstitutions()`, `User::academicPeriods()`, `User::subjects()`, and `User::teachers()`; `EducationInstitution::academicPeriods()`, `EducationInstitution::subjects()`, and `EducationInstitution::teachers()` are also implemented as `hasMany` relationships;
+- the approved primary/foreign keys, indexes, uniqueness constraints, owner cascade deletes, optional institution `SET NULL` deletes, and eleven enforced MySQL CHECK constraints across the six domain tables; Group 3 adds `academic_periods_valid_date_range` and `subjects_valid_color`, while teacher names use a non-unique index;
+- factories and focused MySQL-backed `PlanningPersistenceTest` / `AcademicContextPersistenceTest`; `PlanningMigrationTest` dynamically rolls back and reapplies domain migrations while preserving the four scaffold migrations and existing users, with coverage for later additive groups.
 
-**Still design-only / not implemented:** education institutions, academic periods, subjects, teachers, schedule import, lessons, tasks/subtasks, study sessions, reminders, and AI conversation/message persistence (Migration Groups 3–9). Their table/column designs and Eloquent relationships below remain approved intent, not implemented code.
+**Still design-only / not implemented:** schedule import, lessons, tasks/subtasks, study sessions, reminders, and AI conversation/message persistence (Migration Groups 4–9). Their table/column designs and Eloquent relationships below remain approved intent, not implemented code. Relationships from implemented models to these future models are also design-only.
 
-This slice implements persistence only. Planning-preference APIs, application lifecycle creation of preference rows, availability-overlap detection, and planning business features remain unimplemented; product defaults remain undecided.
+Groups 1–3 implement persistence only. Planning-preference and academic CRUD APIs, application lifecycle creation of preference rows, ownership validation Services, availability-overlap detection, and planning business features remain unimplemented; product defaults remain undecided. Same-owner compatibility between an academic period, subject, or teacher and its optional institution remains an application-level invariant: the approved simple foreign keys enforce institution existence, not matching ownership.
 
 The companion [DBML source](database-schema.dbml) preserves the supplied `student-ai-planner.dbml` diagram. It uses numeric shorthand and omits SQL CHECK expressions; the MySQL types and constraints below remain authoritative. See [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [the earlier draft review](database-review-notes.md) for context. Known implementation issues are recorded in section 8 without changing approved tables, columns, keys, or delete actions.
 
@@ -897,8 +900,8 @@ Recommended sequence:
 
 1. **Completed:** extend `users` with `timezone`;
 2. **Completed:** `planning_preferences`, `study_availability_windows`;
-3. **Next implementation slice (not implemented):** `education_institutions`, `academic_periods`, `subjects`, `teachers`;
-4. `schedule_import_batches`, `schedule_import_rows`;
+3. **Completed:** `education_institutions`, `academic_periods`, `subjects`, `teachers`;
+4. **Next implementation slice (not implemented):** `schedule_import_batches`, `schedule_import_rows`;
 5. `lessons`;
 6. `tasks`, `subtasks`;
 7. `study_sessions`;
@@ -916,9 +919,9 @@ Each group should include:
 
 ## 8. Implementation issues and gate
 
-Migration Groups 1–2 are implemented and verified; Groups 3–9 remain design-only. MySQL version support for the completed slice's enforced CHECK constraints has been verified. The minimum constraint-enforcement baseline is **MySQL >= 8.0.16**; the currently verified development/test server is **MySQL 8.4.10**, using the dedicated `student_planner_testing` database. The verified local version is not an exact production-version pin.
+Migration Groups 1–3 are implemented and verified; Groups 4–9 remain design-only. MySQL version support for the implemented groups' enforced CHECK constraints has been verified. The minimum constraint-enforcement baseline is **MySQL >= 8.0.16**; the currently verified development/test server is **MySQL 8.4.10**, using the dedicated `student_planner_testing` database. The verified local version is not an exact production-version pin.
 
-Completed-slice verification passed 38 focused tests, the full suite of 40 tests / 271 assertions, Pint, `git diff --check`, and rollback/reapply verification. These are the completed implementation's verification results, not tests rerun for this documentation update.
+The latest completed Groups 1–3 verification passed the Academic Context focused suite (50 tests / 411 assertions), Groups 1–2 regression suite (38 tests / 269 assertions), and full suite (90 tests / 686 assertions), with PHPUnit process exit code 0. Pint, `git diff --check`, and rollback/reapply verification also passed. These counts record the completed implementation's current verification, not permanent architectural requirements or tests rerun for this documentation update.
 
 The following issues remain unresolved and require explicit resolution before the later affected migration groups; this document preserves the approved checks and FK actions rather than silently selecting alternatives.
 
@@ -942,4 +945,4 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
 - Define product defaults and any conflict override policy in Stage 03; no defaults or override behavior are introduced here.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup.
 
-Review this specification, the [companion DBML](database-schema.dbml), and the recorded issues before each later migration slice. Groups 1–2 are complete; the next implementation slice is Group 3 (`education_institutions`, `academic_periods`, `subjects`, `teachers`), with focused MySQL tests and review before continuing. **This documentation synchronization creates no migrations, models, or application features and does not begin Group 3.**
+Review this specification, the [companion DBML](database-schema.dbml), and the recorded issues before each later migration slice. Groups 1–3 are complete; the next implementation slice is Group 4 (`schedule_import_batches`, `schedule_import_rows`), with focused MySQL tests and review before continuing. Deterministic fingerprint normalization/serialization remains unresolved before lesson/import commit behavior is implemented. **This documentation synchronization creates no migrations, models, or application features and does not begin Group 4.**

@@ -1,6 +1,6 @@
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
-Status: historical draft review; persistence decisions resolved by the approved Stage 02 design. The first approved persistence slice (Migration Groups 1–2) is now implemented.
+Status: historical draft review; persistence decisions resolved by the approved Stage 02 design. The first three approved persistence groups (Migration Groups 1–3) are now implemented.
 
 The canonical design is [database-schema.md](database-schema.md), with [database-schema.dbml](database-schema.dbml) as its diagram source. The earlier draft below is neither the approved design nor the current application schema. New MySQL implementation issues are recorded in the canonical schema's implementation gate and must be resolved before affected migrations.
 
@@ -8,9 +8,9 @@ The canonical design is [database-schema.md](database-schema.md), with [database
 
 The supplied Stage 01 review refers to an earlier SQL/ER draft, but no source SQL draft or ER image is present in this repository. Draft-specific observations below are carried forward from that review and remain unverified against the original artifacts. They describe possible design issues, not defects in the current migrations.
 
-The inspected repository contains the default Laravel users (including password-reset tokens and sessions), cache, and jobs migrations, plus Sanctum's `personal_access_tokens` migration. The first approved Stage 02 slice adds `users.timezone`, `planning_preferences`, and `study_availability_windows`, with Eloquent models/user relationships, factories, MySQL constraints, and migration/persistence tests. Later domain tables and relationships remain design-only. `.env.example` and `phpunit.xml` explicitly select MySQL; Laravel's SQLite fallback in `config/database.php` remains unchanged.
+The inspected repository contains the default Laravel users (including password-reset tokens and sessions), cache, and jobs migrations, plus Sanctum's `personal_access_tokens` migration. Stage 02 Groups 1–3 add `users.timezone`, `planning_preferences`, `study_availability_windows`, `education_institutions`, `academic_periods`, `subjects`, and `teachers`, with Eloquent models/user and institution relationships, factories, MySQL constraints, and migration/persistence tests. Groups 4–9 remain design-only; Group 4 (`schedule_import_batches`, `schedule_import_rows`) is next. Same-owner compatibility for optional institution references still requires application-level validation. `.env.example` and `phpunit.xml` explicitly select MySQL; Laravel's SQLite fallback in `config/database.php` remains unchanged.
 
-The earlier SQL/ER draft remains rejected and is retained here as historical context. The approved Stage 02 specification and DBML determine the persistence design; Groups 1–2 implement that approved design through additive migrations, preserving the existing scaffold migrations.
+The earlier SQL/ER draft remains rejected and is retained here as historical context. The approved Stage 02 specification and DBML determine the persistence design; Groups 1–3 implement that approved design through additive migrations, preserving the existing scaffold migrations.
 
 ## 1. Useful concepts already present
 

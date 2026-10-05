@@ -1,9 +1,9 @@
 # Conceptual Domain Model
 
 Status: conceptual model synchronized with the approved Stage 02 design\
-Important: this document defines **domain concepts and ownership**. The approved physical MySQL design and Eloquent relationship intent are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml), not duplicated here. Migration Groups 1–2 implement `users.timezone`, planning preferences, recurring availability windows, and their Eloquent relationships; remaining domain persistence is design-only.
+Important: this document defines **domain concepts and ownership**. The approved physical MySQL design and Eloquent relationship intent are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml), not duplicated here. Migration Groups 1–3 implement `users.timezone`, planning preferences, recurring availability windows, education institutions, academic periods, subjects, teachers, and their current Eloquent relationships; Groups 4–9 remain design-only.
 
-The implemented models are `User`, `PlanningPreference`, and `StudyAvailabilityWindow`; this slice provides persistence, not planning APIs or business Services. References below to an earlier SQL/ER draft come from the supplied Stage 01 review; that source draft is not present in this repository and its details have not been independently verified. See [database review notes](database-review-notes.md).
+The implemented models are `User`, `PlanningPreference`, `StudyAvailabilityWindow`, `EducationInstitution`, `AcademicPeriod`, `Subject`, and `Teacher`; Groups 1–3 provide persistence only. Academic/planning APIs and business Services, including same-owner validation of optional institution references, remain unimplemented. References below to an earlier SQL/ER draft come from the supplied Stage 01 review; that source draft is not present in this repository and its details have not been independently verified. See [database review notes](database-review-notes.md).
 
 ## 1. Domain boundaries
 
