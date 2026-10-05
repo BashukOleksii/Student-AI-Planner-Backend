@@ -31,6 +31,11 @@ class ScheduleImportBatch extends Model
         return $this->hasMany(ScheduleImportRow::class);
     }
 
+    public function lessons(): HasMany
+    {
+        return $this->hasMany(Lesson::class);
+    }
+
     protected function casts(): array
     {
         return [

@@ -30,6 +30,11 @@ class AcademicPeriod extends Model
         return $this->hasMany(ScheduleImportBatch::class);
     }
 
+    public function lessons(): HasMany
+    {
+        return $this->hasMany(Lesson::class);
+    }
+
     protected function casts(): array
     {
         return [

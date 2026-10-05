@@ -1,9 +1,9 @@
 # Conceptual Domain Model
 
 Status: conceptual model synchronized with the approved Stage 02 design\
-Important: this document defines **domain concepts and ownership**. The approved physical MySQL design and Eloquent relationship intent are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml), not duplicated here. Migration Groups 1–4 implement `users.timezone`, planning preferences, recurring availability windows, education institutions, academic periods, subjects, teachers, schedule import batches/rows, and their current Eloquent relationships; Groups 5–9 remain design-only, with Lessons next after resolving the documented implementation issues.
+Important: this document defines **domain concepts and ownership**. The approved physical MySQL design and Eloquent relationship intent are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml), not duplicated here. Migration Groups 1–5 implement `users.timezone`, planning preferences, recurring availability windows, education institutions, academic periods, subjects, teachers, schedule import batches/rows, Lessons, and their current Eloquent relationships; Groups 6–9 remain design-only, with Tasks/Subtasks next.
 
-The implemented models are `User`, `PlanningPreference`, `StudyAvailabilityWindow`, `EducationInstitution`, `AcademicPeriod`, `Subject`, `Teacher`, `ScheduleImportBatch`, and `ScheduleImportRow`; Groups 1–4 provide persistence only. Import-status PHP backed enums, JSON-array casts, and factories support persisted staging/history. Academic/planning/import APIs and business Services, including same-owner validation of optional institution references and import-period references, remain unimplemented. Excel parsing, normalization/fingerprint generation, preview/commit behavior, duplicate resolution, and Lesson creation remain future work. References below to an earlier SQL/ER draft come from the supplied Stage 01 review; that source draft is not present in this repository and its details have not been independently verified. See [database review notes](database-review-notes.md).
+The implemented models are `User`, `PlanningPreference`, `StudyAvailabilityWindow`, `EducationInstitution`, `AcademicPeriod`, `Subject`, `Teacher`, `ScheduleImportBatch`, `ScheduleImportRow`, and `Lesson`; Groups 1–5 provide persistence only. Import-status PHP backed enums, JSON-array casts, Lesson status/type enums, datetime casts, soft deletion, and factories support persisted staging/history and schedule occurrences. Academic/planning/import/schedule APIs and business Services, including same-owner validation of institution, import-period, and Lesson associations, remain unimplemented. Excel parsing, normalization/fingerprint generation, preview/commit behavior, duplicate resolution, and import-driven Lesson creation remain future work. References below to an earlier SQL/ER draft come from the supplied Stage 01 review; that source draft is not present in this repository and its details have not been independently verified. See [database review notes](database-review-notes.md).
 
 ## 1. Domain boundaries
 
@@ -35,13 +35,13 @@ A persisted, user-owned semester/academic-period boundary and explicit target fo
 ### Schedule
 
 **Lesson**  
-A concrete, user-owned scheduled occurrence with a subject, start/end time, type, and optional teacher/room metadata. Its lifecycle distinguishes active, cancelled, and replaced entries; normal deletion is soft deletion.
+A concrete, user-owned scheduled occurrence with a subject, start/end time, type, and optional teacher/room metadata. Its persistence model is implemented; schedule behavior remains future Service work. Its lifecycle distinguishes active, cancelled, and replaced entries; normal deletion is soft deletion.
 
 **Lesson Replacement / Schedule Change**  
-A replacement is another lesson linked to its original through the approved self-reference. The original becomes `replaced` and the replacement is `active`; both resolve to the same owner. Cancelled, replaced, and soft-deleted lessons do not block free time.
+A replacement is another lesson linked to its original through the approved self-reference. The database enforces original existence and at most one direct replacement. The future deterministic Service must prohibit self-replacement, validate same ownership, and transition the original to `replaced` and the replacement to `active`; none of that workflow is implemented yet. Cancelled, replaced, and soft-deleted lessons do not block free time under future schedule Services.
 
 **Schedule Import Batch**  
-A persisted process entity representing one Excel import attempt, its academic period, source-file identity, validation state, and commit history. Persisted import rows retain preview data and row-level errors. Imported lessons use deterministic SHA-256 identity from normalized subject identity/name and start/end instants; teacher, room, and type are excluded.
+A persisted process entity representing one Excel import attempt, its academic period, source-file identity, validation state, and commit history. Persisted import rows retain preview data and row-level errors. The fixed imported Lesson fingerprint contract uses the resolved persisted Subject ID and UTC whole-second start/end instants in an ordered JSON array, hashed to lowercase SHA-256; subject name/code, teacher, room, and type are excluded. Fingerprint generation and import commit remain unimplemented; see [the exact contract](database-schema.md#fixed-v1-import-fingerprint-contract).
 
 ### Tasks
 
@@ -214,4 +214,4 @@ Planning runs, generated report history, and reminder-delivery history are also 
 
 The former Stage 02 ownership, academic-period, target-reference, replacement, enum, and deletion/history questions are resolved by [the approved physical schema](database-schema.md). Its implementation issues section records MySQL constraint enforcement questions without reopening those domain decisions.
 
-Stage 03 still needs to define product defaults for study hours, breaks, and session bounds; conflict handling/override policy; and the exact normalization/serialization of the approved fingerprint identity. No domain migrations or application behavior are introduced by this documentation.
+Stage 03 still needs to define product defaults for study hours, breaks, and session bounds, and conflict handling/override policy. The V1 fingerprint normalization/serialization contract is fixed; its generator and import behavior remain future implementation work. Groups 1–5 implement persistence only.

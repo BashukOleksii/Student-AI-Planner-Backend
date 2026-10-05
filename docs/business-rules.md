@@ -1,7 +1,7 @@
 # Business Rules
 
 Status: baseline synchronized with the approved Stage 02 design\
-Rule IDs are stable references for implementation and tests. Physical persistence details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–4 implement `users.timezone`, typed planning preferences, recurring availability windows, education institutions, academic periods, subjects, teachers, schedule import batches/rows, their current Eloquent relationships, import-status PHP backed enums, MySQL constraints, factories, and persistence tests. Groups 5–9 persistence remains design-only, with Lessons next after resolving the documented implementation issues. Academic/planning/import API and business capabilities are not yet implemented: persisted import staging does not provide Excel parsing, normalization/fingerprint generation, preview/validation/commit Services, duplicate resolution, or Lesson creation. Same-owner compatibility for optional institution references and import-period references (BR-IMP-005) remains an application-level invariant; its validation Service is not yet implemented.
+Rule IDs are stable references for implementation and tests. Physical persistence details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–5 implement `users.timezone`, typed planning preferences, recurring availability windows, education institutions, academic periods, subjects, teachers, schedule import batches/rows, Lessons with soft deletion, their current Eloquent relationships, import/Lesson PHP backed enums, MySQL constraints, factories, and persistence tests. Groups 6–9 persistence remains design-only, with Tasks/Subtasks next. Academic/planning/import/schedule APIs and business capabilities are not yet implemented: persisted staging and Lessons do not provide Excel parsing, normalization/fingerprint generation, preview/validation/commit Services, duplicate resolution, or import-driven Lesson creation. Same-owner compatibility for optional institution references, import-period references (BR-IMP-005), and Lesson associations remains an application-level invariant. Self-replacement prohibition and replacement lifecycle transitions also await deterministic Services; MySQL cannot enforce the self-replacement CHECK with the approved schema.
 
 These are intended requirements, not a claim that the backend implements all of them. References to "V1" mean the initial product release, not an implemented `/api/v1` route prefix. Deterministic rules must be shared by REST and AI-tool entry points through application Services. Preserve rule IDs when refining requirements so implementation and tests can trace them.
 
@@ -43,7 +43,11 @@ The replacement lesson references the original through `replaces_lesson_id`. Bot
 Overlapping effective lessons are detected by a Service. Manual creation/import must return a conflict result rather than silently accepting inconsistent scheduling.
 
 **BR-SCH-006 — Duplicate detection**  
-Imported lessons use a deterministic SHA-256 fingerprint based on normalized subject identity/name and the lesson's UTC start/end instants. Teacher, room, and lesson type are excluded because changes can update the same occurrence. Imported duplicate identity is scoped to user and academic period. Exact normalization/serialization remains implementation work; manual-entry duplicate handling is a Stage 03 decision.
+Imported lessons use the resolved persisted Subject database ID only, expressed as a positive ASCII decimal string without leading zeros or floating-point conversion, and the lesson's UTC start/end instants. Subject names/codes, teacher, room, and lesson type are excluded. Subject resolution is a separate importer responsibility; fingerprinting requires no text normalization. Re-importing the same Subject ID and interval preserves identity across subject renames.
+
+Serialize times explicitly in UTC as `YYYY-MM-DDTHH:MM:SSZ`, with whole-second precision and no fractional seconds, independent of PHP/server default timezone; persisted lesson DATETIME values represent UTC. Canonical serialization is an ordered JSON array of exactly three strings `[subject_id, starts_at_utc, ends_at_utc]`, encoded with `JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE`, without pretty printing, BOM, or trailing newline. `hash('sha256', canonical_serialization, false)` produces lowercase 64-character hexadecimal SHA-256. The verified example is recorded in [database-schema.md §3.10](database-schema.md#fixed-v1-import-fingerprint-contract).
+
+Imported duplicate identity is scoped to `(user_id, academic_period_id, import_fingerprint)`. The database requires a period for a non-NULL fingerprint and retains fingerprint uniqueness after soft deletion. The contract is fixed; fingerprint generation and import commit Services are not implemented. Manual-entry duplicate handling remains a Stage 03 decision.
 
 **BR-SCH-007 — Schedule views**  
 Today's, a specific date's, and a week's schedule are calculated using the user's timezone and return only effective schedule entries for the requested range.
@@ -300,7 +304,6 @@ Stage 02 status, priority, targeting, effort, deletion/history, and fingerprint 
 
 - default study-window and break values;
 - minimum/maximum study-session duration;
-- exact normalization/serialization of the approved duplicate fingerprint identity;
 - manual schedule-entry duplicate handling;
 - whether schedule conflict blocks saving or can be force-confirmed;
 - later requirements for report-history retention (no V1 report-history table).

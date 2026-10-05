@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['user_id', 'education_institution_id', 'name', 'code', 'color'])]
 class Subject extends Model
@@ -22,5 +23,10 @@ class Subject extends Model
     public function educationInstitution(): BelongsTo
     {
         return $this->belongsTo(EducationInstitution::class);
+    }
+
+    public function lessons(): HasMany
+    {
+        return $this->hasMany(Lesson::class);
     }
 }
