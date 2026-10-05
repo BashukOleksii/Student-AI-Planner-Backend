@@ -1,10 +1,10 @@
 # Physical Database Schema
 
-Status: **approved Stage 02 design; Migration Groups 1–5 implemented**\
+Status: **Migration Groups 1–9 implemented; Stage 02 persistence complete**\
 Scope: Laravel backend + MySQL + Eloquent\
-Important: this is the canonical repository adaptation of the approved `stage-02-database-schema-spec.md`. The first five approved persistence groups are implemented alongside the Laravel/Sanctum scaffold; Groups 6–9 remain design-only.
+Important: this is the canonical repository adaptation of the approved `stage-02-database-schema-spec.md`. All nine approved persistence groups are implemented alongside the Laravel/Sanctum scaffold. The MySQL enforcement decisions below preserve the approved tables, columns, keys, and delete actions.
 
-**Implemented now (Migration Groups 1–5):**
+**Implemented now (Migration Groups 1–9):**
 
 - `users.timezone`;
 - `planning_preferences` and `study_availability_windows`;
@@ -15,12 +15,16 @@ Important: this is the canonical repository adaptation of the approved `stage-02
 - `User::educationInstitutions()`, `User::academicPeriods()`, `User::subjects()`, and `User::teachers()`; `EducationInstitution::academicPeriods()`, `EducationInstitution::subjects()`, and `EducationInstitution::teachers()` are also implemented as `hasMany` relationships;
 - `ScheduleImportBatch::user()`, `ScheduleImportBatch::academicPeriod()`, and `ScheduleImportBatch::rows()`; `ScheduleImportRow::scheduleImportBatch()`; `User::scheduleImportBatches()` and `AcademicPeriod::scheduleImportBatches()`; batch status/datetime/counter casts and row status/JSON-array casts;
 - `lessons`, the `Lesson` model with `SoftDeletes`, `LessonStatus` / `LessonType` enum casts, UTC datetime fields, and relationships to its user, period, subject, teacher, import batch, original, and replacement; `User`, `AcademicPeriod`, `Subject`, `Teacher`, and `ScheduleImportBatch` each expose `lessons()`;
-- the approved primary/foreign keys, indexes, uniqueness constraints, owner cascade deletes, optional institution `SET NULL` deletes, and eighteen enforced MySQL CHECK constraints across the nine domain tables; Group 3 adds `academic_periods_valid_date_range` and `subjects_valid_color`, while teacher names use a non-unique index; Group 4 adds an academic-period `RESTRICT` FK, batch-to-row cascade deletes, and the named status/positive-row-number checks below; Group 5 adds four supported Lesson checks, historical `RESTRICT` references, nullable `SET NULL` references, and replacement/import uniqueness;
-- factories and focused MySQL-backed `PlanningPersistenceTest`, `AcademicContextPersistenceTest`, `ScheduleImportPersistenceTest`, and `LessonPersistenceTest`; the batch factory derives its owner from its period, and the Lesson factory creates a manual lesson with a subject owned by the same user. Row fixtures contain representative JSON without defining an importer contract. `PlanningMigrationTest` dynamically rolls back and reapplies domain migrations while preserving the four scaffold migrations and existing users, now explicitly covering Groups 1–5 and later additive groups.
+- `tasks` and `subtasks`, with `TaskStatus`, integer-backed `TaskPriority`, completion/estimate/position constraints, soft deletion, and parent/subject/session/reminder relationships;
+- `study_sessions`, with `StudySessionStatus`, completion/actual-effort constraints, nullable subtask and predecessor relationships, one direct successor per predecessor, and lifecycle history without soft deletion;
+- `reminders`, with `ReminderStatus`, nullable `ReminderAnchor`, signed offsets, explicit target relationships, and the four DB-safe checks below;
+- `ai_conversations` and `ai_messages`, with `AiMessageRole`, JSON-array tool-call metadata, and conversation/message cascades; messages automatically write `created_at` and have no `updated_at`;
+- the approved primary/foreign keys, indexes, uniqueness constraints, owner cascade deletes, optional `SET NULL` deletes, and thirty-six enforced MySQL CHECK constraints across fifteen domain tables; historical Lesson/import `RESTRICT` references remain unchanged. Unsupported self-reference and reminder target checks are assigned explicitly to future deterministic Services;
+- factories and focused MySQL-backed `PlanningPersistenceTest`, `AcademicContextPersistenceTest`, `ScheduleImportPersistenceTest`, `LessonPersistenceTest`, `TaskPersistenceTest`, `StudySessionPersistenceTest`, `ReminderPersistenceTest`, and `AiPersistenceTest`. Factory defaults are valid and ownership-consistent; the StudySession factory derives its owner from its Task. Import/AI JSON fixtures do not define future processing protocols. `PlanningMigrationTest` dynamically rolls back and reapplies domain migrations while preserving the four scaffold migrations and existing users, explicitly covering all Groups 1–9 without a fixed rollback count.
 
-**Still design-only / not implemented:** tasks/subtasks, study sessions, reminders, and AI conversation/message persistence (Migration Groups 6–9). Their table/column designs and Eloquent relationships below remain approved intent, not implemented code. Relationships from implemented models to these future models are also design-only.
+**Persistence complete; application behavior not implemented:** REST APIs, Policies, deterministic Services, planning/free-time/conflict algorithms, reminder delivery, statistics, AI orchestration/tools, and import parsing/commit. Persisted lifecycle states and relationships do not implement those workflows.
 
-Groups 1–5 implement persistence only. Planning-preference, academic, and Lesson CRUD APIs, application lifecycle creation of preference rows, ownership validation Services, availability-overlap detection, and schedule/planning business features remain unimplemented; product defaults remain undecided. Import staging exists, but Excel parsing, uploads/file storage, preview endpoints, validation/commit Services, duplicate resolution, fingerprint generation, and import-driven Lesson creation remain unimplemented. Same-owner compatibility for optional institution references, import-period references (BR-IMP-005), and all Lesson associations remains an application-level invariant: the approved simple foreign keys enforce existence, not matching ownership. Self-replacement prohibition and replacement lifecycle transitions also await deterministic Services.
+Groups 1–9 implement persistence only. Application lifecycle creation of preference rows, ownership validation, availability-overlap detection, task deletion cleanup, rescheduling, and reminder target validation/recalculation remain unimplemented; product defaults remain undecided. Import staging exists, but Excel parsing, uploads/file storage, preview endpoints, validation/commit Services, duplicate resolution, fingerprint generation, and import-driven Lesson creation remain unimplemented. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. Self-replacement/self-rescheduling prohibitions and lifecycle transitions await deterministic Services.
 
 The companion [DBML source](database-schema.dbml) preserves the supplied `student-ai-planner.dbml` diagram. It uses numeric shorthand and omits SQL CHECK expressions; the MySQL types and constraints below remain authoritative. See [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [the earlier draft review](database-review-notes.md) for context. Known implementation issues are recorded in section 8 without changing approved tables, columns, keys, or delete actions.
 
@@ -73,7 +77,7 @@ Stored as `VARCHAR(20)`:
 - `cancelled`
 - `replaced`
 
-### TaskStatus / SubtaskStatus
+### TaskStatus (shared by Task and Subtask)
 Stored as `VARCHAR(20)`:
 
 - `pending`
@@ -573,7 +577,7 @@ The contract is fixed; fingerprint generation, subject resolution, duplicate res
 
 ### 3.11 tasks
 
-User-owned academic work.
+Implemented persistence for user-owned academic work; task workflows remain future Service work.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -601,14 +605,12 @@ FK:
 - `user_id -> users.id ON DELETE CASCADE`;
 - `subject_id -> subjects.id ON DELETE SET NULL`.
 
-Checks:
+DB-enforced CHECKs:
 
-- status in approved task states;
-- `priority BETWEEN 1 AND 3`;
-- `estimated_minutes IS NULL OR estimated_minutes > 0`;
-- completion-state consistency:
-  - completed => `completed_at IS NOT NULL`;
-  - pending => `completed_at IS NULL`.
+- `tasks_valid_status`: `status IN ('pending', 'completed')`;
+- `tasks_valid_priority`: `priority BETWEEN 1 AND 3`;
+- `tasks_positive_estimate`: `estimated_minutes IS NULL OR estimated_minutes > 0`;
+- `tasks_completion_consistency`: `(status = 'completed' AND completed_at IS NOT NULL) OR (status = 'pending' AND completed_at IS NULL)`.
 
 Indexes:
 
@@ -619,7 +621,7 @@ Derived:
 
 - `overdue = status != completed AND deadline_at < now`.
 
-Delete behavior:
+Future Task/Reminder Service deletion behavior (not implemented by model soft deletion):
 
 - application-level task deletion is soft delete;
 - subtasks are soft deleted by the Task service;
@@ -639,7 +641,7 @@ Eloquent:
 
 ### 3.12 subtasks
 
-Ordered decomposition of a task.
+Implemented persistence for ordered decomposition of a task.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -664,12 +666,12 @@ FK:
 
 - `task_id -> tasks.id ON DELETE CASCADE`.
 
-Checks:
+DB-enforced CHECKs:
 
-- `position > 0`;
-- approved task/subtask status;
-- positive estimate when configured;
-- completion-state consistency.
+- `subtasks_positive_position`: `position > 0`;
+- `subtasks_valid_status`: `status IN ('pending', 'completed')`;
+- `subtasks_positive_estimate`: `estimated_minutes IS NULL OR estimated_minutes > 0`;
+- `subtasks_completion_consistency`: `(status = 'completed' AND completed_at IS NOT NULL) OR (status = 'pending' AND completed_at IS NULL)`.
 
 Indexes:
 
@@ -693,7 +695,7 @@ Eloquent:
 
 ### 3.13 study_sessions
 
-Concrete reserved study block.
+Implemented persistence for a concrete reserved study block; planning and rescheduling Services remain unimplemented. No soft deletes.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -721,14 +723,15 @@ FK:
 - `subtask_id -> subtasks.id ON DELETE SET NULL`;
 - `rescheduled_from_session_id -> study_sessions.id ON DELETE SET NULL`.
 
-Checks:
+DB-enforced CHECKs:
 
-- `starts_at < ends_at`;
-- approved study-session status;
-- `actual_minutes IS NULL OR actual_minutes > 0`;
-- `status = 'completed'` iff `completed_at IS NOT NULL`;
-- `actual_minutes IS NULL OR status = 'completed'`;
-- `rescheduled_from_session_id IS NULL OR rescheduled_from_session_id <> id`.
+- `study_sessions_valid_interval`: `starts_at < ends_at`;
+- `study_sessions_valid_status`: `status IN ('planned', 'completed', 'missed', 'rescheduled', 'cancelled')`;
+- `study_sessions_positive_actual_minutes`: `actual_minutes IS NULL OR actual_minutes > 0`;
+- `study_sessions_completion_consistency`: `(status = 'completed' AND completed_at IS NOT NULL) OR (status <> 'completed' AND completed_at IS NULL)`;
+- `study_sessions_actual_requires_completion`: `actual_minutes IS NULL OR status = 'completed'`.
+
+The self-rescheduling CHECK is intentionally omitted: MySQL prohibits the AUTO_INCREMENT comparison and CHECKs involving the self-FK's `SET NULL` action (3818/3823). There is no trigger or generated-column workaround. The FK enforces predecessor existence and `UNIQUE(rescheduled_from_session_id)` enforces at most one direct successor; multiple NULL predecessors are allowed. Self-reference remains physically possible but is invalid domain data.
 
 Indexes:
 
@@ -739,6 +742,7 @@ Indexes:
 
 Service invariants:
 
+- self-rescheduling is forbidden;
 - if `subtask_id` is set, that subtask must belong to `task_id`;
 - task, subtask and session must resolve to the same owner;
 - sessions may not overlap active lessons or other blocking study sessions;
@@ -756,15 +760,15 @@ Eloquent:
 - `belongsTo(User::class)`
 - `belongsTo(Task::class)`
 - `belongsTo(Subtask::class)`
-- `belongsTo(StudySession::class, 'rescheduled_from_session_id')`
-- `hasOne(StudySession::class, 'rescheduled_from_session_id')`
+- `belongsTo(StudySession::class, 'rescheduled_from_session_id')` as `rescheduledFromSession`
+- `hasOne(StudySession::class, 'rescheduled_from_session_id')` as `rescheduledToSession`
 - `hasMany(Reminder::class)`
 
 ---
 
 ### 3.14 reminders
 
-Reminder with an optional typed domain target.
+Implemented reminder persistence with optional typed domain targets; target validation, trigger recalculation, and delivery remain unimplemented.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -793,18 +797,22 @@ FK:
 - `subtask_id -> subtasks.id ON DELETE SET NULL`;
 - `study_session_id -> study_sessions.id ON DELETE SET NULL`.
 
-Checks:
+DB-enforced CHECKs (none reference SET NULL target columns):
 
-- approved reminder status;
-- at most one of `task_id`, `subtask_id`, `study_session_id` is non-null;
-- `anchor` and `offset_minutes` are either both null or both non-null;
-- anchor target compatibility:
-  - `task_deadline` requires `task_id`;
-  - `subtask_deadline` requires `subtask_id`;
-  - `session_start` requires `study_session_id`;
-- sent-state consistency:
-  - sent => `sent_at IS NOT NULL`;
-  - non-sent => `sent_at IS NULL`.
+- `reminders_valid_status`: `status IN ('scheduled', 'sent', 'cancelled')`;
+- `reminders_valid_anchor`: `anchor IS NULL OR anchor IN ('task_deadline', 'subtask_deadline', 'session_start')`;
+- `reminders_anchor_offset_pair`: `(anchor IS NULL AND offset_minutes IS NULL) OR (anchor IS NOT NULL AND offset_minutes IS NOT NULL)`;
+- `reminders_sent_consistency`: `(status = 'sent' AND sent_at IS NOT NULL) OR (status IN ('scheduled', 'cancelled') AND sent_at IS NULL)`.
+
+Future Reminder Service invariants:
+
+- at most one of `task_id`, `subtask_id`, `study_session_id` is non-NULL;
+- `task_deadline`, `subtask_deadline`, and `session_start` require their matching target;
+- all targets belong to the reminder's user;
+- trigger recalculation follows anchor/offset and target changes;
+- reconcile targets, relative metadata, and lifecycle before hard purge.
+
+MySQL rejects CHECKs involving these `ON DELETE SET NULL` FK columns (3823), so target count and compatibility are intentionally application-level rules. Tests demonstrate that multiple targets, mismatched anchors, and cross-owner references are physically permitted but invalid domain data. Target hard deletion clears its FK and leaves anchor/offset metadata unchanged; the future Service must reconcile that metadata. No trigger is used.
 
 Offset semantics:
 
@@ -881,7 +889,7 @@ Eloquent:
 
 - `belongsTo(AiConversation::class)`.
 
-Messages are treated as append-oriented records; `updated_at` is not required.
+Messages are treated as append-oriented records; `updated_at` is absent. `AiMessage::UPDATED_AT = null` keeps automatic `created_at` support without writing an update timestamp. Role casts to `AiMessageRole`, tool calls to array, and creation time to datetime. Append-oriented usage is a future application convention, not database immutability; Eloquent updates remain schema-compatible. No soft deletes.
 
 ## 4. Delete behavior matrix
 
@@ -949,10 +957,10 @@ Recommended sequence:
 3. **Completed:** `education_institutions`, `academic_periods`, `subjects`, `teachers`;
 4. **Completed:** `schedule_import_batches`, `schedule_import_rows` (persistence only);
 5. **Completed:** `lessons` (persistence only);
-6. **Next implementation slice (not implemented):** `tasks`, `subtasks`;
-7. `study_sessions`;
-8. `reminders`;
-9. `ai_conversations`, `ai_messages`.
+6. **Completed:** `tasks`, `subtasks`;
+7. **Completed:** `study_sessions`;
+8. **Completed:** `reminders`;
+9. **Completed:** `ai_conversations`, `ai_messages`.
 
 Each group should include:
 
@@ -965,30 +973,35 @@ Each group should include:
 
 ## 8. Implementation issues and gate
 
-Migration Groups 1–5 are implemented and verified; Groups 6–9 remain design-only. MySQL version support for the implemented groups' enforced CHECK constraints has been verified. The minimum constraint-enforcement baseline is **MySQL >= 8.0.16**; the currently verified development/test server is **MySQL 8.4.10**, using the dedicated `student_planner_testing` database. The verified local version is not an exact production-version pin.
+Migration Groups 1–9 are implemented and verified; Stage 02 persistence is complete. MySQL constraint support has been verified, and the unsupported checks have explicit application-level enforcement decisions rather than unresolved migration blockers. The minimum constraint-enforcement baseline is **MySQL >= 8.0.16**; the currently verified development/test server is **MySQL 8.4.10**, using the dedicated `student_planner_testing` database. The verified local version is not an exact production-version pin.
 
-The latest completed Groups 1–5 verification passed the Lesson focused suite (51 tests / 461 assertions), the combined Schedule Import/Academic Context/Planning persistence and migration regression suite (134 tests / 1,040 assertions), and the full suite (187 tests / 1,507 assertions), each with PHPUnit process exit code 0. Pint verification, `git diff --check`, and rollback/reapply verification also passed. These counts record current implementation verification, not permanent architectural requirements.
+The latest completed Groups 1–9 verification passed the new Task/StudySession/Reminder/AI focused suites (100 tests / 1,052 assertions), the combined Lesson/Schedule Import/Academic Context/Planning persistence and migration regression suite (185 tests / 1,513 assertions), and the full suite (287 tests / 2,571 assertions), each with PHPUnit process exit code 0. Pint verification, `git diff --check`, and full domain rollback/reapply verification also passed. These counts record current implementation verification, not permanent architectural requirements.
 
-The Lesson design gate resolved its CHECK and fingerprint questions explicitly. Remaining issues require resolution before the later affected migration groups; approved FK actions are preserved.
+All Stage 02 migration enforcement decisions are resolved. Approved FK actions are preserved, with future deterministic Services responsible for the cross-row invariants below. Services and lifecycle workflows are not implemented by these persistence models.
 
 ### 8.1 Self-reference CHECK restrictions
 
-MySQL prohibits CHECK expressions referencing an `AUTO_INCREMENT` column. The Lesson design gate confirmed error 3818 on MySQL 8.4.10; Group 5 deliberately omits the self-replacement CHECK and assigns the prohibition to a future deterministic Service. The physical schema permits self-reference, an invalid domain state explicitly demonstrated by the persistence test. The analogous `study_sessions.rescheduled_from_session_id <> id` enforcement decision remains unresolved before Group 7. [MySQL CHECK constraint restrictions](https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html).
+MySQL prohibits CHECK expressions referencing an `AUTO_INCREMENT` column. The Lesson design gate confirmed error 3818 on MySQL 8.4.10; Lessons and StudySessions deliberately omit self-comparison CHECKs and assign self-replacement/self-rescheduling prohibitions to future deterministic Services. Persistence tests explicitly demonstrate physically permitted self-reference as invalid domain data. FKs enforce referenced existence, and unique references enforce one direct replacement/successor. No triggers or generated-column workarounds are used. [MySQL CHECK constraint restrictions](https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html).
 
 ### 8.2 CHECK constraints and referential actions
 
-The Lesson design gate independently confirmed error 3823 for a CHECK involving the self-FK column with `ON DELETE SET NULL`. The self FK remains unchanged and self-replacement validation belongs to the future Service. The lesson import-period CHECK is supported with its `RESTRICT` FK and is now enforced as `lessons_import_requires_period`. The analogous study-session self-reference and reminder target/anchor checks involving `SET NULL` still need explicit resolution before their migration groups. [MySQL CHECK constraint restrictions](https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html).
+The Lesson design gate independently confirmed error 3823 for a CHECK involving a FK column with `ON DELETE SET NULL`. Lesson and StudySession self FKs remain unchanged. Reminder CHECKs do not reference target FKs: MySQL enforces status, nullable anchor vocabulary, anchor/offset pairing, and sent-state consistency. Target count, anchor/target compatibility, ownership, recalculation, and purge reconciliation belong to a future Reminder Service. The lesson import-period CHECK is supported with its `RESTRICT` FK and remains enforced as `lessons_import_requires_period`. [MySQL CHECK constraint restrictions](https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html).
 
-Independently of SQL support, nulling a relative reminder's target would leave its persisted anchor incompatible with that target. Hard-purge behavior must reconcile the anchor/offset and reminder lifecycle before target deletion; no alternative policy is selected here.
+Nulling a relative reminder's target leaves its persisted anchor/offset unchanged. Tests confirm this behavior; future hard-purge code must reconcile the relative metadata and reminder lifecycle before deleting the target. Database persistence is not a substitute for that application cleanup.
+
+| Area | Database enforcement | Future deterministic Service enforcement |
+|---|---|---|
+| StudySession | interval, status, completion consistency, positive actual minutes only when completed, FK existence/actions, unique predecessor | self-rescheduling prohibition, task/subtask compatibility, ownership, overlaps, deadlines, lifecycle transition |
+| Reminder | status, nullable anchor vocabulary, anchor/offset pairing, sent-state consistency, FK existence/actions | max one target, target/anchor compatibility, ownership, trigger recalculation, hard-purge reconciliation |
 
 ### 8.3 Diagram representation
 
 The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, with some unsigned attributes expressed only in notes. All keys and unsigned numeric values must follow the exact Markdown types, including unsigned `day_of_week` and signed `reminders.offset_minutes`. The diagram does not encode all CHECK expressions or Service invariants and must not be treated as a complete executable migration source.
 
-### 8.4 Remaining implementation questions
+### 8.4 Remaining application work and product decisions
 
 - Implement fingerprint generation and import commit later using the fixed contract in section 3.10; normalization/serialization is no longer an unresolved design question. Groups 4–5 store fingerprints without generating them.
 - Define product defaults and any conflict override policy in Stage 03; no defaults or override behavior are introduced here.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup. Group 4 tests on MySQL 8.4.10 show that directly deleting a User who owns both a period and its import batch is rejected with error 1451 by `schedule_import_batches_academic_period_id_foreign`. Group 5 confirms that an isolated User/Subject/manual-Lesson graph can cascade, while a combined period/batch/Lesson history graph blocks direct User deletion with 1451. Hard-removing Lessons first still leaves the batch/period restriction; deleting batches next cascades their rows and then permits User deletion. Soft deletion does not remove restrictive references. Account hard purge is an ordered administrative operation, distinct from normal domain deletion; the approved FKs are unchanged.
 
-Review this specification, the [companion DBML](database-schema.dbml), and the recorded issues before each later migration slice. Groups 1–5 persistence is complete; the next implementation slice is Group 6 (`tasks`, `subtasks`). Schedule/Lesson APIs and Services, import parsing, preview APIs, commit behavior, fingerprint generation, duplicate resolution, and import-driven Lesson creation remain unimplemented.
+Stage 02 persistence is complete through Groups 1–9. Stage 03 application implementation must add authenticated/authorized APIs and deterministic Services over these models, including task deletion orchestration, ownership validation, planning/conflicts, and reminder cleanup. Import parsing/preview/commit, fingerprint generation, duplicate resolution, delivery, statistics, and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.

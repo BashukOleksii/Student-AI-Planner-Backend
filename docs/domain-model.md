@@ -1,9 +1,11 @@
 # Conceptual Domain Model
 
 Status: conceptual model synchronized with the approved Stage 02 design\
-Important: this document defines **domain concepts and ownership**. The approved physical MySQL design and Eloquent relationship intent are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml), not duplicated here. Migration Groups 1–5 implement `users.timezone`, planning preferences, recurring availability windows, education institutions, academic periods, subjects, teachers, schedule import batches/rows, Lessons, and their current Eloquent relationships; Groups 6–9 remain design-only, with Tasks/Subtasks next.
+Important: this document defines **domain concepts and ownership**. The approved physical MySQL design and implemented Eloquent relationships are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml), not duplicated here. Migration Groups 1–9 are implemented; Stage 02 persistence is complete.
 
-The implemented models are `User`, `PlanningPreference`, `StudyAvailabilityWindow`, `EducationInstitution`, `AcademicPeriod`, `Subject`, `Teacher`, `ScheduleImportBatch`, `ScheduleImportRow`, and `Lesson`; Groups 1–5 provide persistence only. Import-status PHP backed enums, JSON-array casts, Lesson status/type enums, datetime casts, soft deletion, and factories support persisted staging/history and schedule occurrences. Academic/planning/import/schedule APIs and business Services, including same-owner validation of institution, import-period, and Lesson associations, remain unimplemented. Excel parsing, normalization/fingerprint generation, preview/commit behavior, duplicate resolution, and import-driven Lesson creation remain future work. References below to an earlier SQL/ER draft come from the supplied Stage 01 review; that source draft is not present in this repository and its details have not been independently verified. See [database review notes](database-review-notes.md).
+Implemented models are `User`, `PlanningPreference`, `StudyAvailabilityWindow`, `EducationInstitution`, `AcademicPeriod`, `Subject`, `Teacher`, `ScheduleImportBatch`, `ScheduleImportRow`, `Lesson`, `Task`, `Subtask`, `StudySession`, `Reminder`, `AiConversation`, and `AiMessage`. PHP backed enums, scalar/date/datetime/JSON-array casts, factories, and MySQL-backed persistence tests support all groups. Lessons, tasks, and subtasks use soft deletion; sessions/reminders retain lifecycle states; AI messages have `created_at` without `updated_at`.
+
+Persistence does not implement REST APIs, Policies, deterministic Services, ownership validation, planning/free-time/conflict algorithms, reminder delivery, statistics, or AI orchestration/tools. Excel parsing, fingerprint generation, preview/commit behavior, and duplicate resolution remain future work. Self-replacement/self-rescheduling and Reminder target compatibility are explicit future Service invariants, not unsupported DB CHECKs. References below to an earlier SQL/ER draft are historical Stage 01 review context; its source is not present in the repository. See [database review notes](database-review-notes.md).
 
 ## 1. Domain boundaries
 
@@ -190,7 +192,7 @@ Persisted states are `scheduled`, `sent`, and `cancelled`. Sent reminders retain
 
 ### Deletion and history
 
-Lessons, tasks, and subtasks use soft deletion. Deleting a task also soft-deletes its subtasks and cancels affected future planned sessions, while completed/missed/rescheduled history remains. Scheduled reminders targeting that task are cancelled or removed by the Reminder service. Study sessions retain history through lifecycle states.
+Lessons, tasks, and subtasks use soft deletion. The future Task Service must soft-delete subtasks, cancel affected future planned sessions, preserve completed/missed/rescheduled history, and cancel/remove scheduled reminders through Reminder cleanup. Model soft deletion alone does not implement that orchestration. Study sessions retain history through lifecycle states.
 
 Teacher removal may clear lesson teacher references. Subjects referenced by lessons cannot be hard-deleted; task subject references may become null. Academic periods with schedule/import history are protected. Normal domain deletion is distinct from administrative/account hard purges; the physical schema records the approved FK actions.
 
@@ -212,6 +214,6 @@ Planning runs, generated report history, and reminder-delivery history are also 
 
 ## 7. Resolved design and remaining work
 
-The former Stage 02 ownership, academic-period, target-reference, replacement, enum, and deletion/history questions are resolved by [the approved physical schema](database-schema.md). Its implementation issues section records MySQL constraint enforcement questions without reopening those domain decisions.
+The former Stage 02 ownership, academic-period, target-reference, replacement, enum, and deletion/history questions are resolved by [the approved physical schema](database-schema.md). Its implementation gate records the resolved DB-versus-Service enforcement decisions without reopening those domain decisions.
 
-Stage 03 still needs to define product defaults for study hours, breaks, and session bounds, and conflict handling/override policy. The V1 fingerprint normalization/serialization contract is fixed; its generator and import behavior remain future implementation work. Groups 1–5 implement persistence only.
+Stage 03 still needs to define product defaults for study hours, breaks, and session bounds, and conflict handling/override policy. The V1 fingerprint normalization/serialization contract is fixed; its generator and import behavior remain future implementation work. Groups 1–9 complete persistence only; application behavior remains unimplemented.

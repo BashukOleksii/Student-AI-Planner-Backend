@@ -1,7 +1,9 @@
 # Business Rules
 
 Status: baseline synchronized with the approved Stage 02 design\
-Rule IDs are stable references for implementation and tests. Physical persistence details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–5 implement `users.timezone`, typed planning preferences, recurring availability windows, education institutions, academic periods, subjects, teachers, schedule import batches/rows, Lessons with soft deletion, their current Eloquent relationships, import/Lesson PHP backed enums, MySQL constraints, factories, and persistence tests. Groups 6–9 persistence remains design-only, with Tasks/Subtasks next. Academic/planning/import/schedule APIs and business capabilities are not yet implemented: persisted staging and Lessons do not provide Excel parsing, normalization/fingerprint generation, preview/validation/commit Services, duplicate resolution, or import-driven Lesson creation. Same-owner compatibility for optional institution references, import-period references (BR-IMP-005), and Lesson associations remains an application-level invariant. Self-replacement prohibition and replacement lifecycle transitions also await deterministic Services; MySQL cannot enforce the self-replacement CHECK with the approved schema.
+Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Persistence does not implement REST APIs, Policies, deterministic Services, planning, reminder delivery, statistics, AI orchestration/tools, or import parsing/preview/commit/fingerprint generation.
+
+Same-owner compatibility, task/subtask consistency, self-replacement/self-rescheduling prohibition, lifecycle transitions, deadlines/overlaps, task deletion cleanup, and Reminder target count/compatibility/recalculation/purge reconciliation remain future Service requirements. MySQL enforces supported scalar/timestamp CHECKs, FK existence/actions, and approved uniqueness; it does not enforce cross-row ownership or checks prohibited by AUTO_INCREMENT/SET NULL restrictions.
 
 These are intended requirements, not a claim that the backend implements all of them. References to "V1" mean the initial product release, not an implemented `/api/v1` route prefix. Deterministic rules must be shared by REST and AI-tool entry points through application Services. Preserve rule IDs when refining requirements so implementation and tests can trace them.
 
@@ -227,7 +229,7 @@ A newly created scheduled reminder should have a future trigger unless the use c
 Retries must not intentionally produce duplicate user notifications for the same delivery event.
 
 **BR-REM-005 — Target changes**  
-When a deadline/session changes, a deterministic Service recalculates relative reminders from the persisted anchor and offset. Hard-purge handling must reconcile relative reminders before a target is removed; the schema records an unresolved CHECK/SET NULL implementation issue.
+When a deadline/session changes, a deterministic Service recalculates relative reminders from the persisted anchor and offset. Hard-purge handling must reconcile relative reminders before a target is removed; target compatibility and purge reconciliation are explicitly Service-level because MySQL forbids target CHECKs involving the SET NULL FKs.
 
 **BR-REM-006 — Relative and absolute triggers**\
 Supported relative anchors are `task_deadline`, `subtask_deadline`, and `session_start`, each requiring its matching target. Persist the anchor, signed `offset_minutes`, and resolved `trigger_at = anchor_time + offset_minutes`; negative offsets mean before the anchor. Anchor and offset are both present or both null. For absolute reminders they are null and `trigger_at` is authoritative.
@@ -308,4 +310,4 @@ Stage 02 status, priority, targeting, effort, deletion/history, and fingerprint 
 - whether schedule conflict blocks saving or can be force-confirmed;
 - later requirements for report-history retention (no V1 report-history table).
 
-No product defaults or conflict override policy are invented here. MySQL enforcement issues are recorded in the physical schema's implementation gate and require resolution before affected migrations. Each resolved rule should retain its ID and receive implementation tests.
+No product defaults or conflict override policy are invented here. Resolved MySQL/application enforcement decisions are recorded in the physical schema's implementation gate; application invariants still require future Services. Each resolved rule should retain its ID and receive implementation tests.

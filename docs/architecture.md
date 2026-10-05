@@ -1,6 +1,6 @@
 # Backend Architecture
 
-Status: Stage 01 architecture baseline with documented Stage 02 persistence design\
+Status: architecture baseline with completed Stage 02 persistence\
 Scope: Laravel backend only  
 Persistence target: MySQL through Eloquent ORM  
 Frontend: independent Vue application communicating through REST API
@@ -33,19 +33,21 @@ Microservices are intentionally not used at this stage. The domain is broad, but
 
 ## 2.1 Current repository baseline (2026-10-05)
 
-The repository now includes Stage 02 persistence Migration Groups 1–5 alongside its Laravel/Sanctum scaffold:
+The repository now includes Stage 02 persistence Migration Groups 1–9 alongside its Laravel/Sanctum scaffold:
 
 - Laravel `^13.17` on PHP `^8.3`;
 - Laravel Sanctum `^4.0` is installed;
-- framework users/cache/jobs migrations and Sanctum's `personal_access_tokens` migration remain present; ten additional migrations implement `users.timezone`, typed `planning_preferences`, recurring `study_availability_windows`, user-owned `education_institutions`, explicit `academic_periods`, `subjects`, `teachers`, persisted `schedule_import_batches` / `schedule_import_rows`, and `lessons`;
+- framework users/cache/jobs migrations and Sanctum's `personal_access_tokens` migration remain present; sixteen additional migrations implement `users.timezone`, typed `planning_preferences`, recurring `study_availability_windows`, user-owned `education_institutions`, explicit `academic_periods`, `subjects`, `teachers`, persisted `schedule_import_batches` / `schedule_import_rows`, `lessons`, `tasks`, `subtasks`, `study_sessions`, `reminders`, `ai_conversations`, and `ai_messages`;
 - `User`, `PlanningPreference`, `StudyAvailabilityWindow`, `EducationInstitution`, `AcademicPeriod`, `Subject`, `Teacher`, `ScheduleImportBatch`, `ScheduleImportRow`, and `Lesson` models provide current user/institution/period/batch/Lesson relationships, numeric/date/datetime/JSON-array casts, and factories; import statuses cast to the PHP string-backed `ScheduleImportBatchStatus` and `ScheduleImportRowStatus` enums. Lessons use `SoftDeletes`, `LessonStatus` / `LessonType` enum casts, UTC datetime fields, and original/replacement relationships. MySQL enforces the approved keys, indexes, uniqueness constraints, owner cascade deletes, optional `SET NULL` deletes, historical period/subject `RESTRICT` references, batch-to-row cascade deletes, and CHECK constraints; file hashes and row fingerprints are non-unique, while imported Lesson identity and direct replacements have approved unique keys;
 - `routes/api.php` currently defines only `/user`, mounted at `GET /api/user` and protected with `auth:sanctum`; API versioning is not implemented;
 - `.env.example` selects MySQL (`student_planner`), and `phpunit.xml` selects a separate MySQL test database (`student_planner_testing`);
 - `config/database.php` retains Laravel's default SQLite fallback when `DB_CONNECTION` is absent. This fallback does not override the explicit MySQL environment configuration and does not need to be changed in Stage 01;
-- Groups 1–5 implement persistence only; planning-preference, academic, and Lesson CRUD APIs, ownership validation Services, and import/schedule/tasks/planning application capabilities remain unimplemented. Persisted import staging/history and Lessons exist, but Import Services/APIs, file upload/storage/parsing, normalization, preview endpoints, commit, duplicate resolution, and import-driven Lesson creation do not. Simple foreign keys enforce existence; same-owner compatibility requires later application validation. The unsupported Lesson self-replacement CHECK is deliberately omitted, with prohibition and replacement lifecycle assigned to later deterministic Services. The [V1 fingerprint contract](database-schema.md#fixed-v1-import-fingerprint-contract) is fixed, but its generator is not implemented. Groups 6–9 persistence remains design-only, with Group 6 (`tasks`, `subtasks`) next;
-- MySQL-backed `PlanningPersistenceTest`, `AcademicContextPersistenceTest`, `ScheduleImportPersistenceTest`, `LessonPersistenceTest`, and `PlanningMigrationTest` cover schema definitions, relationships, enum/JSON/datetime casts, constraints, soft deletion, fingerprint reservation, user-data separation, and the limits of simple ownership FKs and self-reference enforcement. Import/Lesson tests demonstrate restrictive account hard-delete paths and successful ordered purge after hard-removing Lessons and then batches. Rollback/reapply coverage dynamically counts domain migrations, preserves the four scaffold migrations and existing users, verifies Groups 1–5 return, and accommodates later additive groups; scaffold examples remain, while authentication and planning API behavior are not yet covered.
+- Groups 1–9 complete Stage 02 persistence only. REST APIs, Policies, ownership validation Services, task deletion/rescheduling workflows, planning/free-time/conflict algorithms, reminder delivery, statistics, AI agent orchestration/tools, and import parsing/preview/commit remain unimplemented. The [V1 fingerprint contract](database-schema.md#fixed-v1-import-fingerprint-contract) is fixed, but its generator is not implemented;
+- `Task` and `Subtask` share `TaskStatus`, retain completion/deadline metadata, and use soft deletion; Task additionally casts priority through integer-backed `TaskPriority`. `StudySession` has `StudySessionStatus`, task/subtask and predecessor/successor relationships, completion/actual-effort casts, and lifecycle history without soft deletion. `Reminder` has `ReminderStatus`, nullable `ReminderAnchor`, signed offsets, and explicit target relationships. `AiConversation` / `AiMessage` provide user/conversation/message relationships, `AiMessageRole`, JSON-array tool-call metadata, and creation timestamps without message `updated_at`. All six models have factories;
+- simple FKs enforce existence, while same-owner associations and session task/subtask compatibility require future Services. Lesson/StudySession self-comparison CHECKs are deliberately omitted because MySQL prohibits them; FK existence and unique direct successors remain enforced. Reminder DB checks cover status, nullable anchor vocabulary, anchor/offset pairing, and sent-state consistency; max-one-target, target/anchor compatibility, ownership, recalculation, and purge cleanup remain Service responsibilities;
+- MySQL-backed `PlanningPersistenceTest`, `AcademicContextPersistenceTest`, `ScheduleImportPersistenceTest`, `LessonPersistenceTest`, `TaskPersistenceTest`, `StudySessionPersistenceTest`, `ReminderPersistenceTest`, `AiPersistenceTest`, and `PlanningMigrationTest` cover schema, relationships, enum/JSON/datetime casts, supported constraints, soft deletion/history, and physical-schema limitations. Import/Lesson tests retain restrictive account hard-delete coverage. Rollback/reapply dynamically counts domain migrations, preserves the four scaffold migrations and existing users, and verifies the exact migration/table snapshots for Groups 1–9. The full verification record is in [database-schema.md](database-schema.md); authentication and application API behavior are not yet covered.
 
-Architecture sections below describe the intended direction. Their implementation-pending statements now apply to the remaining persistence groups and application capabilities; the completed Groups 1–5 scope is recorded here and in [database-schema.md](database-schema.md). Suggested directories/classes are created only when a concrete feature requires them.
+Architecture sections below describe the intended direction. Their implementation-pending statements now apply to application capabilities; the completed Groups 1–9 persistence scope is recorded here and in [database-schema.md](database-schema.md). Suggested directories/classes are created only when a concrete feature requires them.
 
 The architectural decision and alternatives are recorded in [ADR-001](decisions/ADR-001-backend-architecture.md). Domain concepts, rule IDs, and persistence questions are recorded in [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [database review notes](database-review-notes.md).
 
@@ -139,7 +141,7 @@ database/seeders/
 
 Eloquent models represent persistence state and relationships. Complex planning rules should not be hidden in model events or accessors. Query scopes may be used for reusable query constraints, but orchestration belongs in Services.
 
-The approved Stage 02 tables, columns, foreign keys, indexes, enum representation, and delete behavior are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml). Domain migrations and model relationships are not yet implemented; known constraint-enforcement issues are recorded there for resolution before affected migrations.
+The approved Stage 02 tables, columns, foreign keys, indexes, enum representation, and delete behavior are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml). All Stage 02 domain migrations, model relationships, enums, and factories are implemented. The documented MySQL enforcement decisions separate supported DB constraints from future Service invariants.
 
 ### 4.4 Infrastructure / integrations
 
@@ -267,7 +269,7 @@ Rules:
 - convert to presentation timezone only at the API/application boundary;
 - never use server-local timezone as a business rule.
 
-The approved MySQL column types are recorded in [database-schema.md](database-schema.md). Existing framework/audit timestamp types are preserved as specified; these design decisions have not yet been implemented.
+The approved MySQL column types are recorded in [database-schema.md](database-schema.md). Existing framework/audit timestamp types are preserved as specified; the persistence types are implemented, while application-level timezone conversion/validation remains future work.
 
 ## 11. Transactions and consistency
 
@@ -405,8 +407,8 @@ For a student project, start simpler and add infrastructure only when Stage 07 b
 Stage 02:
 
 - physical mapping, fields/types, foreign keys, delete behavior, indexes, scalar enum storage, and explicit target relationships are approved and documented in [database-schema.md](database-schema.md);
-- migrations, model relationships, and factories remain unimplemented;
-- resolve the documented MySQL enforcement issues before implementing affected migration groups.
+- all Migration Groups 1–9, model relationships, enums, factories, MySQL constraints, and persistence tests are implemented;
+- unsupported self-reference and SET NULL target checks have explicit future Service enforcement decisions; Stage 02 persistence is complete.
 
 Stage 03:
 
