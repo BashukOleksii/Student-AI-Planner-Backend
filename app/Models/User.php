@@ -29,6 +29,26 @@ class User extends Authenticatable
         return $this->hasMany(StudyAvailabilityWindow::class);
     }
 
+    public function educationInstitutions(): HasMany
+    {
+        return $this->hasMany(EducationInstitution::class);
+    }
+
+    public function academicPeriods(): HasMany
+    {
+        return $this->hasMany(AcademicPeriod::class);
+    }
+
+    public function subjects(): HasMany
+    {
+        return $this->hasMany(Subject::class);
+    }
+
+    public function teachers(): HasMany
+    {
+        return $this->hasMany(Teacher::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *
