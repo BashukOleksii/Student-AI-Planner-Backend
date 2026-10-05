@@ -49,6 +49,11 @@ class User extends Authenticatable
         return $this->hasMany(Teacher::class);
     }
 
+    public function scheduleImportBatches(): HasMany
+    {
+        return $this->hasMany(ScheduleImportBatch::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *

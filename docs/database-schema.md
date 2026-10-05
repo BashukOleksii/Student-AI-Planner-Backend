@@ -1,23 +1,25 @@
 # Physical Database Schema
 
-Status: **approved Stage 02 design; Migration Groups 1–3 implemented**\
+Status: **approved Stage 02 design; Migration Groups 1–4 implemented**\
 Scope: Laravel backend + MySQL + Eloquent\
-Important: this is the canonical repository adaptation of the approved `stage-02-database-schema-spec.md`. The first three approved persistence groups are implemented alongside the Laravel/Sanctum scaffold; Groups 4–9 remain design-only.
+Important: this is the canonical repository adaptation of the approved `stage-02-database-schema-spec.md`. The first four approved persistence groups are implemented alongside the Laravel/Sanctum scaffold; Groups 5–9 remain design-only.
 
-**Implemented now (Migration Groups 1–3):**
+**Implemented now (Migration Groups 1–4):**
 
 - `users.timezone`;
 - `planning_preferences` and `study_availability_windows`;
 - user-owned `education_institutions`, explicit `academic_periods`, `subjects`, and `teachers`;
+- `schedule_import_batches` and `schedule_import_rows` for persisted import staging/history, with `ScheduleImportBatchStatus` and `ScheduleImportRowStatus` PHP string-backed enums over bounded VARCHAR columns;
 - `PlanningPreference` and `StudyAvailabilityWindow` models, their `belongsTo(User::class)` relationships, and `User::planningPreference()` / `User::studyAvailabilityWindows()`;
 - `EducationInstitution`, `AcademicPeriod`, `Subject`, and `Teacher` models with `belongsTo(User::class)`; `AcademicPeriod`, `Subject`, and `Teacher` also have optional `belongsTo(EducationInstitution::class)` relationships; academic-period dates use Laravel date casts;
 - `User::educationInstitutions()`, `User::academicPeriods()`, `User::subjects()`, and `User::teachers()`; `EducationInstitution::academicPeriods()`, `EducationInstitution::subjects()`, and `EducationInstitution::teachers()` are also implemented as `hasMany` relationships;
-- the approved primary/foreign keys, indexes, uniqueness constraints, owner cascade deletes, optional institution `SET NULL` deletes, and eleven enforced MySQL CHECK constraints across the six domain tables; Group 3 adds `academic_periods_valid_date_range` and `subjects_valid_color`, while teacher names use a non-unique index;
-- factories and focused MySQL-backed `PlanningPersistenceTest` / `AcademicContextPersistenceTest`; `PlanningMigrationTest` dynamically rolls back and reapplies domain migrations while preserving the four scaffold migrations and existing users, with coverage for later additive groups.
+- `ScheduleImportBatch::user()`, `ScheduleImportBatch::academicPeriod()`, and `ScheduleImportBatch::rows()`; `ScheduleImportRow::scheduleImportBatch()`; `User::scheduleImportBatches()` and `AcademicPeriod::scheduleImportBatches()`; batch status/datetime/counter casts and row status/JSON-array casts;
+- the approved primary/foreign keys, indexes, uniqueness constraints, owner cascade deletes, optional institution `SET NULL` deletes, and fourteen enforced MySQL CHECK constraints across the eight domain tables; Group 3 adds `academic_periods_valid_date_range` and `subjects_valid_color`, while teacher names use a non-unique index; Group 4 adds an academic-period `RESTRICT` FK, batch-to-row cascade deletes, and the named status/positive-row-number checks below;
+- factories and focused MySQL-backed `PlanningPersistenceTest`, `AcademicContextPersistenceTest`, and `ScheduleImportPersistenceTest`; the batch factory derives its owner from its period and row fixtures contain representative JSON without defining an importer contract. `PlanningMigrationTest` dynamically rolls back and reapplies domain migrations while preserving the four scaffold migrations and existing users, now explicitly covering Groups 1–4 and later additive groups.
 
-**Still design-only / not implemented:** schedule import, lessons, tasks/subtasks, study sessions, reminders, and AI conversation/message persistence (Migration Groups 4–9). Their table/column designs and Eloquent relationships below remain approved intent, not implemented code. Relationships from implemented models to these future models are also design-only.
+**Still design-only / not implemented:** lessons, tasks/subtasks, study sessions, reminders, and AI conversation/message persistence (Migration Groups 5–9). Their table/column designs and Eloquent relationships below remain approved intent, not implemented code. Relationships from implemented models to these future models are also design-only.
 
-Groups 1–3 implement persistence only. Planning-preference and academic CRUD APIs, application lifecycle creation of preference rows, ownership validation Services, availability-overlap detection, and planning business features remain unimplemented; product defaults remain undecided. Same-owner compatibility between an academic period, subject, or teacher and its optional institution remains an application-level invariant: the approved simple foreign keys enforce institution existence, not matching ownership.
+Groups 1–4 implement persistence only. Planning-preference and academic CRUD APIs, application lifecycle creation of preference rows, ownership validation Services, availability-overlap detection, and planning business features remain unimplemented; product defaults remain undecided. Import staging exists, but Excel parsing, uploads/file storage, preview endpoints, validation/commit Services, duplicate resolution, fingerprint generation, and Lesson creation remain unimplemented. Same-owner compatibility between an academic period, subject, or teacher and its optional institution, and between an import batch and its academic period (BR-IMP-005), remains an application-level invariant: the approved simple foreign keys enforce existence, not matching ownership.
 
 The companion [DBML source](database-schema.dbml) preserves the supplied `student-ai-planner.dbml` diagram. It uses numeric shorthand and omits SQL CHECK expressions; the MySQL types and constraints below remain authoritative. See [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [the earlier draft review](database-review-notes.md) for context. Known implementation issues are recorded in section 8 without changing approved tables, columns, keys, or delete actions.
 
@@ -376,7 +378,7 @@ Eloquent:
 
 ### 3.8 schedule_import_batches
 
-Persistent import process/history.
+Implemented persistence for import staging/history; import processing itself is not implemented.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -407,20 +409,29 @@ FK:
 
 Checks:
 
-- status in approved import-batch states.
+- `schedule_import_batches_valid_status`: `status IN ('uploaded', 'validated', 'committed', 'failed', 'cancelled')`.
 
 Indexes:
 
 - `INDEX(user_id, academic_period_id, created_at)`;
 - `INDEX(user_id, file_hash)`.
 
-No unique constraint on `file_hash`: the same file may be uploaded again for preview, while duplicate protection is enforced when lessons are committed.
+No unique constraint on `file_hash`: the same file may be uploaded again for preview, while duplicate protection must be enforced by the future Lesson/import commit behavior.
+
+The non-unique period/date index is named `schedule_import_batches_user_period_created_index` to stay within MySQL's identifier-length limit; the hash index is `schedule_import_batches_user_id_file_hash_index`.
+
+Implemented Eloquent:
+
+- `belongsTo(User::class)` as `user`;
+- `belongsTo(AcademicPeriod::class)` as `academicPeriod`;
+- `hasMany(ScheduleImportRow::class)` as `rows`;
+- `status` casts to `ScheduleImportBatchStatus`, `committed_at` to datetime, and the four counters to integers.
 
 ---
 
 ### 3.9 schedule_import_rows
 
-Staging/preview rows for an import batch.
+Implemented staging/preview-row persistence for an import batch; JSON fixtures do not define the future normalization contract.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -441,13 +452,20 @@ FK:
 
 Checks:
 
-- `row_number > 0`;
-- status in approved row states.
+- `schedule_import_rows_positive_row_number`: `row_number > 0`;
+- `schedule_import_rows_valid_status`: `status IN ('valid', 'invalid', 'duplicate')`.
 
 Indexes:
 
 - `UNIQUE(schedule_import_batch_id, row_number)`;
 - `INDEX(schedule_import_batch_id, status)`.
+
+The unique constraint is named `schedule_import_rows_schedule_import_batch_id_row_number_unique`; the status index is `schedule_import_rows_schedule_import_batch_id_status_index`. `fingerprint` is nullable and non-unique; matching fingerprints can be stored within one batch or across batches. Its generation/normalization algorithm remains unimplemented.
+
+Implemented Eloquent:
+
+- `belongsTo(ScheduleImportBatch::class)` as `scheduleImportBatch`;
+- `status` casts to `ScheduleImportRowStatus`, `row_number` to integer, and `raw_data`, `normalized_data`, and `validation_errors` to arrays, preserving nullable metadata.
 
 ---
 
@@ -901,8 +919,8 @@ Recommended sequence:
 1. **Completed:** extend `users` with `timezone`;
 2. **Completed:** `planning_preferences`, `study_availability_windows`;
 3. **Completed:** `education_institutions`, `academic_periods`, `subjects`, `teachers`;
-4. **Next implementation slice (not implemented):** `schedule_import_batches`, `schedule_import_rows`;
-5. `lessons`;
+4. **Completed:** `schedule_import_batches`, `schedule_import_rows` (persistence only);
+5. **Next implementation slice (not implemented):** `lessons`, after resolving the relevant section 8 issues;
 6. `tasks`, `subtasks`;
 7. `study_sessions`;
 8. `reminders`;
@@ -919,9 +937,9 @@ Each group should include:
 
 ## 8. Implementation issues and gate
 
-Migration Groups 1–3 are implemented and verified; Groups 4–9 remain design-only. MySQL version support for the implemented groups' enforced CHECK constraints has been verified. The minimum constraint-enforcement baseline is **MySQL >= 8.0.16**; the currently verified development/test server is **MySQL 8.4.10**, using the dedicated `student_planner_testing` database. The verified local version is not an exact production-version pin.
+Migration Groups 1–4 are implemented and verified; Groups 5–9 remain design-only. MySQL version support for the implemented groups' enforced CHECK constraints has been verified. The minimum constraint-enforcement baseline is **MySQL >= 8.0.16**; the currently verified development/test server is **MySQL 8.4.10**, using the dedicated `student_planner_testing` database. The verified local version is not an exact production-version pin.
 
-The latest completed Groups 1–3 verification passed the Academic Context focused suite (50 tests / 411 assertions), Groups 1–2 regression suite (38 tests / 269 assertions), and full suite (90 tests / 686 assertions), with PHPUnit process exit code 0. Pint, `git diff --check`, and rollback/reapply verification also passed. These counts record the completed implementation's current verification, not permanent architectural requirements or tests rerun for this documentation update.
+The latest completed Groups 1–4 verification passed the Schedule Import focused suite (46 tests / 354 assertions), the combined Planning/Academic Context persistence and migration regression suite (88 tests / 684 assertions), and the full suite (136 tests / 1,044 assertions), each with PHPUnit process exit code 0. Pint verification, `git diff --check`, and rollback/reapply verification also passed. These counts record current implementation verification, not permanent architectural requirements.
 
 The following issues remain unresolved and require explicit resolution before the later affected migration groups; this document preserves the approved checks and FK actions rather than silently selecting alternatives.
 
@@ -941,8 +959,8 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
 
 ### 8.4 Remaining implementation questions
 
-- Fix deterministic fingerprint normalization/serialization before import implementation; the identity fields and SHA-256 algorithm are already approved.
+- Fix deterministic fingerprint normalization/serialization before Lesson/import commit implementation; the identity fields and SHA-256 algorithm are already approved. Group 4 stores nullable fingerprints without generating them.
 - Define product defaults and any conflict override policy in Stage 03; no defaults or override behavior are introduced here.
-- Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup.
+- Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup. Group 4 tests on MySQL 8.4.10 show that directly deleting a User who owns both a period and its import batch is rejected with error 1451 by `schedule_import_batches_academic_period_id_foreign`: cascading period deletion is blocked by the batch's `RESTRICT` reference. Deleting the batch first cascades its rows and then permits User deletion. This observed behavior preserves the approved FKs and requires an ordered future account-purge operation.
 
-Review this specification, the [companion DBML](database-schema.dbml), and the recorded issues before each later migration slice. Groups 1–3 are complete; the next implementation slice is Group 4 (`schedule_import_batches`, `schedule_import_rows`), with focused MySQL tests and review before continuing. Deterministic fingerprint normalization/serialization remains unresolved before lesson/import commit behavior is implemented. **This documentation synchronization creates no migrations, models, or application features and does not begin Group 4.**
+Review this specification, the [companion DBML](database-schema.dbml), and the recorded issues before each later migration slice. Groups 1–4 persistence is complete; the next implementation slice is Group 5 (`lessons`), requiring explicit resolution of the relevant MySQL CHECK/FK issues and fingerprint normalization/serialization first. Import parsing, preview APIs, commit behavior, duplicate resolution, and Lesson creation remain unimplemented.
