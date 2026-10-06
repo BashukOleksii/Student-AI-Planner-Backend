@@ -1,11 +1,11 @@
 # Conceptual Domain Model
 
-Status: conceptual model synchronized with the approved Stage 02 design\
+Status: conceptual model synchronized with approved persistence and the completed Academic Context API\
 Important: this document defines **domain concepts and ownership**. The approved physical MySQL design and implemented Eloquent relationships are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml), not duplicated here. Migration Groups 1–9 are implemented; Stage 02 persistence is complete.
 
 Implemented models are `User`, `PlanningPreference`, `StudyAvailabilityWindow`, `EducationInstitution`, `AcademicPeriod`, `Subject`, `Teacher`, `ScheduleImportBatch`, `ScheduleImportRow`, `Lesson`, `Task`, `Subtask`, `StudySession`, `Reminder`, `AiConversation`, and `AiMessage`. PHP backed enums, scalar/date/datetime/JSON-array casts, factories, and MySQL-backed persistence tests support all groups. Lessons, tasks, and subtasks use soft deletion; sessions/reminders retain lifecycle states; AI messages have `created_at` without `updated_at`.
 
-Authentication + User Profile now implements the first-party Sanctum session/cookie API; see [the contract](auth-profile.md). Planning Preferences and Study Availability Windows also have authenticated APIs and focused Services/ownership protection; see [planning settings](planning-settings.md). Other domain REST APIs, Policies, deterministic Services, ownership validation, planning/free-time/conflict algorithms, reminder delivery, statistics, and AI orchestration/tools remain future work. Excel parsing, fingerprint generation, preview/commit behavior, and duplicate resolution remain future work. Self-replacement/self-rescheduling and Reminder target compatibility are explicit future Service invariants, not unsupported DB CHECKs. References below to an earlier SQL/ER draft are historical Stage 01 review context; its source is not present in the repository. See [database review notes](database-review-notes.md).
+Authentication + User Profile now implements the first-party Sanctum session/cookie API; see [the contract](auth-profile.md). Planning Preferences and Study Availability Windows also have authenticated APIs and focused Services/ownership protection; see [planning settings](planning-settings.md). Academic Context CRUD and its ownership Policies, institution validation, and guarded lifecycle Services are implemented; see [the Academic Context contract](academic-context.md). Lesson/schedule, Task/Subtask, Reminder, import, statistics, and AI application APIs and ownership compatibility, plus planning/free-time/conflict algorithms, reminder delivery, statistics, and AI orchestration/tools remain future work. Excel parsing, fingerprint generation, preview/commit behavior, and duplicate resolution remain future work. Self-replacement/self-rescheduling and Reminder target compatibility are explicit future Service invariants, not unsupported DB CHECKs. References below to an earlier SQL/ER draft are historical Stage 01 review context; its source is not present in the repository. See [database review notes](database-review-notes.md).
 
 ## 1. Domain boundaries
 
@@ -21,6 +21,8 @@ User-defined constraints such as maximum daily/weekly workload, breaks, and sess
 A recurring local study window for an ISO day of the week. Windows are separate from numeric preferences; overnight availability requires two explicitly submitted windows. The API uses local `HH:MM:SS`, permits `24:00:00` only as an end, rejects overlaps for the same user/day, and permits adjacency. ID-based mutations use an ownership Policy with 404 for other users. The user's IANA timezone belongs to the profile. Concrete domain instants are UTC, while recurring windows use local wall-clock times.
 
 ### Academic Context
+
+All four resources have authenticated CRUD with public Resources and ownership Policies. Academic Services validate optional same-owner institution links against the complete candidate state. GET masks a malformed foreign institution reference as null without persistence changes; unrelated PATCH requires explicit repair to null or an owned institution. Destructive guards preserve foreign malformed dependents and retain valid same-owner FK behavior.
 
 **Subject**  
 User-owned academic course/subject used to group lessons and optionally tasks. It may reference the user's education institution; it is not a shared global catalog in V1.
@@ -194,7 +196,7 @@ Persisted states are `scheduled`, `sent`, and `cancelled`. Sent reminders retain
 
 Lessons, tasks, and subtasks use soft deletion. The future Task Service must soft-delete subtasks, cancel affected future planned sessions, preserve completed/missed/rescheduled history, and cancel/remove scheduled reminders through Reminder cleanup. Model soft deletion alone does not implement that orchestration. Study sessions retain history through lifecycle states.
 
-Teacher removal may clear lesson teacher references. Subjects referenced by lessons cannot be hard-deleted; task subject references may become null. Academic periods with schedule/import history are protected. Normal domain deletion is distinct from administrative/account hard purges; the physical schema records the approved FK actions.
+Implemented Teacher removal clears same-owner active/soft-deleted Lesson references while rejecting foreign Lesson references. Subject removal is blocked by all Lesson history or foreign active/soft-deleted Tasks; allowed removal clears same-owner Task references. Academic periods with any schedule/import history are protected. Institution removal clears same-owner Period/Subject/Teacher references but rejects foreign children. Normal domain deletion is distinct from administrative/account hard purges; the physical schema records the approved FK actions.
 
 ## 6. Derived data
 
@@ -216,4 +218,4 @@ Planning runs, generated report history, and reminder-delivery history are also 
 
 The former Stage 02 ownership, academic-period, target-reference, replacement, enum, and deletion/history questions are resolved by [the approved physical schema](database-schema.md). Its implementation gate records the resolved DB-versus-Service enforcement decisions without reopening those domain decisions.
 
-Stage 03 still needs to define product defaults for study hours, breaks, and session bounds, and conflict handling/override policy. The V1 fingerprint normalization/serialization contract is fixed; its generator and import behavior remain future implementation work. Groups 1–9 complete persistence only; application behavior beyond Authentication/Profile and Planning Settings remains unimplemented.
+Future planning work still needs to define product defaults for study hours, breaks, and session bounds, and conflict handling/override policy. The V1 fingerprint normalization/serialization contract is fixed; its generator and import behavior remain future implementation work. Groups 1–9 complete persistence only; application behavior beyond Authentication/Profile, Planning Settings, and Academic Context remains unimplemented.

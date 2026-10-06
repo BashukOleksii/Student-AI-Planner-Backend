@@ -17,7 +17,9 @@ class SubjectController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        return SubjectResource::collection($request->user()->subjects()->orderBy('name')->orderBy('id')->get());
+        return SubjectResource::collection($request->user()->subjects()->with([
+            'educationInstitution' => fn ($query) => $query->where('user_id', $request->user()->id)->select(['id', 'user_id']),
+        ])->orderBy('name')->orderBy('id')->get());
     }
 
     public function store(SaveSubjectRequest $request, SubjectService $service): JsonResponse

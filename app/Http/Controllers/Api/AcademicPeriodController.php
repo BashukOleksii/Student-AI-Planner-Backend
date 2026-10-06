@@ -17,7 +17,9 @@ class AcademicPeriodController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        return AcademicPeriodResource::collection($request->user()->academicPeriods()->orderBy('starts_on')->orderBy('id')->get());
+        return AcademicPeriodResource::collection($request->user()->academicPeriods()->with([
+            'educationInstitution' => fn ($query) => $query->where('user_id', $request->user()->id)->select(['id', 'user_id']),
+        ])->orderBy('starts_on')->orderBy('id')->get());
     }
 
     public function store(SaveAcademicPeriodRequest $request, AcademicPeriodService $service): JsonResponse

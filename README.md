@@ -22,7 +22,8 @@ selects the separate MySQL test database `student_planner_testing`.
 
 Stage 01 architecture and Stage 02 MySQL persistence are complete. The completed
 application/API verticals implement registration, login, logout, current-user
-profile retrieval/update, Planning Preferences, and Study Availability Windows.
+profile retrieval/update, Planning Preferences, Study Availability Windows, and
+Academic Context CRUD for institutions, periods, subjects, and teachers.
 See [Authentication + User Profile](docs/auth-profile.md)
 for routes, responses, and the Vue SPA local configuration and CSRF flow.
 
@@ -30,9 +31,12 @@ The repository is not yet feature-complete. Schedule management, tasks,
 planning, imports, reminders, reports, and AI orchestration remain planned work.
 See [Planning settings API](docs/planning-settings.md) for singleton preferences,
 recurring local availability, overlap validation, and ownership protection.
+See [Academic Context API](docs/academic-context.md) for the completed Stage 04
+CRUD contracts, same-owner institution rules, and guarded deletion/history behavior.
 
 ## Documentation
 
+- [Academic Context API](docs/academic-context.md)
 - [Backend architecture](docs/architecture.md)
 - [Conceptual domain model](docs/domain-model.md)
 - [Business rules and stable rule IDs](docs/business-rules.md)

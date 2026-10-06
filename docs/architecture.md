@@ -1,6 +1,6 @@
 # Backend Architecture
 
-Status: architecture baseline with completed Stage 02 persistence and Authentication/Profile + Planning Settings APIs\
+Status: architecture baseline with completed Stage 02 persistence and Authentication/Profile, Planning Settings, and Academic Context APIs\
 Scope: Laravel backend only  
 Persistence target: MySQL through Eloquent ORM  
 Frontend: independent Vue application communicating through REST API
@@ -43,12 +43,13 @@ The repository now includes Stage 02 persistence Migration Groups 1–9 alongsid
 - `.env.example` selects MySQL (`student_planner`), and `phpunit.xml` selects a separate MySQL test database (`student_planner_testing`);
 - `config/database.php` retains Laravel's default SQLite fallback when `DB_CONNECTION` is absent. This fallback does not override the explicit MySQL environment configuration and does not need to be changed in Stage 01;
 - Planning settings now expose authenticated singleton preferences (GET/PUT) and availability windows (GET/POST/PATCH/DELETE). Form Requests validate input, Resources expose only public fields, `PlanningPreferenceService` enforces cross-field bounds, and `StudyAvailabilityService` rejects same-user/day overlaps with serialized transactional mutations. The auto-discovered window Policy hides cross-user mutation targets with 404. See [the planning settings contract](planning-settings.md).
-- Groups 1–9 complete Stage 02 persistence only. Other domain REST APIs, Policies, ownership validation Services, task deletion/rescheduling workflows, planning/free-time/conflict algorithms, reminder delivery, statistics, AI agent orchestration/tools, and import parsing/preview/commit remain unimplemented. The [V1 fingerprint contract](database-schema.md#fixed-v1-import-fingerprint-contract) is fixed, but its generator is not implemented;
+- Academic Context has 20 authenticated CRUD routes with thin Controllers, Form Requests, public Resources, and auto-discovered ownership Policies. Academic Services enforce same-owner institution links, complete-candidate validation, uniqueness/date rules, and protected deletion; destructive guards prevent FK side effects on malformed foreign children, including soft-deleted history. Legacy foreign institution IDs serialize as null without GET repairs, with scoped eager loading on collections. See [the Academic Context contract](academic-context.md).
+- Groups 1–9 complete Stage 02 persistence only. Lesson/schedule and Task/Subtask APIs/workflows, ownership compatibility for their associations, planning/free-time/conflict algorithms, reminder delivery, statistics, AI orchestration/tools, and import parsing/preview/commit remain unimplemented. The [V1 fingerprint contract](database-schema.md#fixed-v1-import-fingerprint-contract) is fixed, but its generator is not implemented;
 - `Task` and `Subtask` share `TaskStatus`, retain completion/deadline metadata, and use soft deletion; Task additionally casts priority through integer-backed `TaskPriority`. `StudySession` has `StudySessionStatus`, task/subtask and predecessor/successor relationships, completion/actual-effort casts, and lifecycle history without soft deletion. `Reminder` has `ReminderStatus`, nullable `ReminderAnchor`, signed offsets, and explicit target relationships. `AiConversation` / `AiMessage` provide user/conversation/message relationships, `AiMessageRole`, JSON-array tool-call metadata, and creation timestamps without message `updated_at`. All six models have factories;
-- simple FKs enforce existence, while same-owner associations and session task/subtask compatibility require future Services. Lesson/StudySession self-comparison CHECKs are deliberately omitted because MySQL prohibits them; FK existence and unique direct successors remain enforced. Reminder DB checks cover status, nullable anchor vocabulary, anchor/offset pairing, and sent-state consistency; max-one-target, target/anchor compatibility, ownership, recalculation, and purge cleanup remain Service responsibilities;
+- simple FKs enforce existence, while same-owner institution compatibility is now enforced by Academic Services. Ownership compatibility for Lesson/Task/import/Reminder associations and session task/subtask compatibility remain future Service work. Lesson/StudySession self-comparison CHECKs are deliberately omitted because MySQL prohibits them; FK existence and unique direct successors remain enforced. Reminder DB checks cover status, nullable anchor vocabulary, anchor/offset pairing, and sent-state consistency; max-one-target, target/anchor compatibility, ownership, recalculation, and purge cleanup remain Service responsibilities;
 - MySQL-backed `PlanningPersistenceTest`, `AcademicContextPersistenceTest`, `ScheduleImportPersistenceTest`, `LessonPersistenceTest`, `TaskPersistenceTest`, `StudySessionPersistenceTest`, `ReminderPersistenceTest`, `AiPersistenceTest`, and `PlanningMigrationTest` cover schema, relationships, enum/JSON/datetime casts, supported constraints, soft deletion/history, and physical-schema limitations. Import/Lesson tests retain restrictive account hard-delete coverage. Rollback/reapply dynamically counts domain migrations, preserves the four scaffold migrations and existing users, and verifies the exact migration/table snapshots for Groups 1–9. The full verification record is in [database-schema.md](database-schema.md); `AuthProfileTest` covers authentication/profile HTTP behavior, trusted ownership, public serialization, session rotation/invalidation, CSRF, and credentialed CORS.
 
-Architecture sections below describe the intended direction. Their implementation-pending statements now apply to application capabilities beyond authentication/profile and planning settings; the completed Groups 1–9 persistence scope is recorded here and in [database-schema.md](database-schema.md). Suggested directories/classes are created only when a concrete feature requires them.
+Architecture sections below describe the intended direction. Their implementation-pending statements now apply to application capabilities beyond authentication/profile, planning settings, and Academic Context; the completed Groups 1–9 persistence scope is recorded here and in [database-schema.md](database-schema.md). Suggested directories/classes are created only when a concrete feature requires them.
 
 The architectural decision and alternatives are recorded in [ADR-001](decisions/ADR-001-backend-architecture.md). Domain concepts, rule IDs, and persistence questions are recorded in [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [database review notes](database-review-notes.md).
 
@@ -331,7 +332,7 @@ The parser does not write directly to final schedule records during preview. Dup
 - filters/sorting expressed as query parameters;
 - no frontend-specific database field leakage where an API Resource can provide a stable contract.
 
-Authentication/profile and planning-settings endpoints are implemented as documented in [auth-profile.md](auth-profile.md) and [planning-settings.md](planning-settings.md). Endpoints for other domain capabilities remain deferred until their backend features are implemented.
+Authentication/profile, planning-settings, and Academic Context endpoints are implemented as documented in [auth-profile.md](auth-profile.md), [planning-settings.md](planning-settings.md), and [academic-context.md](academic-context.md). Endpoints for other domain capabilities remain deferred until their backend features are implemented.
 
 ## 16. Recommended Laravel application structure
 
@@ -415,12 +416,12 @@ Stage 02:
 - all Migration Groups 1–9, model relationships, enums, factories, MySQL constraints, and persistence tests are implemented;
 - unsupported self-reference and SET NULL target checks have explicit future Service enforcement decisions; Stage 02 persistence is complete.
 
-Stage 03:
+Implemented API capabilities (Stages 03–04):
 
-- exact API endpoints and Resources;
-- concrete Services and controller boundaries.
+- authentication/profile, planning settings, and Academic Context endpoints and Resources;
+- ownership Policies, reusable deterministic Services, and thin controller boundaries.
 
-Stage 04:
+Future AI integration:
 
 - LLM provider;
 - tool schemas;

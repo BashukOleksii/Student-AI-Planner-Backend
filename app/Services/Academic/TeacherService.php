@@ -38,7 +38,12 @@ class TeacherService
     {
         DB::transaction(function () use ($user, $teacher): void {
             $this->lockOwner($user);
-            $user->teachers()->lockForUpdate()->findOrFail($teacher->getKey())->delete();
+            $teacher = $user->teachers()->lockForUpdate()->findOrFail($teacher->getKey());
+            if ($teacher->lessons()->withTrashed()->where('user_id', '!=', $user->getKey())->lockForUpdate()->first() !== null) {
+                throw ValidationException::withMessages(['teacher' => ['This teacher cannot be deleted.']]);
+            }
+
+            $teacher->delete();
         });
     }
 

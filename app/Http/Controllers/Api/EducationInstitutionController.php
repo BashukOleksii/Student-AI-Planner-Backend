@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\SaveEducationInstitutionRequest;
 use App\Http\Resources\EducationInstitutionResource;
 use App\Models\EducationInstitution;
+use App\Services\Academic\EducationInstitutionService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,10 +51,10 @@ class EducationInstitutionController extends Controller
         return new EducationInstitutionResource($educationInstitution);
     }
 
-    public function destroy(Request $request, EducationInstitution $educationInstitution): Response
+    public function destroy(Request $request, EducationInstitution $educationInstitution, EducationInstitutionService $service): Response
     {
         Gate::authorize('delete', $educationInstitution);
-        $educationInstitution->delete();
+        $service->delete($request->user(), $educationInstitution);
 
         return response()->noContent();
     }

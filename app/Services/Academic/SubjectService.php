@@ -44,6 +44,9 @@ class SubjectService
             if ($subject->lessons()->withTrashed()->lockForUpdate()->first() !== null) {
                 throw ValidationException::withMessages(['subject' => ['A subject with lesson history cannot be deleted.']]);
             }
+            if ($subject->tasks()->withTrashed()->where('user_id', '!=', $user->getKey())->lockForUpdate()->first() !== null) {
+                throw ValidationException::withMessages(['subject' => ['This subject cannot be deleted.']]);
+            }
 
             $subject->delete();
         });

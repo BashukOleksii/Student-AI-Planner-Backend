@@ -17,7 +17,9 @@ class TeacherController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        return TeacherResource::collection($request->user()->teachers()->orderBy('name')->orderBy('id')->get());
+        return TeacherResource::collection($request->user()->teachers()->with([
+            'educationInstitution' => fn ($query) => $query->where('user_id', $request->user()->id)->select(['id', 'user_id']),
+        ])->orderBy('name')->orderBy('id')->get());
     }
 
     public function store(SaveTeacherRequest $request, TeacherService $service): JsonResponse

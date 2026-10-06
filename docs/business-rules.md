@@ -1,19 +1,19 @@
 # Business Rules
 
-Status: baseline synchronized with the approved Stage 02 design\
-Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Other domain REST APIs, Policies, deterministic Services, planning, reminder delivery, statistics, AI orchestration/tools, and import parsing/preview/commit/fingerprint generation remain future work.
+Status: approved persistence baseline with current API enforcement recorded\
+Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Lesson/schedule and Task/Subtask APIs/workflows, planning, reminder delivery, statistics, AI orchestration/tools, and import parsing/preview/commit/fingerprint generation remain future work.
 
-Same-owner compatibility, task/subtask consistency, self-replacement/self-rescheduling prohibition, lifecycle transitions, task/session/lesson deadlines and overlaps, task deletion cleanup, and Reminder target count/compatibility/recalculation/purge reconciliation remain future Service requirements. MySQL enforces supported scalar/timestamp CHECKs, FK existence/actions, and approved uniqueness; it does not enforce cross-row ownership or checks prohibited by AUTO_INCREMENT/SET NULL restrictions.
+Same-owner compatibility for Lesson/Task/import/Reminder associations, task/subtask consistency, self-replacement/self-rescheduling prohibition, lifecycle transitions, task/session/lesson deadlines and overlaps, task deletion cleanup, and Reminder target count/compatibility/recalculation/purge reconciliation remain future Service requirements. MySQL enforces supported scalar/timestamp CHECKs, FK existence/actions, and approved uniqueness; it does not enforce cross-row ownership or checks prohibited by AUTO_INCREMENT/SET NULL restrictions.
 
 These are intended requirements, not a claim that the backend implements all of them. References to "V1" mean the initial product release, not an implemented `/api/v1` route prefix. Deterministic rules must be shared by REST and AI-tool entry points through application Services. Preserve rule IDs when refining requirements so implementation and tests can trace them.
 
 ## 1. Global and ownership rules
 
 **BR-GEN-001 — Ownership isolation**  
-A user may read or mutate only resources that belong to that user, directly or through an owned parent. Education institutions, subjects, and teachers are user-owned in V1, not shared global catalogs. Optional institution references must resolve to the same owner.
+A user may read or mutate only resources that belong to that user, directly or through an owned parent. Education institutions, subjects, and teachers are user-owned in V1, not shared global catalogs. Optional institution references must resolve to the same owner. Academic Context APIs enforce this through Policies, user-scoped relationships and Services. Their destructive guards also prevent FK side effects on foreign malformed children, including soft-deleted Tasks/Lessons; unsafe legacy institution IDs are masked on reads without altering data.
 
 **BR-GEN-002 — Trusted user context**  
-Public API requests and AI tool arguments must not be able to choose another user's ID. The authenticated user is obtained from trusted server context.
+Public API requests and AI tool arguments must not be able to choose another user's ID. The authenticated user is obtained from trusted server context. This is enforced by all current identity/profile, planning-settings, and Academic Context APIs; other domain/AI entry points remain future work.
 
 **BR-GEN-003 — Deterministic business logic**  
 Deadline checks, free-time calculation, conflicts, priority ordering, workload limits, progress metrics, and schedule import validation are implemented in PHP Services, not delegated to the LLM.
@@ -49,7 +49,7 @@ Imported lessons use the resolved persisted Subject database ID only, expressed 
 
 Serialize times explicitly in UTC as `YYYY-MM-DDTHH:MM:SSZ`, with whole-second precision and no fractional seconds, independent of PHP/server default timezone; persisted lesson DATETIME values represent UTC. Canonical serialization is an ordered JSON array of exactly three strings `[subject_id, starts_at_utc, ends_at_utc]`, encoded with `JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE`, without pretty printing, BOM, or trailing newline. `hash('sha256', canonical_serialization, false)` produces lowercase 64-character hexadecimal SHA-256. The verified example is recorded in [database-schema.md §3.10](database-schema.md#fixed-v1-import-fingerprint-contract).
 
-Imported duplicate identity is scoped to `(user_id, academic_period_id, import_fingerprint)`. The database requires a period for a non-NULL fingerprint and retains fingerprint uniqueness after soft deletion. The contract is fixed; fingerprint generation and import commit Services are not implemented. Manual-entry duplicate handling remains a Stage 03 decision.
+Imported duplicate identity is scoped to `(user_id, academic_period_id, import_fingerprint)`. The database requires a period for a non-NULL fingerprint and retains fingerprint uniqueness after soft deletion. The contract is fixed; fingerprint generation and import commit Services are not implemented. Manual-entry duplicate handling remains a future schedule API decision.
 
 **BR-SCH-007 — Schedule views**  
 Today's, a specific date's, and a week's schedule are calculated using the user's timezone and return only effective schedule entries for the requested range.
@@ -69,7 +69,7 @@ The commit policy must be explicit: either all accepted rows are committed atomi
 Repeating the same import must not silently duplicate unchanged schedule entries. The same file may be uploaded again for preview; file hashes are not unique. Commit resolves the lesson fingerprint and restores/updates a matching soft-deleted lesson rather than inserting a conflicting duplicate.
 
 **BR-IMP-005 — Semester replacement is explicit**  
-Every import batch targets a persisted AcademicPeriod owned by the user. Importing a new semester must not implicitly delete prior periods or schedule history. Academic periods with schedule/import history are protected from destructive deletion; any replacement operation requires explicit user intent and normal confirmation policy.
+Every import batch targets a persisted AcademicPeriod owned by the user. Importing a new semester must not implicitly delete prior periods or schedule history. Academic periods with schedule/import history are protected from destructive deletion (implemented by AcademicPeriodService, including soft-deleted or malformed foreign history); any replacement operation requires explicit user intent and normal confirmation policy.
 
 ## 4. Task rules
 
@@ -92,7 +92,7 @@ Task and subtask statuses are only `pending` and `completed`, stored in bounded 
 An unfinished task whose deadline has passed is overdue. Derive this from completion state, deadline, and current time; V1 persists neither an overdue status nor an overdue flag.
 
 **BR-TSK-007 — Subject association**  
-Subject association is optional. If a task references a subject, it must belong to the same user. Subjects referenced by lessons cannot be hard-deleted; task subject references may become null on subject removal.
+Subject association is optional. If a task references a subject, it must belong to the same user. SubjectService blocks deletion for all Lesson history, including soft-deleted Lessons. Allowed removal nulls same-owner Task references, including soft-deleted Tasks; foreign Task references block removal to prevent cross-user FK side effects. Task-subject assignment validation remains future Task application work.
 
 **BR-TSK-008 — Deletion preserves session history**\
 Normal task deletion soft-deletes the task and its subtasks, cancels affected future planned study sessions, and preserves historical completed/missed/rescheduled sessions. Scheduled reminders targeting the task are cancelled or removed by the Reminder service. Administrative/account hard purge is separate from normal application deletion.
@@ -302,7 +302,7 @@ Excel imports enforce allowed file type/size and parse content as untrusted inpu
 
 ## 14. Rules intentionally deferred
 
-Stage 02 status, priority, targeting, effort, deletion/history, and fingerprint identity decisions are documented above and in [database-schema.md](database-schema.md). The following remain Stage 03 or later decisions:
+Stage 02 status, priority, targeting, effort, deletion/history, and fingerprint identity decisions are documented above and in [database-schema.md](database-schema.md). The following remain future planning/product decisions:
 
 - default study-window and break values;
 - minimum/maximum study-session duration;
