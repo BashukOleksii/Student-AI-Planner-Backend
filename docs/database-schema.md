@@ -1004,7 +1004,10 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
 ### 8.4 Remaining application work and product decisions
 
 - Implement fingerprint generation and import commit later using the fixed contract in section 3.10; normalization/serialization is no longer an unresolved design question. Groups 4–5 store fingerprints without generating them.
-- Define product defaults and any conflict override policy in Stage 03; no defaults or override behavior are introduced here.
+- Define product defaults and any conflict override policy in a future
+  planning/product-decision stage; no defaults or override behavior are
+  introduced by the completed Stage 03 APIs.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup. Group 4 tests on MySQL 8.4.10 show that directly deleting a User who owns both a period and its import batch is rejected with error 1451 by `schedule_import_batches_academic_period_id_foreign`. Group 5 confirms that an isolated User/Subject/manual-Lesson graph can cascade, while a combined period/batch/Lesson history graph blocks direct User deletion with 1451. Hard-removing Lessons first still leaves the batch/period restriction; deleting batches next cascades their rows and then permits User deletion. Soft deletion does not remove restrictive references. Account hard purge is an ordered administrative operation, distinct from normal domain deletion; the approved FKs are unchanged.
 
 Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Further backend verticals must add academic and schedule APIs, task/subtask workflows, other domain ownership compatibility, free-time/planning algorithms, rescheduling, and reminder cleanup. Import parsing/preview/commit, fingerprint generation, duplicate resolution, delivery, statistics, and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.
+
