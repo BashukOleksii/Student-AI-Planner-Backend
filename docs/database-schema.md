@@ -182,7 +182,7 @@ Eloquent:
 
 ### 3.2 planning_preferences
 
-One row per user. The primary key prevents multiple preference rows; application lifecycle logic must ensure a row is created for each user. Nullable constraints use documented system defaults when implemented; this specification does not choose product default study hours, break duration, or session bounds.
+At most one row per user. The primary key prevents multiple preference rows. The singleton API returns an all-null configuration without persistence on GET when missing; complete PUT materializes/replaces the current user’s row. Nullable constraints use documented system defaults when implemented; this specification does not choose product default study hours, break duration, or session bounds.
 
 | Column | MySQL type | Null | Notes |
 |---|---|---:|---|

@@ -20,14 +20,16 @@ selects the separate MySQL test database `student_planner_testing`.
 
 ## Project Status
 
-Stage 01 architecture and Stage 02 MySQL persistence are complete. The first
-application/API vertical implements registration, login, logout, and current-user
-profile retrieval/update. See [Authentication + User Profile](docs/auth-profile.md)
+Stage 01 architecture and Stage 02 MySQL persistence are complete. The completed
+application/API verticals implement registration, login, logout, current-user
+profile retrieval/update, Planning Preferences, and Study Availability Windows.
+See [Authentication + User Profile](docs/auth-profile.md)
 for routes, responses, and the Vue SPA local configuration and CSRF flow.
 
 The repository is not yet feature-complete. Schedule management, tasks,
 planning, imports, reminders, reports, and AI orchestration remain planned work.
-Planning Preferences and Study Availability APIs remain deferred.
+See [Planning settings API](docs/planning-settings.md) for singleton preferences,
+recurring local availability, overlap validation, and ownership protection.
 
 ## Documentation
 

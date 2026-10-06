@@ -1,6 +1,6 @@
 # ADR-001: Laravel Layered Modular Monolith for Backend
 
-- Status: accepted; Stage 02 persistence and Authentication + User Profile implemented
+- Status: accepted; Stage 02 persistence, Authentication/Profile, and Planning Settings implemented
 - Date: 2026-10-01
 
 ## Context
@@ -26,7 +26,7 @@ Build the backend as a **Laravel layered modular monolith** with:
 
 Use Laravel conventions before adding custom architectural abstractions.
 
-This decision defines the architecture. Stage 02 MySQL persistence is complete. Authentication + User Profile implements thin Controllers, Form Requests, and a shared UserResource using Sanctum SPA cookie/session authentication with the standard web guard. No Service wraps trivial persistence/auth calls. The canonical profile endpoint is `/api/profile`; `/api/user` is removed. API versioning and other domain application capabilities remain deferred. See [the authentication contract](../auth-profile.md).
+This decision defines the architecture. Stage 02 MySQL persistence is complete. Authentication + User Profile implements thin Controllers, Form Requests, and a shared UserResource using Sanctum SPA cookie/session authentication with the standard web guard. No Service wraps trivial persistence/auth calls. The canonical profile endpoint is `/api/profile`; `/api/user` is removed. Planning Settings adds focused invariant/overlap Services and an auto-discovered availability ownership Policy using not-found denials; see [the planning settings contract](../planning-settings.md). API versioning and other domain application capabilities remain deferred. See [the authentication contract](../auth-profile.md).
 
 See [backend architecture](../architecture.md), [the conceptual domain model](../domain-model.md), [business rules](../business-rules.md), and [Stage 02 database review questions](../database-review-notes.md).
 
