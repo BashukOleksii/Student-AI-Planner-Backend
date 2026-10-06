@@ -13,23 +13,21 @@ REST API.
 
 - PHP `^8.3` and Laravel `^13.17`.
 - Eloquent ORM with MySQL as the application database.
-- Laravel Sanctum `^4.0` is installed as the authentication package baseline;
-  full authentication flows are not implemented yet.
+- Laravel Sanctum `^4.0` provides first-party SPA cookie/session authentication.
 
 `.env.example` selects the MySQL database `student_planner`, and `phpunit.xml`
 selects the separate MySQL test database `student_planner_testing`.
 
 ## Project Status
 
-Stage 01 establishes architecture and conceptual domain documentation. The
-application is currently a mostly fresh Laravel scaffold with the default
-`User` model, framework migrations, Sanctum's personal-access-token migration,
-and the `GET /api/user` route protected by `auth:sanctum`.
+Stage 01 architecture and Stage 02 MySQL persistence are complete. The first
+application/API vertical implements registration, login, logout, and current-user
+profile retrieval/update. See [Authentication + User Profile](docs/auth-profile.md)
+for routes, responses, and the Vue SPA local configuration and CSRF flow.
 
 The repository is not yet feature-complete. Schedule management, tasks,
 planning, imports, reminders, reports, and AI orchestration remain planned work.
-Stage 02 will decide the physical MySQL domain schema and persistence details;
-the existing migrations are not the final domain schema.
+Planning Preferences and Study Availability APIs remain deferred.
 
 ## Documentation
 

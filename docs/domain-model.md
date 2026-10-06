@@ -5,14 +5,14 @@ Important: this document defines **domain concepts and ownership**. The approved
 
 Implemented models are `User`, `PlanningPreference`, `StudyAvailabilityWindow`, `EducationInstitution`, `AcademicPeriod`, `Subject`, `Teacher`, `ScheduleImportBatch`, `ScheduleImportRow`, `Lesson`, `Task`, `Subtask`, `StudySession`, `Reminder`, `AiConversation`, and `AiMessage`. PHP backed enums, scalar/date/datetime/JSON-array casts, factories, and MySQL-backed persistence tests support all groups. Lessons, tasks, and subtasks use soft deletion; sessions/reminders retain lifecycle states; AI messages have `created_at` without `updated_at`.
 
-Persistence does not implement REST APIs, Policies, deterministic Services, ownership validation, planning/free-time/conflict algorithms, reminder delivery, statistics, or AI orchestration/tools. Excel parsing, fingerprint generation, preview/commit behavior, and duplicate resolution remain future work. Self-replacement/self-rescheduling and Reminder target compatibility are explicit future Service invariants, not unsupported DB CHECKs. References below to an earlier SQL/ER draft are historical Stage 01 review context; its source is not present in the repository. See [database review notes](database-review-notes.md).
+Authentication + User Profile now implements the first-party Sanctum session/cookie API; see [the contract](auth-profile.md). Other domain REST APIs, Policies, deterministic Services, ownership validation, planning/free-time/conflict algorithms, reminder delivery, statistics, and AI orchestration/tools remain future work. Excel parsing, fingerprint generation, preview/commit behavior, and duplicate resolution remain future work. Self-replacement/self-rescheduling and Reminder target compatibility are explicit future Service invariants, not unsupported DB CHECKs. References below to an earlier SQL/ER draft are historical Stage 01 review context; its source is not present in the repository. See [database review notes](database-review-notes.md).
 
 ## 1. Domain boundaries
 
 ### Identity & Profile
 
 **User**  
-Authenticated owner of private planning data.
+Authenticated owner of private planning data. The current profile API exposes `id`, `name`, `email`, and an IANA `timezone` (default `UTC`). Ownership comes from authenticated server context, never a payload `user_id`.
 
 **Planning Preferences**  
 User-defined constraints such as maximum daily/weekly workload, breaks, and session bounds. Stage 02 uses one typed planning-preferences row per user, not an opaque planning JSON column. Nullable numeric values use system defaults once those defaults are decided.
@@ -216,4 +216,4 @@ Planning runs, generated report history, and reminder-delivery history are also 
 
 The former Stage 02 ownership, academic-period, target-reference, replacement, enum, and deletion/history questions are resolved by [the approved physical schema](database-schema.md). Its implementation gate records the resolved DB-versus-Service enforcement decisions without reopening those domain decisions.
 
-Stage 03 still needs to define product defaults for study hours, breaks, and session bounds, and conflict handling/override policy. The V1 fingerprint normalization/serialization contract is fixed; its generator and import behavior remain future implementation work. Groups 1–9 complete persistence only; application behavior remains unimplemented.
+Stage 03 still needs to define product defaults for study hours, breaks, and session bounds, and conflict handling/override policy. The V1 fingerprint normalization/serialization contract is fixed; its generator and import behavior remain future implementation work. Groups 1–9 complete persistence only; application behavior beyond Authentication + User Profile remains unimplemented.
