@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\EducationInstitutionController;
 use App\Http\Controllers\Api\PlanningPreferenceController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\StudyAvailabilityWindowController;
+use App\Http\Controllers\Api\SubjectController;
+use App\Http\Controllers\Api\TeacherController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->name('auth.')->group(function (): void {
@@ -36,4 +38,16 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/academic-periods/{academicPeriod}', [AcademicPeriodController::class, 'show'])->name('academic-periods.show');
     Route::patch('/academic-periods/{academicPeriod}', [AcademicPeriodController::class, 'update'])->name('academic-periods.update');
     Route::delete('/academic-periods/{academicPeriod}', [AcademicPeriodController::class, 'destroy'])->name('academic-periods.destroy');
+
+    Route::get('/subjects', [SubjectController::class, 'index'])->name('subjects.index');
+    Route::post('/subjects', [SubjectController::class, 'store'])->name('subjects.store');
+    Route::get('/subjects/{subject}', [SubjectController::class, 'show'])->name('subjects.show');
+    Route::patch('/subjects/{subject}', [SubjectController::class, 'update'])->name('subjects.update');
+    Route::delete('/subjects/{subject}', [SubjectController::class, 'destroy'])->name('subjects.destroy');
+
+    Route::get('/teachers', [TeacherController::class, 'index'])->name('teachers.index');
+    Route::post('/teachers', [TeacherController::class, 'store'])->name('teachers.store');
+    Route::get('/teachers/{teacher}', [TeacherController::class, 'show'])->name('teachers.show');
+    Route::patch('/teachers/{teacher}', [TeacherController::class, 'update'])->name('teachers.update');
+    Route::delete('/teachers/{teacher}', [TeacherController::class, 'destroy'])->name('teachers.destroy');
 });

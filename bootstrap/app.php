@@ -14,6 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        // Subject color distinguishes explicit null from an invalid empty string.
+        $middleware->convertEmptyStringsToNull(except: [
+            fn (Request $request) => $request->is('api/subjects', 'api/subjects/*'),
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
