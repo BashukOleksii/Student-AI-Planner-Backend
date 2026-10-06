@@ -26,9 +26,11 @@ Important: this is the canonical repository adaptation of the approved `stage-02
 
 **Implemented Stage 04 application behavior:** the four Academic Context resources have authenticated CRUD, public Resources and ownership Policies. Academic Services enforce optional same-owner institutions, complete-candidate validation, uniqueness/date rules, and history-protected deletion. Institution/Subject/Teacher destructive guards prevent SET NULL side effects on malformed foreign children, including soft-deleted Tasks/Lessons. Legacy foreign institution IDs are masked on reads without repairing persistence; explicit owner repair is required before normal updates. See [academic-context.md](academic-context.md).
 
-**Still unimplemented:** lesson/schedule APIs, actual free-time calculation, automatic study planning, task/subtask application workflows, import parsing/preview/commit, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
+**Implemented Stage 05 application behavior:** LessonService validates trusted owned associations, UTC intervals, active overlap and atomic cancellation/replacement/revert, including reuse of deleted manual replacement history. LessonPolicy protects concrete targets; Resources mask malformed foreign links without read-side repair. ScheduleService queries effective Lessons with user-local day/ISO-week boundaries converted independently to UTC and stable starts_at/ends_at/id ordering. Lesson detail uses UTC Z timestamps; schedule presentation uses local numeric offsets and IANA timezone metadata. No physical schema change was needed. See [schedule.md](schedule.md).
 
-Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Ownership compatibility for Lesson/Task/import/Reminder associations, task deletion cleanup, rescheduling, and reminder target validation/recalculation remain unimplemented; product defaults remain undecided. Import staging exists, but Excel parsing, uploads/file storage, preview endpoints, validation/commit Services, duplicate resolution, fingerprint generation, and import-driven Lesson creation remain unimplemented. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. Self-replacement/self-rescheduling prohibitions and lifecycle transitions await deterministic Services.
+**Still unimplemented:** actual free-time calculation, automatic study planning, task/subtask application workflows, import parsing/preview/commit, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
+
+Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. Task/import/Reminder association ownership, task deletion cleanup, rescheduling, and reminder target validation/recalculation remain unimplemented; product defaults remain undecided. Import staging exists, but Excel parsing, uploads/file storage, preview endpoints, validation/commit Services, duplicate resolution, fingerprint generation, and import-driven Lesson creation remain unimplemented. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. StudySession self-rescheduling and other domain lifecycle transitions remain future Service work.
 
 The companion [DBML source](database-schema.dbml) preserves the supplied `student-ai-planner.dbml` diagram. It uses numeric shorthand and omits SQL CHECK expressions; the MySQL types and constraints below remain authoritative. See [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [the earlier draft review](database-review-notes.md) for context. Known implementation issues are recorded in section 8 without changing approved tables, columns, keys, or delete actions.
 
@@ -482,7 +484,7 @@ Implemented Eloquent:
 
 ### 3.10 lessons
 
-Implemented persistence for a concrete schedule occurrence; schedule APIs and business Services remain unimplemented.
+Implemented persistence and manual Lesson CRUD/lifecycle plus bounded schedule views; see [schedule.md](schedule.md). Import processing remains unimplemented.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -547,6 +549,8 @@ Important service invariants:
 - import commit restores/updates an existing soft-deleted row with the same fingerprint instead of attempting a new conflicting insert;
 - imported lesson identity follows the fixed V1 contract below, scoped by the unique user/academic-period key;
 - schedule overlap/conflict detection is handled by a deterministic Service.
+
+LessonService implements the manual Subject/Teacher/AcademicPeriod and replacement ownership, interval, overlap, and lifecycle rules above. Import-batch compatibility and fingerprint restore/update reconciliation remain future import responsibilities. ScheduleService implements effective local date/week querying; free-time calculation remains unimplemented.
 
 Eloquent:
 
@@ -917,13 +921,13 @@ Messages are treated as append-oriented records; `updated_at` is absent. `AiMess
 
 ## 5. Important cross-row/service rules not delegated to MySQL
 
-These are deterministic application responsibilities, separate from MySQL enforcement. Recurring availability overlap, current API ownership protection, and Academic Context institution/deletion invariants are implemented; other domain rules remain future work:
+These are deterministic application responsibilities, separate from MySQL enforcement. Recurring availability overlap, current API ownership protection, Academic Context institution/deletion invariants, and manual Lesson/schedule rules are implemented; other domain rules remain future work:
 
-1. lesson overlap and schedule conflicts;
+1. lesson overlap and schedule conflicts (implemented by LessonService for manual create/update/replacement/revert; import remains pending);
 2. study-session overlap and free-time validation;
-3. cross-user ownership checks (implemented for current profile/preferences/availability and Academic Context APIs; Lesson/Task/import/Reminder association compatibility remains pending);
-4. subject/teacher/academic-period institution ownership compatibility (implemented by Academic Services); ownership of their references from future Lesson/Task/import operations remains pending;
-5. replacement lesson and original lesson ownership;
+3. cross-user ownership checks (implemented for current profile/preferences/availability and Academic Context APIs; Lesson Subject/Teacher/AcademicPeriod compatibility is implemented; Task/import/Reminder association compatibility remains pending);
+4. subject/teacher/academic-period institution ownership compatibility (implemented by Academic Services); Lesson references are owner-validated by LessonService; Task/import operations remain pending;
+5. replacement lesson and original lesson ownership (implemented by LessonService, including malformed legacy guards);
 6. subtask belongs to the study session's task;
 7. deadline feasibility;
 8. daily and weekly workload limits;
@@ -980,13 +984,13 @@ Each group should include:
 
 Migration Groups 1–9 are implemented and verified; Stage 02 persistence is complete. MySQL constraint support has been verified, and the unsupported checks have explicit application-level enforcement decisions rather than unresolved migration blockers. The minimum constraint-enforcement baseline is **MySQL >= 8.0.16**; the currently verified development/test server is **MySQL 8.4.10**, using the dedicated `student_planner_testing` database. The verified local version is not an exact production-version pin.
 
-The latest completed Groups 1–9 verification passed the new Task/StudySession/Reminder/AI focused suites (100 tests / 1,052 assertions), the combined Lesson/Schedule Import/Academic Context/Planning persistence and migration regression suite (185 tests / 1,513 assertions), and the full suite (287 tests / 2,571 assertions), each with PHPUnit process exit code 0. Pint verification, `git diff --check`, and full domain rollback/reapply verification also passed. These counts record current implementation verification, not permanent architectural requirements.
+The latest completed Groups 1–9 verification passed the new Task/StudySession/Reminder/AI focused suites (100 tests / 1,052 assertions), the combined Lesson/Schedule Import/Academic Context/Planning persistence and migration regression suite (185 tests / 1,513 assertions), and the full suite (287 tests / 2,571 assertions), each with PHPUnit process exit code 0. Pint verification, `git diff --check`, and full domain rollback/reapply verification also passed. These counts record historical Stage 02 verification, not the current application suite or permanent architectural requirements.
 
-All Stage 02 migration enforcement decisions are resolved. Approved FK actions are preserved, with future deterministic Services responsible for the cross-row invariants below. Services and lifecycle workflows are not implemented by these persistence models.
+All Stage 02 migration enforcement decisions are resolved. Approved FK actions are preserved. LessonService now enforces Lesson cross-row/lifecycle rules; remaining deterministic Services are responsible for the other cross-row invariants below. Services and lifecycle workflows are not implemented by these persistence models.
 
 ### 8.1 Self-reference CHECK restrictions
 
-MySQL prohibits CHECK expressions referencing an `AUTO_INCREMENT` column. The Lesson design gate confirmed error 3818 on MySQL 8.4.10; Lessons and StudySessions deliberately omit self-comparison CHECKs and assign self-replacement/self-rescheduling prohibitions to future deterministic Services. Persistence tests explicitly demonstrate physically permitted self-reference as invalid domain data. FKs enforce referenced existence, and unique references enforce one direct replacement/successor. No triggers or generated-column workarounds are used. [MySQL CHECK constraint restrictions](https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html).
+MySQL prohibits CHECK expressions referencing an `AUTO_INCREMENT` column. The Lesson design gate confirmed error 3818 on MySQL 8.4.10; Lessons and StudySessions deliberately omit self-comparison CHECKs and assign those prohibitions to deterministic application Services. LessonService now prohibits self-replacement; StudySession self-rescheduling remains future work. Persistence tests explicitly demonstrate physically permitted self-reference as invalid domain data. FKs enforce referenced existence, and unique references enforce one direct replacement/successor. No triggers or generated-column workarounds are used. [MySQL CHECK constraint restrictions](https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html).
 
 ### 8.2 CHECK constraints and referential actions
 
@@ -1011,5 +1015,5 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
   introduced by the completed Stage 03 APIs.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup. Group 4 tests on MySQL 8.4.10 show that directly deleting a User who owns both a period and its import batch is rejected with error 1451 by `schedule_import_batches_academic_period_id_foreign`. Group 5 confirms that an isolated User/Subject/manual-Lesson graph can cascade, while a combined period/batch/Lesson history graph blocks direct User deletion with 1451. Hard-removing Lessons first still leaves the batch/period restriction; deleting batches next cascades their rows and then permits User deletion. Soft deletion does not remove restrictive references. Account hard purge is an ordered administrative operation, distinct from normal domain deletion; the approved FKs are unchanged.
 
-Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Further backend verticals must add schedule APIs, task/subtask workflows, other domain ownership compatibility, free-time/planning algorithms, rescheduling, and reminder cleanup. Import parsing/preview/commit, fingerprint generation, duplicate resolution, delivery, statistics, and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.
+Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Further backend verticals must add task/subtask workflows, other domain ownership compatibility, free-time/planning algorithms, rescheduling, and reminder cleanup. Import parsing/preview/commit, fingerprint generation, duplicate resolution, delivery, statistics, and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.
 

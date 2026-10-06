@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\EducationInstitutionController;
 use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\PlanningPreferenceController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\StudyAvailabilityWindowController;
 use App\Http\Controllers\Api\SubjectController;
 use App\Http\Controllers\Api\TeacherController;
@@ -58,4 +59,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::delete('/lessons/{lesson}', [LessonController::class, 'destroy'])->name('lessons.destroy');
     Route::post('/lessons/{lesson}/cancel', [LessonController::class, 'cancel'])->name('lessons.cancel');
     Route::post('/lessons/{lesson}/replacement', [LessonController::class, 'replacement'])->name('lessons.replacement.store');
+
+    Route::get('/schedule/today', [ScheduleController::class, 'today'])->name('schedule.today');
+    Route::get('/schedule/date/{date}', [ScheduleController::class, 'date'])->where('date', '.*')->name('schedule.date');
+    Route::get('/schedule/week/{date}', [ScheduleController::class, 'week'])->where('date', '.*')->name('schedule.week');
 });

@@ -1,6 +1,6 @@
 # Backend Architecture
 
-Status: architecture baseline with completed Stage 02 persistence and Authentication/Profile, Planning Settings, and Academic Context APIs\
+Status: architecture baseline with completed Stage 02 persistence and Authentication/Profile, Planning Settings, Academic Context, and Lesson/Schedule APIs\
 Scope: Laravel backend only  
 Persistence target: MySQL through Eloquent ORM  
 Frontend: independent Vue application communicating through REST API
@@ -44,12 +44,13 @@ The repository now includes Stage 02 persistence Migration Groups 1–9 alongsid
 - `config/database.php` retains Laravel's default SQLite fallback when `DB_CONNECTION` is absent. This fallback does not override the explicit MySQL environment configuration and does not need to be changed in Stage 01;
 - Planning settings now expose authenticated singleton preferences (GET/PUT) and availability windows (GET/POST/PATCH/DELETE). Form Requests validate input, Resources expose only public fields, `PlanningPreferenceService` enforces cross-field bounds, and `StudyAvailabilityService` rejects same-user/day overlaps with serialized transactional mutations. The auto-discovered window Policy hides cross-user mutation targets with 404. See [the planning settings contract](planning-settings.md).
 - Academic Context has 20 authenticated CRUD routes with thin Controllers, Form Requests, public Resources, and auto-discovered ownership Policies. Academic Services enforce same-owner institution links, complete-candidate validation, uniqueness/date rules, and protected deletion; destructive guards prevent FK side effects on malformed foreign children, including soft-deleted history. Legacy foreign institution IDs serialize as null without GET repairs, with scoped eager loading on collections. See [the Academic Context contract](academic-context.md).
-- Groups 1–9 complete Stage 02 persistence only. Lesson/schedule and Task/Subtask APIs/workflows, ownership compatibility for their associations, planning/free-time/conflict algorithms, reminder delivery, statistics, AI orchestration/tools, and import parsing/preview/commit remain unimplemented. The [V1 fingerprint contract](database-schema.md#fixed-v1-import-fingerprint-contract) is fixed, but its generator is not implemented;
+- LessonService implements trusted manual-field mutations, complete-candidate owned associations/UTC intervals, active overlap validation, cancellation, replacement reuse, and atomic deletion/revert under owner locks. LessonPolicy hides foreign targets as 404; requests authorize before validation. ScheduleService supplies read-only today/date/ISO-week views with effective filtering, interval overlap and starts_at/ends_at/id ordering; presentation relations are eager loaded and ownership-masked. See [schedule.md](schedule.md);
+- Groups 1–9 complete Stage 02 persistence. Manual Lesson CRUD/lifecycle and bounded schedule views are now implemented. Task/Subtask APIs/workflows, ownership compatibility for their associations, planning/free-time algorithms, reminder delivery, statistics, AI orchestration/tools, and import parsing/preview/commit remain unimplemented. The [V1 fingerprint contract](database-schema.md#fixed-v1-import-fingerprint-contract) is fixed, but its generator is not implemented;
 - `Task` and `Subtask` share `TaskStatus`, retain completion/deadline metadata, and use soft deletion; Task additionally casts priority through integer-backed `TaskPriority`. `StudySession` has `StudySessionStatus`, task/subtask and predecessor/successor relationships, completion/actual-effort casts, and lifecycle history without soft deletion. `Reminder` has `ReminderStatus`, nullable `ReminderAnchor`, signed offsets, and explicit target relationships. `AiConversation` / `AiMessage` provide user/conversation/message relationships, `AiMessageRole`, JSON-array tool-call metadata, and creation timestamps without message `updated_at`. All six models have factories;
-- simple FKs enforce existence, while same-owner institution compatibility is now enforced by Academic Services. Ownership compatibility for Lesson/Task/import/Reminder associations and session task/subtask compatibility remain future Service work. Lesson/StudySession self-comparison CHECKs are deliberately omitted because MySQL prohibits them; FK existence and unique direct successors remain enforced. Reminder DB checks cover status, nullable anchor vocabulary, anchor/offset pairing, and sent-state consistency; max-one-target, target/anchor compatibility, ownership, recalculation, and purge cleanup remain Service responsibilities;
+- simple FKs enforce existence, while same-owner institution compatibility is now enforced by Academic Services. Lesson Subject/Teacher/AcademicPeriod and replacement ownership are enforced by LessonService. Task/import/Reminder association ownership and session task/subtask compatibility remain future Service work. Lesson/StudySession self-comparison CHECKs are deliberately omitted because MySQL prohibits them; FK existence and unique direct successors remain enforced. Reminder DB checks cover status, nullable anchor vocabulary, anchor/offset pairing, and sent-state consistency; max-one-target, target/anchor compatibility, ownership, recalculation, and purge cleanup remain Service responsibilities;
 - MySQL-backed `PlanningPersistenceTest`, `AcademicContextPersistenceTest`, `ScheduleImportPersistenceTest`, `LessonPersistenceTest`, `TaskPersistenceTest`, `StudySessionPersistenceTest`, `ReminderPersistenceTest`, `AiPersistenceTest`, and `PlanningMigrationTest` cover schema, relationships, enum/JSON/datetime casts, supported constraints, soft deletion/history, and physical-schema limitations. Import/Lesson tests retain restrictive account hard-delete coverage. Rollback/reapply dynamically counts domain migrations, preserves the four scaffold migrations and existing users, and verifies the exact migration/table snapshots for Groups 1–9. The full verification record is in [database-schema.md](database-schema.md); `AuthProfileTest` covers authentication/profile HTTP behavior, trusted ownership, public serialization, session rotation/invalidation, CSRF, and credentialed CORS.
 
-Architecture sections below describe the intended direction. Their implementation-pending statements now apply to application capabilities beyond authentication/profile, planning settings, and Academic Context; the completed Groups 1–9 persistence scope is recorded here and in [database-schema.md](database-schema.md). Suggested directories/classes are created only when a concrete feature requires them.
+Architecture sections below describe the intended direction. Their implementation-pending statements now apply to application capabilities beyond authentication/profile, planning settings, Academic Context, and manual Lesson/lifecycle/schedule views; the completed Groups 1–9 persistence scope is recorded here and in [database-schema.md](database-schema.md). Suggested directories/classes are created only when a concrete feature requires them.
 
 The architectural decision and alternatives are recorded in [ADR-001](decisions/ADR-001-backend-architecture.md). Domain concepts, rule IDs, and persistence questions are recorded in [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [database review notes](database-review-notes.md).
 
@@ -275,7 +276,7 @@ Rules:
 - convert to presentation timezone only at the API/application boundary;
 - never use server-local timezone as a business rule.
 
-The approved MySQL column types are recorded in [database-schema.md](database-schema.md). Existing framework/audit timestamp types are preserved as specified; the persistence types are implemented, while profile timezone validation is implemented using Laravel’s IANA `timezone` rule; domain time conversion remains future work.
+The approved MySQL column types are recorded in [database-schema.md](database-schema.md). Existing framework/audit timestamp types are preserved as specified; the persistence types are implemented, while profile timezone validation is implemented using Laravel’s IANA `timezone` rule; ScheduleService implements user-local day/ISO-week boundaries converted independently to UTC, including DST. LessonResource retains canonical whole-second UTC timestamps; ScheduleLessonResource renders those instants with user-local numeric offsets. Other domain time conversion remains future work.
 
 ## 11. Transactions and consistency
 
@@ -414,11 +415,11 @@ Stage 02:
 
 - physical mapping, fields/types, foreign keys, delete behavior, indexes, scalar enum storage, and explicit target relationships are approved and documented in [database-schema.md](database-schema.md);
 - all Migration Groups 1–9, model relationships, enums, factories, MySQL constraints, and persistence tests are implemented;
-- unsupported self-reference and SET NULL target checks have explicit future Service enforcement decisions; Stage 02 persistence is complete.
+- unsupported self-reference and SET NULL target checks have explicit application enforcement decisions; Lesson self-replacement is enforced by LessonService, while StudySession/Reminder invariants remain future work; Stage 02 persistence is complete.
 
-Implemented API capabilities (Stages 03–04):
+Implemented API capabilities (Stages 03–05):
 
-- authentication/profile, planning settings, and Academic Context endpoints and Resources;
+- authentication/profile, planning settings, Academic Context, manual Lesson CRUD/lifecycle, and bounded schedule endpoints and Resources;
 - ownership Policies, reusable deterministic Services, and thin controller boundaries.
 
 Future AI integration:

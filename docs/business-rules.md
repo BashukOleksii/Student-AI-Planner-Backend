@@ -1,25 +1,25 @@
 # Business Rules
 
 Status: approved persistence baseline with current API enforcement recorded\
-Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Lesson/schedule and Task/Subtask APIs/workflows, planning, reminder delivery, statistics, AI orchestration/tools, and import parsing/preview/commit/fingerprint generation remain future work.
+Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. Task/Subtask APIs/workflows, planning, reminder delivery, statistics, AI orchestration/tools, and import parsing/preview/commit/fingerprint generation remain future work.
 
-Same-owner compatibility for Lesson/Task/import/Reminder associations, task/subtask consistency, self-replacement/self-rescheduling prohibition, lifecycle transitions, task/session/lesson deadlines and overlaps, task deletion cleanup, and Reminder target count/compatibility/recalculation/purge reconciliation remain future Service requirements. MySQL enforces supported scalar/timestamp CHECKs, FK existence/actions, and approved uniqueness; it does not enforce cross-row ownership or checks prohibited by AUTO_INCREMENT/SET NULL restrictions.
+Lesson association/replacement ownership, self-replacement/chain prohibition, Lesson lifecycle transitions and active overlap validation are implemented. Task/import/Reminder association ownership, task/subtask consistency, self-rescheduling, Task/StudySession lifecycle transitions, deadlines and overlaps, task deletion cleanup, and Reminder target count/compatibility/recalculation/purge reconciliation remain future Service requirements. MySQL enforces supported scalar/timestamp CHECKs, FK existence/actions, and approved uniqueness; it does not enforce cross-row ownership or checks prohibited by AUTO_INCREMENT/SET NULL restrictions.
 
 These are intended requirements, not a claim that the backend implements all of them. References to "V1" mean the initial product release, not an implemented `/api/v1` route prefix. Deterministic rules must be shared by REST and AI-tool entry points through application Services. Preserve rule IDs when refining requirements so implementation and tests can trace them.
 
 ## 1. Global and ownership rules
 
 **BR-GEN-001 — Ownership isolation**  
-A user may read or mutate only resources that belong to that user, directly or through an owned parent. Education institutions, subjects, and teachers are user-owned in V1, not shared global catalogs. Optional institution references must resolve to the same owner. Academic Context APIs enforce this through Policies, user-scoped relationships and Services. Their destructive guards also prevent FK side effects on foreign malformed children, including soft-deleted Tasks/Lessons; unsafe legacy institution IDs are masked on reads without altering data.
+A user may read or mutate only resources that belong to that user, directly or through an owned parent. Education institutions, subjects, and teachers are user-owned in V1, not shared global catalogs. Optional institution references must resolve to the same owner. Academic Context APIs enforce this through Policies, user-scoped relationships and Services. Their destructive guards also prevent FK side effects on foreign malformed children, including soft-deleted Tasks/Lessons; unsafe legacy institution IDs are masked on reads without altering data. Lesson APIs enforce owned Subject/Teacher/AcademicPeriod and replacement links; schedule views query only the trusted owner and mask foreign presentation relations without repairing persistence.
 
 **BR-GEN-002 — Trusted user context**  
-Public API requests and AI tool arguments must not be able to choose another user's ID. The authenticated user is obtained from trusted server context. This is enforced by all current identity/profile, planning-settings, and Academic Context APIs; other domain/AI entry points remain future work.
+Public API requests and AI tool arguments must not be able to choose another user's ID. The authenticated user is obtained from trusted server context. This is enforced by all current identity/profile, planning-settings, Academic Context, and Lesson/Schedule APIs; other domain/AI entry points remain future work.
 
 **BR-GEN-003 — Deterministic business logic**  
 Deadline checks, free-time calculation, conflicts, priority ordering, workload limits, progress metrics, and schedule import validation are implemented in PHP Services, not delegated to the LLM.
 
 **BR-GEN-004 — Timezone awareness**  
-All user-facing date concepts are evaluated in the user's IANA timezone persisted in `users.timezone`. Concrete domain instants use UTC DATETIME values; recurring local availability uses TIME values. Server timezone must not change planning results.
+All user-facing date concepts are evaluated in the user's IANA timezone persisted in `users.timezone`. Concrete domain instants use UTC DATETIME values; recurring local availability uses TIME values. Server timezone must not change planning results. Implemented schedule views construct local midnight/ISO Monday boundaries first, then convert each boundary to UTC independently; DST days/weeks do not assume fixed UTC durations. Lesson CRUD retains UTC whole-second Z timestamps; schedule presentation uses local numeric offsets and IANA timezone metadata.
 
 **BR-GEN-005 — Valid intervals**  
 For every time interval, start must be earlier than end.
@@ -36,23 +36,23 @@ Every personal schedule lesson is scoped to one user.
 A lesson considered by planning has a valid date/time interval.
 
 **BR-SCH-003 — Cancelled lesson does not block time**  
-Lesson statuses are `active`, `cancelled`, and `replaced`. Cancelled, replaced, and soft-deleted lessons do not block free time. Normal application deletion of a lesson is soft deletion.
+Lesson statuses are `active`, `cancelled`, and `replaced`. Cancelled, replaced, and soft-deleted lessons do not block free time. Normal application deletion of a lesson is soft deletion. These effective filters and active-to-cancelled transitions are implemented; free-time calculation remains future work.
 
 **BR-SCH-004 — Replacement precedence**  
-The replacement lesson references the original through `replaces_lesson_id`. Both belong to the same user; the original becomes `replaced` and the replacement is `active`. Planning must not double-block them as two active occurrences of the same change.
+The replacement lesson references the original through `replaces_lesson_id`. Both belong to the same user; the original becomes `replaced` and the replacement is `active`. Planning must not double-block them as two active occurrences of the same change. LessonService implements this atomically, prohibits chains/self-replacement, and reuses deleted manual replacement history. Cancelling a replacement leaves the original replaced. Deleting a replacement restores the original only if conflict validation succeeds; a current replacement prevents direct original deletion.
 
 **BR-SCH-005 — Schedule conflicts are deterministic**  
-Overlapping effective lessons are detected by a Service. Manual creation/import must return a conflict result rather than silently accepting inconsistent scheduling.
+Overlapping effective lessons are detected by a Service. Manual creation/import must return a conflict result rather than silently accepting inconsistent scheduling. Manual create/update, replacement, and revert checks are implemented using strict interval overlap against owned active non-deleted Lessons; adjacency is allowed, and conflicts return 422 under schedule. Import conflict handling remains deferred.
 
 **BR-SCH-006 — Duplicate detection**  
 Imported lessons use the resolved persisted Subject database ID only, expressed as a positive ASCII decimal string without leading zeros or floating-point conversion, and the lesson's UTC start/end instants. Subject names/codes, teacher, room, and lesson type are excluded. Subject resolution is a separate importer responsibility; fingerprinting requires no text normalization. Re-importing the same Subject ID and interval preserves identity across subject renames.
 
 Serialize times explicitly in UTC as `YYYY-MM-DDTHH:MM:SSZ`, with whole-second precision and no fractional seconds, independent of PHP/server default timezone; persisted lesson DATETIME values represent UTC. Canonical serialization is an ordered JSON array of exactly three strings `[subject_id, starts_at_utc, ends_at_utc]`, encoded with `JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE`, without pretty printing, BOM, or trailing newline. `hash('sha256', canonical_serialization, false)` produces lowercase 64-character hexadecimal SHA-256. The verified example is recorded in [database-schema.md §3.10](database-schema.md#fixed-v1-import-fingerprint-contract).
 
-Imported duplicate identity is scoped to `(user_id, academic_period_id, import_fingerprint)`. The database requires a period for a non-NULL fingerprint and retains fingerprint uniqueness after soft deletion. The contract is fixed; fingerprint generation and import commit Services are not implemented. Manual-entry duplicate handling remains a future schedule API decision.
+Imported duplicate identity is scoped to `(user_id, academic_period_id, import_fingerprint)`. The database requires a period for a non-NULL fingerprint and retains fingerprint uniqueness after soft deletion. The contract is fixed; fingerprint generation and import commit Services are not implemented. Exact duplicate manual active intervals are rejected by application overlap validation; import duplicate handling remains future work.
 
 **BR-SCH-007 — Schedule views**  
-Today's, a specific date's, and a week's schedule are calculated using the user's timezone and return only effective schedule entries for the requested range.
+Today's, a specific date's, and a week's schedule are calculated using the user's timezone and return only effective schedule entries for the requested range. Implemented views use strict YYYY-MM-DD anchors, ISO Monday-first weeks, interval overlap (not starts-at-only selection), exclusive next-midnight boundaries, and starts_at/ends_at/id ordering. They are read-only and mask malformed foreign presentation relations.
 
 ## 3. Excel import rules
 
@@ -306,8 +306,7 @@ Stage 02 status, priority, targeting, effort, deletion/history, and fingerprint 
 
 - default study-window and break values;
 - minimum/maximum study-session duration;
-- manual schedule-entry duplicate handling;
-- whether schedule conflict blocks saving or can be force-confirmed;
+- any future conflict override policy (current manual Lesson conflicts block saving; no override exists);
 - later requirements for report-history retention (no V1 report-history table).
 
-No product defaults or conflict override policy are invented here. Resolved MySQL/application enforcement decisions are recorded in the physical schema's implementation gate; application invariants still require future Services. Each resolved rule should retain its ID and receive implementation tests.
+No product defaults or conflict override policy are invented here. Resolved MySQL/application enforcement decisions are recorded in the physical schema's implementation gate; remaining domain application invariants still require future Services. Each resolved rule should retain its ID and receive implementation tests.

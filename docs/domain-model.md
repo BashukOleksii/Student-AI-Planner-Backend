@@ -1,11 +1,11 @@
 # Conceptual Domain Model
 
-Status: conceptual model synchronized with approved persistence and the completed Academic Context API\
+Status: conceptual model synchronized with approved persistence and the completed Academic Context and Lesson/Schedule APIs\
 Important: this document defines **domain concepts and ownership**. The approved physical MySQL design and implemented Eloquent relationships are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml), not duplicated here. Migration Groups 1–9 are implemented; Stage 02 persistence is complete.
 
 Implemented models are `User`, `PlanningPreference`, `StudyAvailabilityWindow`, `EducationInstitution`, `AcademicPeriod`, `Subject`, `Teacher`, `ScheduleImportBatch`, `ScheduleImportRow`, `Lesson`, `Task`, `Subtask`, `StudySession`, `Reminder`, `AiConversation`, and `AiMessage`. PHP backed enums, scalar/date/datetime/JSON-array casts, factories, and MySQL-backed persistence tests support all groups. Lessons, tasks, and subtasks use soft deletion; sessions/reminders retain lifecycle states; AI messages have `created_at` without `updated_at`.
 
-Authentication + User Profile now implements the first-party Sanctum session/cookie API; see [the contract](auth-profile.md). Planning Preferences and Study Availability Windows also have authenticated APIs and focused Services/ownership protection; see [planning settings](planning-settings.md). Academic Context CRUD and its ownership Policies, institution validation, and guarded lifecycle Services are implemented; see [the Academic Context contract](academic-context.md). Lesson/schedule, Task/Subtask, Reminder, import, statistics, and AI application APIs and ownership compatibility, plus planning/free-time/conflict algorithms, reminder delivery, statistics, and AI orchestration/tools remain future work. Excel parsing, fingerprint generation, preview/commit behavior, and duplicate resolution remain future work. Self-replacement/self-rescheduling and Reminder target compatibility are explicit future Service invariants, not unsupported DB CHECKs. References below to an earlier SQL/ER draft are historical Stage 01 review context; its source is not present in the repository. See [database review notes](database-review-notes.md).
+Authentication + User Profile now implements the first-party Sanctum session/cookie API; see [the contract](auth-profile.md). Planning Preferences and Study Availability Windows also have authenticated APIs and focused Services/ownership protection; see [planning settings](planning-settings.md). Academic Context CRUD and its ownership Policies, institution validation, and guarded lifecycle Services are implemented; see [the Academic Context contract](academic-context.md). Lesson CRUD/lifecycle and user-timezone today/date/ISO-week views are implemented; see [schedule.md](schedule.md). Task/Subtask, Reminder, import, statistics, and AI application APIs and their ownership compatibility, plus planning/free-time algorithms, reminder delivery, statistics, and AI orchestration/tools remain future work. Excel parsing, fingerprint generation, preview/commit behavior, and duplicate resolution remain future work. LessonService prohibits self-replacement and replacement chains. Self-rescheduling and Reminder target compatibility remain future Service invariants, not unsupported DB CHECKs. References below to an earlier SQL/ER draft are historical Stage 01 review context; its source is not present in the repository. See [database review notes](database-review-notes.md).
 
 ## 1. Domain boundaries
 
@@ -39,10 +39,10 @@ A persisted, user-owned semester/academic-period boundary and explicit target fo
 ### Schedule
 
 **Lesson**  
-A concrete, user-owned scheduled occurrence with a subject, start/end time, type, and optional teacher/room metadata. Its persistence model is implemented; schedule behavior remains future Service work. Its lifecycle distinguishes active, cancelled, and replaced entries; normal deletion is soft deletion.
+A concrete, user-owned scheduled occurrence with a subject, start/end time, type, and optional teacher/room metadata. Manual CRUD and lifecycle use LessonService for trusted ownership, same-owner associations, strict UTC intervals, active overlap checks, and atomic mutations. ScheduleService supplies read-only effective today/date/ISO-week views with DST-safe user-local boundaries. Its lifecycle distinguishes active, cancelled, and replaced entries; normal deletion is soft deletion.
 
 **Lesson Replacement / Schedule Change**  
-A replacement is another lesson linked to its original through the approved self-reference. The database enforces original existence and at most one direct replacement. The future deterministic Service must prohibit self-replacement, validate same ownership, and transition the original to `replaced` and the replacement to `active`; none of that workflow is implemented yet. Cancelled, replaced, and soft-deleted lessons do not block free time under future schedule Services.
+A replacement is another lesson linked to its original through the approved self-reference. The database enforces original existence and at most one direct replacement. LessonService prohibits self-replacement/chains, validates same ownership, and atomically transitions the original to `replaced` and replacement to `active`. Cancelling the replacement leaves the original replaced; deleting it restores the original only after conflict validation. Historical soft-deleted manual replacements are reused without converting import identity. Cancelled, replaced, and soft-deleted Lessons are excluded from effective schedule views; free-time calculation remains future work.
 
 **Schedule Import Batch**  
 A persisted process entity representing one Excel import attempt, its academic period, source-file identity, validation state, and commit history. Persisted import rows retain preview data and row-level errors. The fixed imported Lesson fingerprint contract uses the resolved persisted Subject ID and UTC whole-second start/end instants in an ordered JSON array, hashed to lowercase SHA-256; subject name/code, teacher, room, and type are excluded. Fingerprint generation and import commit remain unimplemented; see [the exact contract](database-schema.md#fixed-v1-import-fingerprint-contract).
@@ -186,6 +186,8 @@ Persisted states are `planned`, `completed`, `missed`, `rescheduled`, and `cance
 
 ### Lesson
 
+Canonical Lesson detail/mutation timestamps are UTC `YYYY-MM-DDTHH:MM:SSZ`. Schedule presentation renders the same persisted instants in the authenticated user’s IANA timezone as `YYYY-MM-DDTHH:MM:SS±HH:MM`, with timezone/date metadata; it does not change stored values.
+
 Persisted states are `active`, `cancelled`, and `replaced`. Only active, non-soft-deleted lessons block planning.
 
 ### Reminder
@@ -218,4 +220,4 @@ Planning runs, generated report history, and reminder-delivery history are also 
 
 The former Stage 02 ownership, academic-period, target-reference, replacement, enum, and deletion/history questions are resolved by [the approved physical schema](database-schema.md). Its implementation gate records the resolved DB-versus-Service enforcement decisions without reopening those domain decisions.
 
-Future planning work still needs to define product defaults for study hours, breaks, and session bounds, and conflict handling/override policy. The V1 fingerprint normalization/serialization contract is fixed; its generator and import behavior remain future implementation work. Groups 1–9 complete persistence only; application behavior beyond Authentication/Profile, Planning Settings, and Academic Context remains unimplemented.
+Future planning work still needs to define product defaults for study hours, breaks, and session bounds, and conflict handling/override policy. The V1 fingerprint normalization/serialization contract is fixed; its generator and import behavior remain future implementation work. Groups 1–9 complete persistence only; Authentication/Profile, Planning Settings, Academic Context, and manual Lesson/lifecycle/schedule-view application behavior is implemented. Other domain workflows remain unimplemented.
