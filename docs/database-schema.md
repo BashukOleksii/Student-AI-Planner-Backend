@@ -22,9 +22,11 @@ Important: this is the canonical repository adaptation of the approved `stage-02
 - the approved primary/foreign keys, indexes, uniqueness constraints, owner cascade deletes, optional `SET NULL` deletes, and thirty-six enforced MySQL CHECK constraints across fifteen domain tables; historical Lesson/import `RESTRICT` references remain unchanged. Unsupported self-reference and reminder target checks are assigned explicitly to future deterministic Services;
 - factories and focused MySQL-backed `PlanningPersistenceTest`, `AcademicContextPersistenceTest`, `ScheduleImportPersistenceTest`, `LessonPersistenceTest`, `TaskPersistenceTest`, `StudySessionPersistenceTest`, `ReminderPersistenceTest`, and `AiPersistenceTest`. Factory defaults are valid and ownership-consistent; the StudySession factory derives its owner from its Task. Import/AI JSON fixtures do not define future processing protocols. `PlanningMigrationTest` dynamically rolls back and reapplies domain migrations while preserving the four scaffold migrations and existing users, explicitly covering all Groups 1–9 without a fixed rollback count.
 
-**Persistence complete; application behavior not implemented:** REST APIs, Policies, deterministic Services, planning/free-time/conflict algorithms, reminder delivery, statistics, AI orchestration/tools, and import parsing/commit. Persisted lifecycle states and relationships do not implement those workflows.
+**Implemented Stage 03 application behavior:** Authentication + User Profile uses Sanctum first-party SPA session/cookie authentication. Planning Preferences exposes side-effect-free singleton reads and complete nullable replacement/upsert through `PlanningPreferenceService`, which enforces session/workload bound ordering. Study Availability exposes user-scoped CRUD through `StudyAvailabilityService`, which enforces local interval ordering and deterministic same-user/day overlap rejection. The auto-discovered `StudyAvailabilityWindowPolicy` hides cross-user mutations with 404. See [the auth/profile contract](auth-profile.md) and [planning settings contract](planning-settings.md).
 
-Groups 1–9 implement persistence only. Application lifecycle creation of preference rows, ownership validation, availability-overlap detection, task deletion cleanup, rescheduling, and reminder target validation/recalculation remain unimplemented; product defaults remain undecided. Import staging exists, but Excel parsing, uploads/file storage, preview endpoints, validation/commit Services, duplicate resolution, fingerprint generation, and import-driven Lesson creation remain unimplemented. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. Self-replacement/self-rescheduling prohibitions and lifecycle transitions await deterministic Services.
+**Still unimplemented:** academic context APIs, lesson/schedule APIs, actual free-time calculation, automatic study planning, task/subtask application workflows, import parsing/preview/commit, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
+
+Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Ownership compatibility for other domain associations, task deletion cleanup, rescheduling, and reminder target validation/recalculation remain unimplemented; product defaults remain undecided. Import staging exists, but Excel parsing, uploads/file storage, preview endpoints, validation/commit Services, duplicate resolution, fingerprint generation, and import-driven Lesson creation remain unimplemented. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. Self-replacement/self-rescheduling prohibitions and lifecycle transitions await deterministic Services.
 
 The companion [DBML source](database-schema.dbml) preserves the supplied `student-ai-planner.dbml` diagram. It uses numeric shorthand and omits SQL CHECK expressions; the MySQL types and constraints below remain authoritative. See [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [the earlier draft review](database-review-notes.md) for context. Known implementation issues are recorded in section 8 without changing approved tables, columns, keys, or delete actions.
 
@@ -229,7 +231,8 @@ Semantics:
 
 - `day_of_week`: ISO `1 = Monday ... 7 = Sunday`;
 - overnight availability is represented as two rows;
-- overlapping windows for the same user/day are rejected by a Service.
+- overlapping windows for the same user/day are rejected by the implemented `StudyAvailabilityService`; adjacency is accepted and PATCH excludes its own row;
+- the API uses local `HH:MM:SS`, with `24:00:00` permitted only as an end boundary; no UTC conversion or automatic overnight splitting is performed.
 
 FK:
 
@@ -912,17 +915,17 @@ Messages are treated as append-oriented records; `updated_at` is absent. `AiMess
 
 ## 5. Important cross-row/service rules not delegated to MySQL
 
-These remain deterministic PHP Service responsibilities:
+These are deterministic application responsibilities, separate from MySQL enforcement. Recurring availability overlap and ownership protection for the current Stage 03 APIs are implemented; other domain rules remain future work:
 
 1. lesson overlap and schedule conflicts;
 2. study-session overlap and free-time validation;
-3. cross-user ownership checks;
+3. cross-user ownership checks (implemented for current profile/preferences/availability APIs; other domain associations remain pending);
 4. subject/teacher/academic-period ownership compatibility;
 5. replacement lesson and original lesson ownership;
 6. subtask belongs to the study session's task;
 7. deadline feasibility;
 8. daily and weekly workload limits;
-9. recurring availability overlap;
+9. recurring availability overlap (implemented by `StudyAvailabilityService`);
 10. parent-task versus subtask effort authority;
 11. reminder target ownership;
 12. relative reminder recalculation after deadline/session changes;
@@ -1004,4 +1007,4 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
 - Define product defaults and any conflict override policy in Stage 03; no defaults or override behavior are introduced here.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup. Group 4 tests on MySQL 8.4.10 show that directly deleting a User who owns both a period and its import batch is rejected with error 1451 by `schedule_import_batches_academic_period_id_foreign`. Group 5 confirms that an isolated User/Subject/manual-Lesson graph can cascade, while a combined period/batch/Lesson history graph blocks direct User deletion with 1451. Hard-removing Lessons first still leaves the batch/period restriction; deleting batches next cascades their rows and then permits User deletion. Soft deletion does not remove restrictive references. Account hard purge is an ordered administrative operation, distinct from normal domain deletion; the approved FKs are unchanged.
 
-Stage 02 persistence is complete through Groups 1–9. Stage 03 application implementation must add authenticated/authorized APIs and deterministic Services over these models, including task deletion orchestration, ownership validation, planning/conflicts, and reminder cleanup. Import parsing/preview/commit, fingerprint generation, duplicate resolution, delivery, statistics, and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.
+Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Further backend verticals must add academic and schedule APIs, task/subtask workflows, other domain ownership compatibility, free-time/planning algorithms, rescheduling, and reminder cleanup. Import parsing/preview/commit, fingerprint generation, duplicate resolution, delivery, statistics, and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.

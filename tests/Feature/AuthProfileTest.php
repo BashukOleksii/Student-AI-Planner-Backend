@@ -132,6 +132,53 @@ class AuthProfileTest extends TestCase
         $this->postJson('/api/auth/login', ['email' => 'invalid'])->assertUnprocessable()->assertJsonValidationErrors(['email', 'password']);
     }
 
+    #[DataProvider('nonStatefulAuthRequests')]
+    public function test_auth_requires_a_stateful_request_before_any_mutation(string $endpoint, ?string $origin): void
+    {
+        $this->withoutHeader('Origin');
+        if ($origin !== null) {
+            $this->withHeader('Origin', $origin);
+        }
+
+        if ($endpoint === 'login') {
+            User::factory()->create(['email' => 'student@example.test', 'password' => 'secure-password']);
+        }
+        $expectedCount = User::count();
+
+        $this->postJson('/api/auth/'.$endpoint, $this->registration())
+            ->assertUnprocessable()->assertJsonValidationErrors('session');
+
+        $this->assertDatabaseCount('users', $expectedCount);
+        $this->assertGuest('web');
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public static function nonStatefulAuthRequests(): array
+    {
+        $cases = [];
+        foreach (['register', 'login'] as $endpoint) {
+            $cases[$endpoint.' missing origin'] = [$endpoint, null];
+            $cases[$endpoint.' untrusted origin'] = [$endpoint, 'http://untrusted.test'];
+            $cases[$endpoint.' unconfigured port'] = [$endpoint, 'http://localhost:5174'];
+        }
+
+        return $cases;
+    }
+
+    public function test_configured_referer_can_establish_a_session_without_origin(): void
+    {
+        $this->withoutHeader('Origin')->withHeader('Referer', 'http://localhost:5173/register');
+
+        $response = $this->postJson('/api/auth/register', $this->registration())->assertCreated();
+        $user = User::sole();
+        $this->assertPublicUser($response, $user);
+        $this->assertAuthenticatedAs($user, 'web');
+
+        $this->withUnencryptedCookie(config('session.cookie'), $response->getCookie(config('session.cookie'), false)->getValue());
+        Auth::forgetGuards();
+        $this->assertPublicUser($this->getJson('/api/profile')->assertOk(), $user);
+    }
+
     public function test_private_endpoints_reject_unauthenticated_requests(): void
     {
         $this->getJson('/api/profile')->assertUnauthorized();
@@ -217,7 +264,8 @@ class AuthProfileTest extends TestCase
         $login = $this->postJson('/api/auth/login', ['email' => $user->email, 'password' => 'secure-password'])->assertOk();
         $sessionId = session()->getId();
         $token = session()->token();
-        $this->withUnencryptedCookie(config('session.cookie'), $login->getCookie(config('session.cookie'), false)->getValue());
+        $oldSessionCookie = $login->getCookie(config('session.cookie'), false)->getValue();
+        $this->withUnencryptedCookie(config('session.cookie'), $oldSessionCookie);
         Auth::forgetGuards();
         $this->getJson('/api/profile')->assertOk();
         $logout = $this->postJson('/api/auth/logout')->assertNoContent();
@@ -226,6 +274,10 @@ class AuthProfileTest extends TestCase
         $this->assertNotSame($token, session()->token());
         $this->assertNull(session()->get(Auth::guard('web')->getName()));
         $this->withUnencryptedCookie(config('session.cookie'), $logout->getCookie(config('session.cookie'), false)->getValue());
+        Auth::forgetGuards();
+        $this->getJson('/api/profile')->assertUnauthorized();
+
+        $this->withUnencryptedCookie(config('session.cookie'), $oldSessionCookie);
         Auth::forgetGuards();
         $this->getJson('/api/profile')->assertUnauthorized();
     }

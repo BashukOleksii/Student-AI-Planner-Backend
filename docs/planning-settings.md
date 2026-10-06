@@ -36,10 +36,10 @@ represented as the following all-null configuration without creating a row:
 ```
 
 PUT requires all five keys, replacing/upserting the complete representation.
-It returns 200 even on first materialization. Each value may be null or an
-JSON integer from 1 through 65535 (the unsigned SMALLINT storage limit). Booleans and numeric strings are rejected. Configured
-values serialize as JSON numbers. Null clears existing configuration and means
-no user-configured value; no future product defaults are invented here.
+It returns 200 even on first materialization. Each value may be null or a
+JSON integer from 1 through 65535 (the unsigned SMALLINT storage limit). Booleans and
+numeric strings are rejected. Configured values serialize as JSON numbers.
+Null clears existing configuration and means no user-configured value; no future product defaults are invented here.
 
 When both bounds are configured, maximum session minutes must be at least
 minimum session minutes, and weekly study minutes must be at least daily study

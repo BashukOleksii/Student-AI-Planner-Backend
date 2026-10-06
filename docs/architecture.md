@@ -249,7 +249,7 @@ Tools are thin application adapters over Services. They receive structured argum
 
 Authentication + User Profile uses **Sanctum first-party SPA cookie/session authentication** with Laravel’s `web` guard. `bootstrap/app.php` enables `statefulApi()`. Registration/login regenerate the session; logout invalidates it and regenerates the CSRF token. No Personal Access Tokens are issued; the existing token table remains. Password reset/change and email verification remain deferred.
 
-Dedicated Form Requests validate registration, login, and partial profile updates. `UserResource` exposes only `id`, `name`, `email`, and `timezone` in Laravel’s standard `data` envelope. Invalid input/credentials return standard `422` errors; unauthenticated private requests return `401`. Profile access uses only `$request->user()`; unknown fields including `user_id` and profile passwords are ignored through validated-field allowlists. No Service or Policy is needed for this current-user-only slice.
+Dedicated Form Requests validate registration, login, and partial profile updates. `UserResource` exposes only `id`, `name`, `email`, and `timezone` in Laravel’s standard `data` envelope. Invalid input/credentials return standard `422` errors; registration/login also reject requests without an attached stateful SPA session as `422` before any mutation; unauthenticated private requests return `401`. Profile access uses only `$request->user()`; unknown fields including `user_id` and profile passwords are ignored through validated-field allowlists. No Service or Policy is needed for this current-user-only slice.
 
 See [SPA integration and API contract](auth-profile.md) for environment, credentials, CSRF, and local frontend setup.
 
@@ -331,7 +331,7 @@ The parser does not write directly to final schedule records during preview. Dup
 - filters/sorting expressed as query parameters;
 - no frontend-specific database field leakage where an API Resource can provide a stable contract.
 
-Exact endpoints are deferred until the related backend feature is implemented.
+Authentication/profile and planning-settings endpoints are implemented as documented in [auth-profile.md](auth-profile.md) and [planning-settings.md](planning-settings.md). Endpoints for other domain capabilities remain deferred until their backend features are implemented.
 
 ## 16. Recommended Laravel application structure
 
