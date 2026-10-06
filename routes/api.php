@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AcademicPeriodController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EducationInstitutionController;
+use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\PlanningPreferenceController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\StudyAvailabilityWindowController;
@@ -50,4 +51,9 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/teachers/{teacher}', [TeacherController::class, 'show'])->name('teachers.show');
     Route::patch('/teachers/{teacher}', [TeacherController::class, 'update'])->name('teachers.update');
     Route::delete('/teachers/{teacher}', [TeacherController::class, 'destroy'])->name('teachers.destroy');
+
+    Route::post('/lessons', [LessonController::class, 'store'])->name('lessons.store');
+    Route::get('/lessons/{lesson}', [LessonController::class, 'show'])->name('lessons.show');
+    Route::patch('/lessons/{lesson}', [LessonController::class, 'update'])->name('lessons.update');
+    Route::delete('/lessons/{lesson}', [LessonController::class, 'destroy'])->name('lessons.destroy');
 });
