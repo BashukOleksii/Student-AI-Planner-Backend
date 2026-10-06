@@ -53,7 +53,7 @@ class LessonApiTest extends TestCase
         $lesson = Lesson::sole();
         $response->assertExactJson(['data' => [
             'id' => $lesson->id, 'academic_period_id' => null, 'subject_id' => $subject->id, 'teacher_id' => null,
-            'type' => 'lecture', 'room' => null, 'starts_at' => '2026-10-06T09:00:00Z', 'ends_at' => '2026-10-06T10:00:00Z', 'status' => 'active',
+            'type' => 'lecture', 'room' => null, 'starts_at' => '2026-10-06T09:00:00Z', 'ends_at' => '2026-10-06T10:00:00Z', 'status' => 'active', 'replaces_lesson_id' => null, 'replacement_id' => null,
         ]]);
         $this->assertSame($subject->user_id, $lesson->user_id);
         $this->assertNotSame(999999, $lesson->id);
@@ -78,7 +78,7 @@ class LessonApiTest extends TestCase
             'teacher_id' => $teacher->id, 'academic_period_id' => $period->id, 'room' => str_repeat('R', 100), 'type' => 'practical',
         ]))->assertCreated()->assertExactJson(['data' => [
             'id' => Lesson::sole()->id, 'subject_id' => $subject->id, 'teacher_id' => $teacher->id, 'academic_period_id' => $period->id,
-            'type' => 'practical', 'room' => str_repeat('R', 100), 'starts_at' => '2026-10-06T09:00:00Z', 'ends_at' => '2026-10-06T10:00:00Z', 'status' => 'active',
+            'type' => 'practical', 'room' => str_repeat('R', 100), 'starts_at' => '2026-10-06T09:00:00Z', 'ends_at' => '2026-10-06T10:00:00Z', 'status' => 'active', 'replaces_lesson_id' => null, 'replacement_id' => null,
         ]]);
     }
 
@@ -183,7 +183,7 @@ class LessonApiTest extends TestCase
             'created_at' => '2000-01-01', 'updated_at' => '2000-01-01', 'deleted_at' => '2000-01-01',
         ])->assertOk()->assertExactJson(['data' => [
             'id' => $lesson->id, 'subject_id' => $lesson->subject_id, 'teacher_id' => null, 'academic_period_id' => null,
-            'type' => 'lecture', 'room' => '302', 'starts_at' => '2026-10-05T06:00:00Z', 'ends_at' => '2026-10-05T07:30:00Z', 'status' => 'active',
+            'type' => 'lecture', 'room' => '302', 'starts_at' => '2026-10-05T06:00:00Z', 'ends_at' => '2026-10-05T07:30:00Z', 'status' => 'active', 'replaces_lesson_id' => null, 'replacement_id' => null,
         ]]);
         $lesson->refresh();
         foreach (['id', 'user_id', 'created_at', 'starts_at', 'ends_at', 'schedule_import_batch_id', 'import_fingerprint', 'replaces_lesson_id', 'deleted_at', 'status'] as $field) {

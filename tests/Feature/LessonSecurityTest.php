@@ -122,7 +122,7 @@ class LessonSecurityTest extends TestCase
         $before = $lesson->getAttributes();
         $this->actingAs($user, 'web')->getJson($this->url($lesson))->assertOk()->assertExactJson(['data' => [
             'id' => $lesson->id, 'academic_period_id' => null, 'subject_id' => null, 'teacher_id' => null,
-            'type' => 'lecture', 'room' => null, 'starts_at' => '2026-10-05T06:00:00Z', 'ends_at' => '2026-10-05T07:30:00Z', 'status' => 'active',
+            'type' => 'lecture', 'room' => null, 'starts_at' => '2026-10-05T06:00:00Z', 'ends_at' => '2026-10-05T07:30:00Z', 'status' => 'active', 'replaces_lesson_id' => $original->id, 'replacement_id' => null,
         ]]);
         $this->assertSame($before, $lesson->refresh()->getAttributes());
     }

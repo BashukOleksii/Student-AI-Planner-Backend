@@ -56,4 +56,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/lessons/{lesson}', [LessonController::class, 'show'])->name('lessons.show');
     Route::patch('/lessons/{lesson}', [LessonController::class, 'update'])->name('lessons.update');
     Route::delete('/lessons/{lesson}', [LessonController::class, 'destroy'])->name('lessons.destroy');
+    Route::post('/lessons/{lesson}/cancel', [LessonController::class, 'cancel'])->name('lessons.cancel');
+    Route::post('/lessons/{lesson}/replacement', [LessonController::class, 'replacement'])->name('lessons.replacement.store');
 });

@@ -38,4 +38,17 @@ class LessonController extends Controller
 
         return response()->noContent();
     }
+
+    public function cancel(Request $request, Lesson $lesson, LessonService $service): LessonResource
+    {
+        Gate::authorize('update', $lesson);
+
+        return new LessonResource($service->cancel($request->user(), $lesson));
+    }
+
+    public function replacement(SaveLessonRequest $request, Lesson $lesson, LessonService $service): JsonResponse
+    {
+        return (new LessonResource($service->createReplacement($request->user(), $lesson, $request->validated())))
+            ->response()->setStatusCode(201);
+    }
 }

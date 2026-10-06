@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\LessonType;
+use App\Models\Lesson;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -11,7 +12,7 @@ class SaveLessonRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        if ($this->isMethod('PATCH')) {
+        if ($this->route('lesson') instanceof Lesson) {
             Gate::authorize('update', $this->route('lesson'));
         }
 

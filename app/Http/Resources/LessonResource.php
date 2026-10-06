@@ -20,6 +20,8 @@ class LessonResource extends JsonResource
             'starts_at' => $this->utcTimestamp('starts_at'),
             'ends_at' => $this->utcTimestamp('ends_at'),
             'status' => $this->status->value,
+            'replaces_lesson_id' => $this->ownedAssociationId('replacedLesson', $request),
+            'replacement_id' => $this->ownedAssociationId('replacement', $request),
         ];
     }
 
