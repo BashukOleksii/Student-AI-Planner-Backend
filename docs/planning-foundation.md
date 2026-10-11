@@ -1,6 +1,7 @@
 # Planning Foundation — PF1 checkpoints C1–C4
 
-Status: **PF1 complete (C1–C4 verified). PF2 remains unimplemented.**
+Status: **PF1 complete (C1–C4 verified).** PF2 has begun with
+[C5 duration checks](planning-constraints.md); remaining PF2 policies are deferred.
 
 C1/C2 provide pure computation. C3 adds read-only FreeTimeService integration
 with owned availability, Lessons and StudySessions. C4 exposes this calculation

@@ -56,8 +56,9 @@ submitted values. Empty PATCH is valid for a valid existing interval. DELETE
 hard-deletes the owned window and returns an empty 204.
 
 Weekdays are ISO: 1 = Monday through 7 = Sunday. Times are recurring **local
-wall-clock** values interpreted in the profile's IANA timezone by future planning
-Services. They are not UTC instants and are never converted to UTC by this API.
+wall-clock** values interpreted in the profile's IANA timezone by the implemented
+[PF1 Services](planning-foundation.md). They are not UTC instants and are never
+converted to UTC by this settings API.
 
 Use canonical `HH:MM:SS`. Starts range from `00:00:00` through `23:59:59`.
 Ends additionally permit exactly `24:00:00`; `24:01:00`, `25:00:00`, invalid
@@ -116,6 +117,8 @@ before validation; DELETE authorizes in its Controller. Service lookups also
 scope route-bound IDs through the trusted user's relationship. No public input
 establishes ownership.
 
-No free-time calculation, scheduling, defaults, academic CRUD, or AI tools are
-implemented in this slice. Future AI adapters must validate structured inputs and
-call these Services under trusted user context.
+This settings slice does not implement scheduling, defaults, academic CRUD or
+AI tools. PF1 free-time calculation and its read-only API are implemented
+separately; see [planning-foundation.md](planning-foundation.md). Future AI
+adapters must validate structured inputs and call these Services under trusted
+user context.
