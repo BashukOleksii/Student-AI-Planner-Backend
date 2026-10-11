@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ReorderSubtasksRequest;
 use App\Http\Requests\SaveSubtaskRequest;
 use App\Http\Resources\SubtaskResource;
 use App\Models\Subtask;
@@ -25,6 +26,11 @@ class SubtaskController extends Controller
     public function store(SaveSubtaskRequest $request, Task $task, SubtaskService $service): JsonResponse
     {
         return (new SubtaskResource($service->create($request->user(), $task, $request->validated())))->response()->setStatusCode(201);
+    }
+
+    public function reorder(ReorderSubtasksRequest $request, Task $task, SubtaskService $service): AnonymousResourceCollection
+    {
+        return SubtaskResource::collection($service->reorder($request->user(), $task, $request->validated('subtask_ids')));
     }
 
     public function show(Request $request, Task $task, Subtask $subtask, SubtaskService $service): SubtaskResource

@@ -37,7 +37,7 @@ projected-conflict classification with transient row statuses, without staging
 or Lesson writes. No schema, enums or fixed fingerprint contract changed.
 See [schedule.md](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
 
-**Still unimplemented:** actual free-time calculation, automatic study planning, Task/Subtask deletion, Subtask reordering and progress workflows, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
+**Still unimplemented:** actual free-time calculation, automatic study planning, Task/Subtask deletion and planning workflows, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
 
 Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. T1/T2 enforce Task Subject ownership, parent deadline bounds and manual completion/reopening. Reminder association ownership, task deletion cleanup, rescheduling, and reminder target validation/recalculation remain unimplemented; product defaults remain undecided. Import C1/C2a/C2b now implement temporary XLSX upload, persisted preview/revalidation and confirmed atomic Lesson reconciliation. Destructive semester replacement is deferred. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. StudySession self-rescheduling and other domain lifecycle transitions remain future Service work.
 
@@ -682,7 +682,7 @@ Eloquent:
 
 ### 3.12 subtasks
 
-Implemented persistence for ordered decomposition of a task. S1 adds nested basic APIs and independent completion/reopening, append-only position allocation and Service deadline validation; see [tasks.md](tasks.md). The schema is unchanged. Deletion/restore, reordering, progress and planning remain deferred.
+Implemented persistence for ordered decomposition of a task. S1 adds nested basic APIs and independent completion/reopening, append-only position allocation and Service deadline validation; see [tasks.md](tasks.md). S2 adds complete active-set transactional position normalization and read-only derived progress. The schema is unchanged: no unique position constraint or stored percentage is added. Deletion/restore and planning remain deferred.
 
 | Column | MySQL type | Null |
 |---|---|---:|

@@ -96,6 +96,43 @@ class SubtaskService
         });
     }
 
+    /** @return Collection<int, Subtask> */
+    public function reorder(User $user, Task $task, array $subtaskIds): Collection
+    {
+        return DB::transaction(function () use ($user, $task, $subtaskIds): Collection {
+            $task = $this->lockParent($user, $task);
+            // Only identity/position is needed for validation; avoid hydrating full models here.
+            $active = $task->subtasks()->orderBy('id')->lockForUpdate()->toBase()->get(['id', 'position'])->keyBy('id');
+            if ($active->count() > 65535) {
+                throw ValidationException::withMessages(['subtask_ids' => ['Too many active subtasks to assign positions.']]);
+            }
+            if (! array_is_list($subtaskIds) || count($subtaskIds) !== $active->count()) {
+                $this->invalidPermutation();
+            }
+            $seen = [];
+            foreach ($subtaskIds as $id) {
+                if (! is_int($id) || $id < 1 || ! $active->has($id) || isset($seen[$id])) {
+                    $this->invalidPermutation();
+                }
+                $seen[$id] = true;
+            }
+
+            foreach ($subtaskIds as $index => $id) {
+                $position = $index + 1;
+                if ((int) $active[$id]->position !== $position) {
+                    $task->subtasks()->whereKey($id)->update(['position' => $position]);
+                }
+            }
+
+            return $task->subtasks()->orderBy('position')->orderBy('id')->get();
+        });
+    }
+
+    private function invalidPermutation(): never
+    {
+        throw ValidationException::withMessages(['subtask_ids' => ['The subtask ids must contain every active subtask of this task exactly once.']]);
+    }
+
     private function lockParent(User $user, Task $task): Task
     {
         User::whereKey($user->getKey())->lockForUpdate()->firstOrFail();

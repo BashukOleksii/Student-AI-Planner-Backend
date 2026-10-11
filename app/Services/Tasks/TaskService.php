@@ -16,6 +16,26 @@ class TaskService
 {
     private const EDITABLE_FIELDS = ['title', 'description', 'subject_id', 'priority', 'estimated_minutes', 'deadline_at'];
 
+    /** @return array{task_id: int, total_subtasks: int, completed_subtasks: int, progress_percent: ?int} */
+    public function progress(User $user, Task $task): array
+    {
+        $task = $user->tasks()->findOrFail($task->getKey());
+        $counts = $task->subtasks()->selectRaw(
+            'COUNT(*) AS total_subtasks, COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS completed_subtasks',
+            [TaskStatus::Completed->value],
+        )->toBase()->first();
+        $total = (int) $counts->total_subtasks;
+        $completed = (int) $counts->completed_subtasks;
+
+        return [
+            'task_id' => $task->getKey(),
+            'total_subtasks' => $total,
+            'completed_subtasks' => $completed,
+            // Positive integer arithmetic implements nearest-integer, half-up rounding.
+            'progress_percent' => $total === 0 ? null : intdiv($completed * 100 + intdiv($total, 2), $total),
+        ];
+    }
+
     /** @return LengthAwarePaginator<int, Task> */
     public function paginate(User $user, array $filters): LengthAwarePaginator
     {

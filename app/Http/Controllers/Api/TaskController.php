@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ListTasksRequest;
 use App\Http\Requests\SaveTaskRequest;
+use App\Http\Resources\TaskProgressResource;
 use App\Http\Resources\TaskResource;
 use App\Models\Task;
 use App\Services\Tasks\TaskService;
@@ -30,6 +31,13 @@ class TaskController extends Controller
         Gate::authorize('view', $task);
 
         return new TaskResource($task);
+    }
+
+    public function progress(Request $request, Task $task, TaskService $service): TaskProgressResource
+    {
+        Gate::authorize('view', $task);
+
+        return new TaskProgressResource($service->progress($request->user(), $task));
     }
 
     public function update(SaveTaskRequest $request, Task $task, TaskService $service): TaskResource

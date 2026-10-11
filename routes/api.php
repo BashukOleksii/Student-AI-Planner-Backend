@@ -75,6 +75,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
     Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
     Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
+    Route::get('/tasks/{task}/progress', [TaskController::class, 'progress'])->name('tasks.progress');
     Route::patch('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
     Route::post('/tasks/{task}/complete', [TaskController::class, 'complete'])->name('tasks.complete');
     Route::post('/tasks/{task}/reopen', [TaskController::class, 'reopen'])->name('tasks.reopen');
@@ -82,6 +83,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::scopeBindings()->group(function (): void {
         Route::get('/tasks/{task}/subtasks', [SubtaskController::class, 'index'])->name('tasks.subtasks.index');
         Route::post('/tasks/{task}/subtasks', [SubtaskController::class, 'store'])->name('tasks.subtasks.store');
+        Route::post('/tasks/{task}/subtasks/reorder', [SubtaskController::class, 'reorder'])->name('tasks.subtasks.reorder');
         Route::get('/tasks/{task}/subtasks/{subtask}', [SubtaskController::class, 'show'])->name('tasks.subtasks.show');
         Route::patch('/tasks/{task}/subtasks/{subtask}', [SubtaskController::class, 'update'])->name('tasks.subtasks.update');
         Route::post('/tasks/{task}/subtasks/{subtask}/complete', [SubtaskController::class, 'complete'])->name('tasks.subtasks.complete');

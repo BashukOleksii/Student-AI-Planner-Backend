@@ -1,11 +1,11 @@
-# Tasks and Subtasks — T1–T3 and S1
+# Tasks and Subtasks — T1–T3, S1 and S2
 
 Implemented: authenticated Task creation, detail retrieval, partial updates,
 completion, reopening and filtered/paginated listing. Persistence uses the existing
 MySQL Task/Subtask schema and enums. S1 adds nested Subtask creation, ordered
-listing, detail, partial editing and completion/reopening. Task/Subtask deletion,
-restore, cleanup, Subtask reordering, progress, planning, reminders and AI tools
-remain deferred.
+listing, detail, partial editing and completion/reopening. S2 adds transactional
+Subtask reordering and read-only derived Task progress. Task/Subtask deletion,
+restore, cleanup, planning, reminders and AI tools remain deferred.
 
 ## Endpoints
 
@@ -19,6 +19,7 @@ All routes require `auth:sanctum` and use the normal `data` Resource wrapper.
 | PATCH | `/api/tasks/{task}` | `tasks.update` | 200 |
 | POST | `/api/tasks/{task}/complete` | `tasks.complete` | 200 |
 | POST | `/api/tasks/{task}/reopen` | `tasks.reopen` | 200 |
+| GET | `/api/tasks/{task}/progress` | `tasks.progress` | 200 |
 
 Unauthenticated requests return 401. Missing, soft-deleted and foreign Tasks
 return 404; PATCH authorizes before validating the body. Validation failures
@@ -159,12 +160,13 @@ relationship objects, Subtask collections or calculated progress are exposed.
 
 ## S1 Subtask API
 
-All six routes require `auth:sanctum` and use SubtaskResource under `data`.
+All nested routes require `auth:sanctum` and use SubtaskResource under `data`.
 
 | Method | Path | Route name | Success |
 |---|---|---|---|
 | GET | `/api/tasks/{task}/subtasks` | `tasks.subtasks.index` | 200 |
 | POST | `/api/tasks/{task}/subtasks` | `tasks.subtasks.store` | 201 |
+| POST | `/api/tasks/{task}/subtasks/reorder` | `tasks.subtasks.reorder` | 200 |
 | GET | `/api/tasks/{task}/subtasks/{subtask}` | `tasks.subtasks.show` | 200 |
 | PATCH | `/api/tasks/{task}/subtasks/{subtask}` | `tasks.subtasks.update` | 200 |
 | POST | `/api/tasks/{task}/subtasks/{subtask}/complete` | `tasks.subtasks.complete` | 200 |
@@ -193,7 +195,7 @@ Creation is allowed under pending or completed parents and never changes parent
 state. New Subtasks are pending with null completion metadata. After locking the
 owner and current parent, SubtaskService allocates position 1 when no non-deleted
 children exist, otherwise maximum non-deleted position + 1. Deleted history is
-excluded; existing rows are never renumbered or restored. Position 65535 is the
+excluded; creation never renumbers or restores existing rows. Position 65535 is the
 last available value; exhaustion returns a `position` validation error. Allocation
 uses the owner/parent serialization locks, without adding a uniqueness constraint.
 
@@ -235,3 +237,65 @@ the existing pending/completed string values. Dates are null or canonical UTC
 whole-second strings, independent of server/User timezone. No audit fields,
 ownership IDs, relationship objects or derived progress are exposed. Existing
 TaskResource remains unchanged and contains no Subtask collection.
+
+## S2a transactional Subtask reordering
+
+`POST /api/tasks/{task}/subtasks/reorder` accepts JSON containing `subtask_ids`,
+the complete desired order of the parent's active (non-deleted) Subtasks:
+
+```json
+{"subtask_ids": [12, 9, 15]}
+```
+
+The field must be a JSON array (including an empty array only for an empty active
+set), with strict positive integer IDs and no duplicates. Objects, string/floating
+IDs, partial/extra/deleted/unrelated IDs are rejected with 422. Foreign and unknown
+IDs receive the same generic permutation error. Forged `user_id`, `task_id` and
+position fields are ignored. Parent authorization precedes body validation;
+missing/deleted/foreign parents return 404 and unauthenticated requests return 401.
+
+SubtaskService opens a transaction, locks owner → current owned parent → all active
+children, then validates against that freshly loaded set. Cached relationship
+collections and stale client counts are not trusted. The submitted order assigns
+positions 1..N, normalizing legacy gaps/duplicate positions without a new uniqueness
+constraint. More than 65535 active rows cannot be represented and causes a controlled
+error. All changes roll back together on failure. Rows already at their desired
+position receive no UPDATE; an identical dense reorder preserves `updated_at`.
+
+The response is the unchanged complete SubtaskResource collection under `data`,
+ordered by position then ID. Subsequent GET shows the same order, and S1 creation
+still appends after the current maximum. Deleted history, parent fields, child
+lifecycle/title/description/deadline/estimate data, sessions and reminders remain
+untouched. GET never repairs positions.
+
+Creation and reordering share the owner/parent locks. A new active child added since
+list retrieval makes the old permutation incomplete and yields 422 without partial
+updates. No snapshot consistency across separate requests is promised.
+
+## S2b derived Task progress
+
+`GET /api/tasks/{task}/progress` returns a separate Resource without changing
+TaskResource or SubtaskResource. It requires the authenticated owner (401 without
+authentication; 404 for foreign, missing or deleted Tasks).
+
+```json
+{"data":{"task_id":42,"total_subtasks":3,"completed_subtasks":2,"progress_percent":67}}
+```
+
+Progress is completed active Subtasks / total active Subtasks × 100, rounded to an
+integer with nearest, half-up behavior using integer arithmetic. For example 1/4
+is 25, 2/3 is 67, and 1/8 is 13. With zero active Subtasks, both counts are 0 and
+`progress_percent` is null, including for a completed parent or deleted-only history.
+
+TaskService reloads the owned active Task and runs one scoped aggregate query;
+both pending and completed non-deleted children count. No Subtask collection is
+loaded, no cache/percentage column is persisted and no records are mutated.
+The result reflects the current aggregate query, without cross-request snapshot
+guarantees. Input cannot supply the counts or progress result.
+
+Parent and child statuses remain independent: a pending Task can report 100%, and
+a completed Task can report 0%. Child completion/reopening changes the next result;
+parent completion/reopening and child reordering do not. Positions, estimates,
+completion dates and study sessions do not define this count-based metric. Remaining
+schedulable duration, effort accounting, feasibility and planning remain deferred;
+BR-SUB-006's future planner must not double-count parent and child estimates.
