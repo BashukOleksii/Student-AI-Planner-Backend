@@ -138,11 +138,47 @@ Parser tests use plain PHPUnit and require no MySQL:
 `vendor/bin/phpunit tests/Unit/ScheduleWorkbookParserTest.php`.
 PhpSpreadsheet requires its Composer-declared PHP extensions, including GD and ZIP.
 
+## Import B1: transient calendar occurrences
+
+`ScheduleOccurrenceMaterializer::materialize(array $template, AcademicPeriod $academicPeriod, string $timezone)`
+expands the Import A weekly template into concrete occurrence candidates. The
+caller supplies a loaded, owned AcademicPeriod and the user's persisted IANA
+timezone; the materializer itself performs no ownership lookup or database access.
+
+Expansion uses the inclusive `starts_on..ends_on` calendar interval. The ISO week
+containing `AcademicPeriod.starts_on` is **numerator**, even for a partial first
+week. Subsequent weeks alternate by their offset from that Monday, independently
+of numeric ISO week numbers and year boundaries. `all` rules match every week.
+
+Calendar arithmetic uses timezone-independent date labels. Each start and end
+wall-clock time resolves independently through the supplied IANA timezone's
+transitions, then becomes a whole-second UTC `YYYY-MM-DDTHH:MM:SSZ` instant.
+Nonexistent times (gaps/skipped dates), ambiguous times (folds), invalid inputs,
+and non-positive instant intervals raise `ScheduleOccurrenceMaterializationException`;
+the service never silently shifts a lesson or chooses a fold offset.
+
+The result contains unchanged `group` and workbook `source`, plus `occurrences`.
+Each occurrence preserves the parser's `weekday`, `pair_label`, rule `parity`,
+subject/teacher names, nullable room, local times, and `source`, and adds
+`local_date`, `starts_at_utc`, `ends_at_utc`, and `type: LessonType::Other` (serialized
+as `other`). The source lesson type remains unknown; Other is solely the technical
+fallback required by the Lesson domain. Ordering is local date/start/end, then
+worksheet/source rows/ranges and literal metadata to break ties deterministically.
+
+The real workbook for `2026-09-07..2026-09-20` in `Europe/Kyiv` produces **30
+occurrences**: 15 in each week. Tests use in-memory AcademicPeriod attributes and
+plain PHPUnit, including partial weeks, year boundaries, DST changes and gaps/folds:
+`vendor/bin/phpunit tests/Unit/ScheduleOccurrenceMaterializerTest.php`.
+
+Candidates remain transient: there is no neutral import-row status, and entity
+resolution, duplicate/conflict validation and commit have not happened. No batch,
+row, preview row number, Subject/Teacher ID, fingerprint or Lesson is produced.
+
 ## Remaining scope
 
 Excel upload/storage, persisted preview/batches/rows, AcademicPeriod selection,
-date expansion and parity anchoring, timezone conversion, Subject/Teacher
-resolution, fingerprints, duplicate/conflict handling, commit/re-import and
+ownership orchestration, Subject/Teacher resolution, fingerprints,
+duplicate/conflict handling, commit/re-import and
 Lesson persistence remain deferred to later import stages. The fixed V1
 fingerprint contract is unchanged. The Excel import feature is not complete.
 Task/Subtask workflows, free-time calculation, study planning/rescheduling,

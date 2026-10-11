@@ -1,7 +1,7 @@
 # Business Rules
 
 Status: approved persistence baseline with current API enforcement recorded\
-Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. Task/Subtask APIs/workflows, planning, reminder delivery, statistics, AI orchestration/tools, and import upload/preview/date expansion/entity resolution/commit/fingerprint generation remain future work. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
+Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. Task/Subtask APIs/workflows, planning, reminder delivery, statistics, AI orchestration/tools, and import upload/preview/entity resolution/commit/fingerprint generation remain future work. Import B1 adds transient calendar/parity/timezone materialization. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
 
 Lesson association/replacement ownership, self-replacement/chain prohibition, Lesson lifecycle transitions and active overlap validation are implemented. Task/import/Reminder association ownership, task/subtask consistency, self-rescheduling, Task/StudySession lifecycle transitions, deadlines and overlaps, task deletion cleanup, and Reminder target count/compatibility/recalculation/purge reconciliation remain future Service requirements. MySQL enforces supported scalar/timestamp CHECKs, FK existence/actions, and approved uniqueness; it does not enforce cross-row ownership or checks prohibited by AUTO_INCREMENT/SET NULL restrictions.
 
@@ -76,6 +76,16 @@ Repeating the same import must not silently duplicate unchanged schedule entries
 
 **BR-IMP-005 — Semester replacement is explicit**  
 Every import batch targets a persisted AcademicPeriod owned by the user. Importing a new semester must not implicitly delete prior periods or schedule history. Academic periods with schedule/import history are protected from destructive deletion (implemented by AcademicPeriodService, including soft-deleted or malformed foreign history); any replacement operation requires explicit user intent and normal confirmation policy.
+
+**BR-IMP-006 — Weekly template materialization**\
+Import B1 expands weekly rules only inside the inclusive AcademicPeriod date
+range. Its starting ISO week is numerator; parity alternates by relative week
+offset, including partial weeks and year boundaries. Every local start/end
+resolves independently in the supplied IANA timezone, producing whole-second
+UTC candidates; nonexistent/ambiguous endpoints and invalid intervals fail.
+The source has no Lesson type: `LessonType::Other` is only a technical domain
+fallback. Candidates remain transient until later resolution and validation;
+no import row is prematurely classified as valid. See [the B1 contract](schedule.md#import-b1-transient-calendar-occurrences).
 
 ## 4. Task rules
 
