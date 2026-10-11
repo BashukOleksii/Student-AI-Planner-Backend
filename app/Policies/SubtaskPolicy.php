@@ -19,4 +19,9 @@ class SubtaskPolicy
     {
         return $this->view($user, $subtask, $task);
     }
+
+    public function delete(User $user, Subtask $subtask, Task $task): Response
+    {
+        return $this->view($user, $subtask, $task);
+    }
 }

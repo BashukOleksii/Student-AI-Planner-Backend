@@ -12,10 +12,19 @@ use App\Services\Tasks\TaskService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 
 class TaskController extends Controller
 {
+    public function destroy(Request $request, Task $task, TaskService $service): Response
+    {
+        Gate::authorize('delete', $task);
+        $service->delete($request->user(), $task);
+
+        return response()->noContent();
+    }
+
     public function index(ListTasksRequest $request, TaskService $service): AnonymousResourceCollection
     {
         return TaskResource::collection($service->paginate($request->user(), $request->validated()));

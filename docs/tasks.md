@@ -1,15 +1,17 @@
-# Tasks and Subtasks — T1–T3, S1 and S2
+# Tasks and Subtasks — T1–T3 and S1–S3
 
 Implemented: authenticated Task creation, detail retrieval, partial updates,
 completion, reopening and filtered/paginated listing. Persistence uses the existing
 MySQL Task/Subtask schema and enums. S1 adds nested Subtask creation, ordered
 listing, detail, partial editing and completion/reopening. S2 adds transactional
-Subtask reordering and read-only derived Task progress. Task/Subtask deletion,
-restore, cleanup, planning, reminders and AI tools remain deferred.
+Subtask reordering and read-only derived Task progress. S3 adds safe Task/Subtask
+soft deletion with synchronous dependency cancellation. Restore, hard purge,
+planning, Reminder CRUD/delivery and AI tools remain deferred.
 
 ## Endpoints
 
-All routes require `auth:sanctum` and use the normal `data` Resource wrapper.
+All routes require `auth:sanctum`. DELETE returns no content; other routes use
+the normal `data` Resource wrapper.
 
 | Method | Path | Route name | Success |
 |---|---|---|---|
@@ -17,6 +19,7 @@ All routes require `auth:sanctum` and use the normal `data` Resource wrapper.
 | POST | `/api/tasks` | `tasks.store` | 201 |
 | GET | `/api/tasks/{task}` | `tasks.show` | 200 |
 | PATCH | `/api/tasks/{task}` | `tasks.update` | 200 |
+| DELETE | `/api/tasks/{task}` | `tasks.destroy` | 204 |
 | POST | `/api/tasks/{task}/complete` | `tasks.complete` | 200 |
 | POST | `/api/tasks/{task}/reopen` | `tasks.reopen` | 200 |
 | GET | `/api/tasks/{task}/progress` | `tasks.progress` | 200 |
@@ -160,7 +163,8 @@ relationship objects, Subtask collections or calculated progress are exposed.
 
 ## S1 Subtask API
 
-All nested routes require `auth:sanctum` and use SubtaskResource under `data`.
+All nested routes require `auth:sanctum`. DELETE returns no content; other
+nested routes use SubtaskResource under `data`.
 
 | Method | Path | Route name | Success |
 |---|---|---|---|
@@ -169,6 +173,7 @@ All nested routes require `auth:sanctum` and use SubtaskResource under `data`.
 | POST | `/api/tasks/{task}/subtasks/reorder` | `tasks.subtasks.reorder` | 200 |
 | GET | `/api/tasks/{task}/subtasks/{subtask}` | `tasks.subtasks.show` | 200 |
 | PATCH | `/api/tasks/{task}/subtasks/{subtask}` | `tasks.subtasks.update` | 200 |
+| DELETE | `/api/tasks/{task}/subtasks/{subtask}` | `tasks.subtasks.destroy` | 204 |
 | POST | `/api/tasks/{task}/subtasks/{subtask}/complete` | `tasks.subtasks.complete` | 200 |
 | POST | `/api/tasks/{task}/subtasks/{subtask}/reopen` | `tasks.subtasks.reopen` | 200 |
 
@@ -299,3 +304,58 @@ parent completion/reopening and child reordering do not. Positions, estimates,
 completion dates and study sessions do not define this count-based metric. Remaining
 schedulable duration, effort accounting, feasibility and planning remain deferred;
 BR-SUB-006's future planner must not double-count parent and child estimates.
+
+## S3 safe deletion and dependency cleanup
+
+DELETE ignores request-body target/ownership fields and returns 204 with no body.
+Authentication failures return 401; missing, deleted, foreign or incorrectly
+nested resources return 404, including repeated deletion. Policies authorize
+before mutation, and Services independently reload owned targets.
+
+Subtask deletion changes its soft-deletion marker without changing the parent,
+sibling positions, lifecycle status or completion metadata. Task deletion
+soft-deletes its active children and then the parent. Previously deleted children
+retain their original deletion timestamps. IDs, foreign keys, work metadata and
+historical records remain; there is no force deletion or restore endpoint.
+
+The whole operation uses one transaction with owner → parent Task → child rows →
+StudySessions → Reminders locks. Multiple dependent rows are locked by ascending
+ID. TaskService and SubtaskService reuse TaskDependencyCleanupService; all eligible
+dependencies are checked before cleanup writes. Any exception rolls back session
+and reminder cancellation together with parent/child deletion.
+
+StudySessions are cancelled only when `status = planned` and `starts_at >= now`,
+using one captured UTC instant with its full precision. Equality is included; a
+whole-second start is already past if the current instant is later within that
+second. Subtask deletion selects its exact sessions; Task deletion selects Task
+sessions and checks descendant references, including previously deleted children.
+Cancelled sessions retain their interval, work references and rescheduling links;
+`completed_at` and `actual_minutes` remain null. Past planned, completed, missed,
+rescheduled and already cancelled sessions are unchanged.
+
+Scheduled Reminders directly targeting deleted work or newly cancelled sessions
+become cancelled with `sent_at = null`. Task deletion includes direct reminders
+for all descendants, including previously deleted children. Target foreign keys,
+trigger, anchor, offset and message remain unchanged. Sent and already cancelled
+reminders, general reminders and unrelated work/session reminders are preserved.
+Reminders for sessions retained by the above policy are not cancelled merely
+because their work target was deleted.
+
+Eligible sessions must belong to the owner and have compatible Task/Subtask
+references. Eligible scheduled reminders must belong to the owner, have exactly
+one compatible target, and use a matching relative anchor when present. Unsafe
+live dependencies produce a generic 422 `deletion` error with no foreign IDs or
+private data, and no partial changes. Inactive historical anomalies are preserved;
+this operation does not repair legacy associations, reconcile rescheduling graphs
+or recalculate reminder triggers.
+
+Existing listing, progress and reorder queries exclude deleted children. Task
+and nested routes hide deleted parents; surviving positions are unchanged, and
+new children continue appending after the highest active position. No progress
+or lifecycle changes are persisted by deletion.
+
+Future StudySession/Reminder mutation Services must follow the same owner-first
+serialization and validate active work targets. Arbitrary database writers are
+outside that application guarantee; simultaneous writer races have not been
+experimentally tested. Restore, hard purge, reminder delivery and planning remain
+separate future work.

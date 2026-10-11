@@ -37,9 +37,9 @@ projected-conflict classification with transient row statuses, without staging
 or Lesson writes. No schema, enums or fixed fingerprint contract changed.
 See [schedule.md](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
 
-**Still unimplemented:** actual free-time calculation, automatic study planning, Task/Subtask deletion and planning workflows, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
+**Still unimplemented:** actual free-time calculation, automatic study planning, Task/Subtask planning workflows, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
 
-Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. T1/T2 enforce Task Subject ownership, parent deadline bounds and manual completion/reopening. Reminder association ownership, task deletion cleanup, rescheduling, and reminder target validation/recalculation remain unimplemented; product defaults remain undecided. Import C1/C2a/C2b now implement temporary XLSX upload, persisted preview/revalidation and confirmed atomic Lesson reconciliation. Destructive semester replacement is deferred. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. StudySession self-rescheduling and other domain lifecycle transitions remain future Service work.
+Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. T1/T2 enforce Task Subject ownership, parent deadline bounds and manual completion/reopening. S3 implements Task/Subtask deletion cleanup with eligible dependency ownership and target validation; general Reminder APIs, rescheduling and reminder recalculation remain unimplemented; product defaults remain undecided. Import C1/C2a/C2b now implement temporary XLSX upload, persisted preview/revalidation and confirmed atomic Lesson reconciliation. Destructive semester replacement is deferred. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. StudySession self-rescheduling and other domain lifecycle transitions remain future Service work.
 
 The companion [DBML source](database-schema.dbml) preserves the supplied `student-ai-planner.dbml` diagram. It uses numeric shorthand and omits SQL CHECK expressions; the MySQL types and constraints below remain authoritative. See [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [the earlier draft review](database-review-notes.md) for context. Known implementation issues are recorded in section 8 without changing approved tables, columns, keys, or delete actions.
 
@@ -618,7 +618,7 @@ The contract remains fixed. Import B2 implements its pure generator and exact ow
 
 ### 3.11 tasks
 
-Implemented persistence for user-owned academic work. T1 adds basic create/detail/PATCH with Service-owned Subject and parent deadline validation; see [tasks.md](tasks.md). T2 adds manual completion/reopening while preserving the existing completion CHECK. T3 adds read-only filtered/paginated listing. Deletion/cleanup and planning remain deferred; the schema is unchanged.
+Implemented persistence for user-owned academic work. T1 adds basic create/detail/PATCH with Service-owned Subject and parent deadline validation; see [tasks.md](tasks.md). T2 adds manual completion/reopening while preserving the existing completion CHECK. T3 adds read-only filtered/paginated listing. S3 implements soft deletion and synchronous dependency cleanup; restore, hard purge and planning remain deferred. The schema is unchanged.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -662,13 +662,13 @@ Derived:
 
 - `overdue = status != completed AND deadline_at < now`.
 
-Future Task/Reminder Service deletion behavior (not implemented by model soft deletion):
+S3 application-Service deletion behavior (model soft deletion alone does not orchestrate cleanup):
 
 - application-level task deletion is soft delete;
 - subtasks are soft deleted by the Task service;
-- future planned sessions are marked `cancelled`;
+- planned sessions with `starts_at >=` the captured current UTC instant are marked `cancelled`; past planned and other lifecycle states remain unchanged;
 - historical completed/missed/rescheduled sessions remain;
-- scheduled reminders targeting the task are cancelled or removed by the Reminder service.
+- scheduled reminders targeting the task, any descendant or a newly cancelled session are cancelled by shared cleanup; sent/cancelled history and all target references remain; unsafe live dependencies reject the transaction.
 
 Eloquent:
 
@@ -682,7 +682,7 @@ Eloquent:
 
 ### 3.12 subtasks
 
-Implemented persistence for ordered decomposition of a task. S1 adds nested basic APIs and independent completion/reopening, append-only position allocation and Service deadline validation; see [tasks.md](tasks.md). S2 adds complete active-set transactional position normalization and read-only derived progress. The schema is unchanged: no unique position constraint or stored percentage is added. Deletion/restore and planning remain deferred.
+Implemented persistence for ordered decomposition of a task. S1 adds nested basic APIs and independent completion/reopening, append-only position allocation and Service deadline validation; see [tasks.md](tasks.md). S2 adds complete active-set transactional position normalization and read-only derived progress. The schema is unchanged: no unique position constraint or stored percentage is added. S3 implements soft deletion and dependency cleanup; restore, hard purge and planning remain deferred.
 
 | Column | MySQL type | Null |
 |---|---|---:|

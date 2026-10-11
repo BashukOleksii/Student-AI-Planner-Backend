@@ -16,6 +16,24 @@ class TaskService
 {
     private const EDITABLE_FIELDS = ['title', 'description', 'subject_id', 'priority', 'estimated_minutes', 'deadline_at'];
 
+    public function __construct(private TaskDependencyCleanupService $cleanup) {}
+
+    public function delete(User $user, Task $task): void
+    {
+        DB::transaction(function () use ($user, $task): void {
+            $this->lockOwner($user);
+            $task = $user->tasks()->lockForUpdate()->findOrFail($task->getKey());
+            $children = $task->subtasks()->withTrashed()->orderBy('id')->lockForUpdate()->get();
+            $this->cleanup->cancel($user, $task, $children->modelKeys(), true);
+            foreach ($children as $child) {
+                if (! $child->trashed()) {
+                    $child->delete();
+                }
+            }
+            $task->delete();
+        });
+    }
+
     /** @return array{task_id: int, total_subtasks: int, completed_subtasks: int, progress_percent: ?int} */
     public function progress(User $user, Task $task): array
     {

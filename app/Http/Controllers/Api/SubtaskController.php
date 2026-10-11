@@ -12,10 +12,20 @@ use App\Services\Tasks\SubtaskService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 
 class SubtaskController extends Controller
 {
+    public function destroy(Request $request, Task $task, Subtask $subtask, SubtaskService $service): Response
+    {
+        Gate::authorize('update', $task);
+        Gate::authorize('delete', [$subtask, $task]);
+        $service->delete($request->user(), $task, $subtask);
+
+        return response()->noContent();
+    }
+
     public function index(Request $request, Task $task, SubtaskService $service): AnonymousResourceCollection
     {
         Gate::authorize('view', $task);

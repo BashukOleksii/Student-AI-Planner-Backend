@@ -16,6 +16,18 @@ class SubtaskService
 {
     private const EDITABLE_FIELDS = ['title', 'description', 'estimated_minutes', 'deadline_at'];
 
+    public function __construct(private TaskDependencyCleanupService $cleanup) {}
+
+    public function delete(User $user, Task $task, Subtask $subtask): void
+    {
+        DB::transaction(function () use ($user, $task, $subtask): void {
+            $task = $this->lockParent($user, $task);
+            $subtask = $task->subtasks()->lockForUpdate()->findOrFail($subtask->getKey());
+            $this->cleanup->cancel($user, $task, [$subtask->getKey()]);
+            $subtask->delete();
+        });
+    }
+
     /** @return Collection<int, Subtask> */
     public function all(User $user, Task $task): Collection
     {
