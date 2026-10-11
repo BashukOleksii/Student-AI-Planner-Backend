@@ -37,7 +37,7 @@ projected-conflict classification with transient row statuses, without staging
 or Lesson writes. No schema, enums or fixed fingerprint contract changed.
 See [schedule.md](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
 
-**Still unimplemented:** actual free-time calculation, automatic study planning, Task listing/deletion and Subtask application workflows, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
+**Still unimplemented:** actual free-time calculation, automatic study planning, Task deletion and Subtask application workflows, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
 
 Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. T1/T2 enforce Task Subject ownership, parent deadline bounds and manual completion/reopening. Reminder association ownership, task deletion cleanup, rescheduling, and reminder target validation/recalculation remain unimplemented; product defaults remain undecided. Import C1/C2a/C2b now implement temporary XLSX upload, persisted preview/revalidation and confirmed atomic Lesson reconciliation. Destructive semester replacement is deferred. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. StudySession self-rescheduling and other domain lifecycle transitions remain future Service work.
 
@@ -618,7 +618,7 @@ The contract remains fixed. Import B2 implements its pure generator and exact ow
 
 ### 3.11 tasks
 
-Implemented persistence for user-owned academic work. T1 adds basic create/detail/PATCH with Service-owned Subject and parent deadline validation; see [tasks.md](tasks.md). T2 adds manual completion/reopening while preserving the existing completion CHECK. Listing, deletion/cleanup and planning remain deferred; the schema is unchanged.
+Implemented persistence for user-owned academic work. T1 adds basic create/detail/PATCH with Service-owned Subject and parent deadline validation; see [tasks.md](tasks.md). T2 adds manual completion/reopening while preserving the existing completion CHECK. T3 adds read-only filtered/paginated listing. Deletion/cleanup and planning remain deferred; the schema is unchanged.
 
 | Column | MySQL type | Null |
 |---|---|---:|

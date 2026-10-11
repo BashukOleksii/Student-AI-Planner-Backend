@@ -7,6 +7,7 @@ use App\Enums\TaskStatus;
 use App\Models\Task;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -14,6 +15,43 @@ use Illuminate\Validation\ValidationException;
 class TaskService
 {
     private const EDITABLE_FIELDS = ['title', 'description', 'subject_id', 'priority', 'estimated_minutes', 'deadline_at'];
+
+    /** @return LengthAwarePaginator<int, Task> */
+    public function paginate(User $user, array $filters): LengthAwarePaginator
+    {
+        if (isset($filters['subject_id']) && ! $user->subjects()->whereKey($filters['subject_id'])->exists()) {
+            throw ValidationException::withMessages(['subject_id' => ['The selected subject is invalid.']]);
+        }
+
+        $from = isset($filters['deadline_from'])
+            ? CarbonImmutable::createFromFormat('!Y-m-d\TH:i:s\Z', $filters['deadline_from'], 'UTC') : null;
+        $to = isset($filters['deadline_to'])
+            ? CarbonImmutable::createFromFormat('!Y-m-d\TH:i:s\Z', $filters['deadline_to'], 'UTC') : null;
+        if ($from !== null && $to !== null && $from->greaterThan($to)) {
+            throw ValidationException::withMessages(['deadline_to' => ['The upper deadline bound must not be earlier than the lower bound.']]);
+        }
+
+        $page = (int) ($filters['page'] ?? 1);
+        $perPage = (int) ($filters['per_page'] ?? 15);
+        if ($page - 1 > intdiv(PHP_INT_MAX, $perPage)) {
+            throw ValidationException::withMessages(['page' => ['The selected page is too large.']]);
+        }
+
+        $query = $user->tasks()->with([
+            'subject' => fn ($query) => $query->where('user_id', $user->getKey())->select(['id', 'user_id']),
+        ]);
+        foreach (['status', 'priority', 'subject_id'] as $field) {
+            if (isset($filters[$field])) {
+                $query->where($field, $filters[$field]);
+            }
+        }
+
+        return $query->when($from !== null, fn ($query) => $query->where('deadline_at', '>=', $from))
+            ->when($to !== null, fn ($query) => $query->where('deadline_at', '<=', $to))
+            ->orderByRaw('deadline_at IS NULL')->orderBy('deadline_at')->orderBy('id')
+            ->paginate($perPage, ['*'], 'page', $page)
+            ->appends(Arr::only($filters, ['status', 'priority', 'subject_id', 'deadline_from', 'deadline_to', 'per_page']));
+    }
 
     public function create(User $user, array $values): Task
     {

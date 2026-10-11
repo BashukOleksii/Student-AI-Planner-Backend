@@ -71,6 +71,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/schedule-imports/{scheduleImportBatch}/revalidate', [ScheduleImportController::class, 'revalidate'])->name('schedule-imports.revalidate');
     Route::post('/schedule-imports/{scheduleImportBatch}/commit', [ScheduleImportController::class, 'commit'])->name('schedule-imports.commit');
 
+    Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
     Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
     Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
     Route::patch('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');

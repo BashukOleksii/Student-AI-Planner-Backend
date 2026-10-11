@@ -1,8 +1,8 @@
-# Tasks — T1 basic API and T2 lifecycle
+# Tasks — T1 basic API, T2 lifecycle and T3 collection
 
 Implemented: authenticated Task creation, detail retrieval, partial updates,
-completion and reopening. Persistence uses the existing MySQL Task/Subtask
-schema and enums. T1/T2 do not implement listing/filtering, deletion/cleanup, Subtask
+completion, reopening and filtered/paginated listing. Persistence uses the existing
+MySQL Task/Subtask schema and enums. T1–T3 do not implement deletion/cleanup, Subtask
 CRUD/reordering, progress, planning, reminders or AI tools.
 
 ## Endpoints
@@ -11,6 +11,7 @@ All routes require `auth:sanctum` and use the normal `data` Resource wrapper.
 
 | Method | Path | Route name | Success |
 |---|---|---|---|
+| GET | `/api/tasks` | `tasks.index` | 200 |
 | POST | `/api/tasks` | `tasks.store` | 201 |
 | GET | `/api/tasks/{task}` | `tasks.show` | 200 |
 | PATCH | `/api/tasks/{task}` | `tasks.update` | 200 |
@@ -21,7 +22,52 @@ Unauthenticated requests return 401. Missing, soft-deleted and foreign Tasks
 return 404; PATCH authorizes before validating the body. Validation failures
 return Laravel field errors with 422 and leave persisted data unchanged.
 
-## Input
+## Collection queries
+
+`GET /api/tasks` is read-only. It accepts the following optional query parameters;
+request-body fields and unknown parameters, including `user_id`, are ignored.
+Supplied filters must be non-empty and valid, or the endpoint returns Laravel
+422 field errors without modifying data.
+
+| Parameter | Contract |
+|---|---|
+| `status` | `pending` or `completed` |
+| `priority` | 1 low, 2 normal, 3 high |
+| `subject_id` | Positive ID of an existing owned Subject |
+| `deadline_from` | Inclusive UTC lower deadline bound |
+| `deadline_to` | Inclusive UTC upper deadline bound |
+| `page` | Positive page, default 1 |
+| `per_page` | 1–100, default 15 |
+
+Numeric query values use canonical positive ASCII decimal notation: no leading
+zeros, signs, whitespace, fractions or exponent notation. Values must fit PHP's
+integer range; page offsets that would overflow it are rejected. Deadline bounds
+use UTC whole-second `YYYY-MM-DDTHH:mm:ssZ`, years 1000–9999, without whitespace
+or offsets. The lower bound must not exceed the upper bound; equality is valid.
+No server/User timezone interpretation is applied.
+
+Filters combine with AND semantics. Deadline ranges match only non-null deadlines.
+Null Subject and null deadline Tasks remain in unfiltered results. Foreign and
+nonexistent Subject filters receive the same generic validation error. No null
+Subject filter, overdue/in-progress status or configurable sorting is supported.
+
+Ordering is fixed: non-null deadlines first, ascending deadline, then ascending
+ID; null deadlines come last in ascending ID order. This is collection presentation
+order, independent of future planning priority ranking.
+
+Laravel pagination runs in MySQL and returns `data`, `links` and `meta`, including
+totals and page metadata. Links preserve approved filters. Empty results and
+out-of-range pages return 200 with empty `data` and pagination metadata. This is
+ordinary offset pagination, without snapshot isolation across separate requests
+when data changes.
+
+TaskService queries only the authenticated owner's non-deleted Tasks, including
+both pending and completed records. Subjects are eager loaded in one owned batch
+query for each non-empty page requiring associations. Legacy foreign Subject links
+serialize as null without loading foreign presentation data or repairing rows.
+TaskResource fields remain unchanged; Subtasks/progress are not exposed.
+
+## Creation and update input
 
 | Field | Create | PATCH | Constraint |
 |---|---|---|---|

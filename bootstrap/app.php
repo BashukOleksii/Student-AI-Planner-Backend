@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trimStrings(except: [
             'deadline_at',
             fn (Request $request) => $request->is('api/lessons', 'api/lessons/*'),
+            fn (Request $request) => $request->isMethod('GET') && $request->is('api/tasks'),
         ]);
         // Subject color and Task deadlines distinguish null from an invalid empty string.
         $middleware->convertEmptyStringsToNull(except: [
