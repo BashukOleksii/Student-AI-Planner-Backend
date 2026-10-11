@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AcademicPeriodController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EducationInstitutionController;
+use App\Http\Controllers\Api\FreeSlotController;
 use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\PlanningPreferenceController;
 use App\Http\Controllers\Api\ProfileController;
@@ -24,6 +25,8 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    Route::get('/planning/free-slots', [FreeSlotController::class, 'index'])->name('planning.free-slots.index');
 
     Route::get('/planning-preferences', [PlanningPreferenceController::class, 'show'])->name('planning-preferences.show');
     Route::put('/planning-preferences', [PlanningPreferenceController::class, 'update'])->name('planning-preferences.update');

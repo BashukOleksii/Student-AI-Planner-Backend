@@ -1,9 +1,12 @@
-# Planning Foundation — PF1 checkpoints C1–C3
+# Planning Foundation — PF1 checkpoints C1–C4
+
+Status: **PF1 complete (C1–C4 verified). PF2 remains unimplemented.**
 
 C1/C2 provide pure computation. C3 adds read-only FreeTimeService integration
-with owned availability, Lessons and StudySessions. The free-slots REST API
-remains unimplemented (C4). PF2 capacity, breaks, workload limits and scheduling
-remain separate future work. No preference defaults or persistence are introduced.
+with owned availability, Lessons and StudySessions. C4 exposes this calculation
+through an authenticated free-slots REST API. PF2 capacity, breaks, workload
+limits and scheduling remain separate future work. No preference defaults or
+persistence are introduced.
 
 ## C1 interval engine
 
@@ -58,7 +61,7 @@ it describes allowed availability, not free time after blockers or guaranteed
 session capacity. There are no database reads/writes, application bootstrap,
 authentication, HTTP, or current-clock dependencies. Calculations use the IANA
 timezone data installed with PHP. C3 supplies trusted user data and bounded ranges;
-C4 will validate HTTP input. No range limit or planning policy is imposed by this
+C4 validates HTTP input. No range limit or planning policy is imposed by this
 pure C2 component.
 
 ## C3 read-only allowed free time
@@ -106,5 +109,73 @@ cleanup, lifecycle changes or cached/persisted slots. Tests verify query behavio
 and unchanged database tables after repeated calculations. Independent reads are
 not an atomic planning/commit snapshot; future plan creation must revalidate
 current state transactionally. Output is allowed study free time, not unrestricted
-calendar free time or guaranteed schedulable capacity. C4's authenticated REST
-workflow and PF2's workload/break/session-capacity policies remain unimplemented.
+calendar free time or guaranteed schedulable capacity. C4 exposes this read-only
+workflow; PF2's workload/break/session-capacity policies remain unimplemented.
+
+## C4 free-slots REST API
+
+`GET /api/planning/free-slots` (`planning.free-slots.index`) requires
+`auth:sanctum`, following the existing first-party SPA authentication contract.
+Only query parameters are considered; a GET body cannot supply or override them.
+
+| Parameter | Contract |
+| --- | --- |
+| `start_date` | Required real calendar date, exactly `YYYY-MM-DD`. |
+| `end_date` | Required real calendar date, exactly `YYYY-MM-DD`; at or after start. |
+| `min_slot_minutes` | Optional canonical positive decimal query string, 1–65535 inclusive. |
+
+The inclusive range contains at most 31 local calendar dates, including when it
+crosses DST. Individual dates are validated before cross-field range checks;
+neither check depends on the server's local timezone. Dates, minimums and arrays
+with invalid formats return Laravel's standard 422 `message`/`errors` response.
+Unauthenticated requests return 401 before query validation.
+
+Minimums reject leading zeroes, signs, decimals, scientific notation, whitespace,
+arrays and explicit empty values. A GET-only TrimStrings exemption preserves
+noncanonical input for rejection without changing other routes. Valid minutes
+are explicitly cast to integer and multiplied by 60 (30 → 1800; 65535 → 3932100).
+Absence passes null to C3: there is no implicit PlanningPreference minimum.
+
+The Controller calls FreeTimeService with the authenticated User and validated
+allowlisted fields only. `user_id`, `owner_id`, `timezone` and other unknown
+parameters are ignored. Availability and blockers remain owned queries in C3;
+no foreign record IDs, source details or blocking-event data are returned.
+
+Successful responses use HTTP 200 and the standard Resource envelope:
+
+```json
+{
+  "data": [
+    {
+      "starts_at": "2026-10-12T06:00:00Z",
+      "ends_at": "2026-10-12T08:00:00Z",
+      "duration_seconds": 7200
+    }
+  ],
+  "meta": {
+    "timezone": "Europe/Kyiv",
+    "start_date": "2026-10-12",
+    "end_date": "2026-10-18"
+  }
+}
+```
+
+The values above are illustrative. Each slot contains exactly those three keys;
+UTC endpoints use whole-second `Z` formatting, independent of server timezone,
+and duration is the exact integer `end - start`. Metadata contains exactly the
+authenticated User's timezone and the validated local date labels. Empty results
+return `data: []` with the same metadata shape. No internal Unix endpoints, owner
+IDs, Lesson IDs or StudySession IDs are exposed.
+
+DST behavior is inherited unchanged from C2/C3: gap-only windows yield nothing,
+both real fold occurrences are included, and blockers may remove one occurrence
+independently. The result is sorted allowed study free time. It does not imply
+that a workload fits, apply breaks/session bounds, or guarantee PF2 capacity.
+
+GET performs no application-table writes, locks, transactions, cleanup or cache
+materialization. Missing preferences remain missing; availability, Lessons,
+StudySessions, Tasks/Subtasks and Reminders remain unchanged. Feature tests cover
+the real MySQL pipeline, exact response shapes, isolation, canonical input,
+second-level filtering, DST and repeated read-only requests. Automatic scheduling,
+StudySession CRUD/rescheduling, Reminder delivery, AI tools and frontend work
+remain outside PF1.
