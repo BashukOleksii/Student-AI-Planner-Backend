@@ -37,7 +37,7 @@ projected-conflict classification with transient row statuses, without staging
 or Lesson writes. No schema, enums or fixed fingerprint contract changed.
 See [schedule.md](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
 
-**Still unimplemented:** actual free-time calculation, automatic study planning, task/subtask application workflows, import upload/persisted preview/commit, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
+**Still unimplemented:** actual free-time calculation, automatic study planning, task/subtask application workflows, import commit, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
 
 Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. Task/import/Reminder association ownership, task deletion cleanup, rescheduling, and reminder target validation/recalculation remain unimplemented; product defaults remain undecided. Import staging exists, but uploads/file storage, preview endpoints, persisted validation/commit Services and import-driven Lesson creation remain unimplemented. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. StudySession self-rescheduling and other domain lifecycle transitions remain future Service work.
 
@@ -399,7 +399,10 @@ Eloquent:
 
 ### 3.8 schedule_import_batches
 
-Implemented persistence for import staging/history; import processing itself is not implemented.
+Implemented persistence for import staging/history. Import C1 now creates owned
+upload attempts and persisted previews through the existing schema; Lesson commit
+remains deferred. Identical file hashes can identify separate attempts. Uploaded
+files are temporary only; `original_filename` is safe basename metadata.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -453,7 +456,16 @@ Implemented Eloquent:
 
 ### 3.9 schedule_import_rows
 
-Implemented staging/preview-row persistence for an import batch; JSON fixtures do not define the future normalization contract.
+Implemented staging/preview-row persistence for an import batch. Import C1 fixes
+the row meaning: one concrete generated calendar occurrence, with `row_number`
+as its deterministic 1-based preview ordinal (not an Excel row). `raw_data`
+preserves group, workbook/occurrence provenance, names, room, date, weekday,
+pair/parity and local/UTC times without claiming a source Lesson type.
+`normalized_data` preserves resolved period/Subject/Teacher IDs, room, scalar
+technical type, UTC interval, operation and diagnostic matched Lesson ID.
+The fingerprint stays in its dedicated column; final `validation_errors` is
+an array (empty `[]` for no errors), without separate B2 resolution errors.
+See [the explicit JSON/API contract](schedule.md#import-c1-xlsx-upload-and-persisted-preview-api).
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -493,7 +505,7 @@ Implemented Eloquent:
 
 ### 3.10 lessons
 
-Implemented persistence and manual Lesson CRUD/lifecycle plus bounded schedule views; see [schedule.md](schedule.md). Import processing remains unimplemented.
+Implemented persistence and manual Lesson CRUD/lifecycle plus bounded schedule views; see [schedule.md](schedule.md). Import C1 processes/persists preview without Lesson mutation; confirmed commit remains unimplemented.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -589,7 +601,7 @@ Verified example: Subject ID `42`, UTC start `2026-10-05T06:00:00Z`, UTC end `20
 
 Result: `aaef02b0a645f0b15b7583ce6b0f21ece2ab2f8ea3d7a8dd2f0c1e6104ed8806`.
 
-The contract remains fixed. Import B2 implements its pure generator and exact owned reference resolution; Import B3 classifies identity/lifecycle/duplicates/conflicts transiently; persisted preview and import commit remain unimplemented. Persistence tests retain the verified stored result; focused generator tests now cover this example.
+The contract remains fixed. Import B2 implements its pure generator and exact owned reference resolution; Import B3 classifies identity/lifecycle/duplicates/conflicts transiently; Import C1 persists these preview snapshots without changing Lessons. Import commit remains unimplemented. Persistence tests retain the verified stored result; focused generator tests cover this example.
 
 ---
 
@@ -1024,4 +1036,4 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
   introduced by the completed Stage 03 APIs.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup. Group 4 tests on MySQL 8.4.10 show that directly deleting a User who owns both a period and its import batch is rejected with error 1451 by `schedule_import_batches_academic_period_id_foreign`. Group 5 confirms that an isolated User/Subject/manual-Lesson graph can cascade, while a combined period/batch/Lesson history graph blocks direct User deletion with 1451. Hard-removing Lessons first still leaves the batch/period restriction; deleting batches next cascades their rows and then permits User deletion. Soft deletion does not remove restrictive references. Account hard purge is an ordered administrative operation, distinct from normal domain deletion; the approved FKs are unchanged.
 
-Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Further backend verticals must add task/subtask workflows, other domain ownership compatibility, free-time/planning algorithms, rescheduling, and reminder cleanup. Import upload/persisted preview/commit, delivery, statistics, and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.
+Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Further backend verticals must add task/subtask workflows, other domain ownership compatibility, free-time/planning algorithms, rescheduling, and reminder cleanup. Import commit, delivery, statistics, and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.

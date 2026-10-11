@@ -211,8 +211,8 @@ The real workbook pipeline produces **30** fully resolved candidates for the B1
 two-week Kyiv fixture period when exact owned academic references exist. Resolver
 Feature tests cover read-only batching, ownership, strict matching and ambiguity;
 fingerprint Unit tests require no database. B2 does not classify duplicates or
-conflicts; that is the B3 responsibility below. Persisted preview and commit
-remain deferred. Excel import is not complete.
+conflicts; that is the B3 responsibility below. B2 remains transient; C1 persists its classified output. Commit
+remains deferred. Excel import is not complete.
 
 ## Import B3: transient identity and projected schedule classification
 
@@ -268,14 +268,79 @@ empty schedule. Classifier Feature tests cover lifecycle/type preservation,
 intra-file groups, manual/effective blockers, swaps, adjacency, batched reads and
 unchanged database snapshots. `matched_lesson_id` is diagnostic only: future
 commit must reload/revalidate identity, ownership, lifecycle and conflicts.
-Persisted preview, confirmation and all Lesson mutations remain future work.
+The classifier remains read-only; C1 persists its output as described below.
+
+## Import C1: XLSX upload and persisted preview API
+
+Authenticated `POST /api/schedule-imports` (`schedule-imports.store`) accepts
+multipart `academic_period_id` and `schedule_file`. The ID is a strict positive
+integer; canonical decimal multipart strings are converted to integers before
+validation. The file must pass Laravel server-detected `mimes:xlsx`, explicit
+`extensions:xlsx`, uploaded-file validation and `max:5120` (5 MiB). Client MIME,
+owner and timezone fields are not trusted. Foreign/nonexistent periods receive
+the same generic 422 validation error and create no batch. Other request-level
+file validation errors also create no batch; unauthenticated requests return 401.
+
+`ScheduleImportPreviewService::create(User $user, int $academicPeriodId, UploadedFile $file)`
+reads the private temporary upload synchronously, computes SHA-256 over its
+actual bytes, and parses before opening its transaction. No workbook is
+permanently stored; only a safe basename and lowercase hash persist. Repeated
+identical bytes may create separate batches and do not imply duplicate rows.
+The transaction locks/reloads User, then the selected owned AcademicPeriod,
+uses the fresh persisted timezone for materialization, invokes B2/B3 unchanged,
+and atomically saves the batch and ordered preview rows. No Lesson is mutated.
+
+Each persisted row is one **concrete occurrence**, not a weekly rule or physical
+Excel row. `row_number` is the deterministic 1-based chronological preview
+ordinal. C1 uses explicit scalar JSON snapshots:
+
+- `raw_data`: `group`, `workbook_source` (worksheet/range), `local_date`, `weekday`,
+  `pair_label`, `parity`, `subject_name`, `teacher_name`, `room`,
+  `starts_at_local`, `ends_at_local`, `starts_at_utc`, `ends_at_utc`, and `source`
+  (worksheet, inclusive rows, range, pair_range). It contains no Lesson type.
+- `normalized_data`: `academic_period_id`, `subject_id`, `teacher_id`, `room`,
+  scalar technical `type = other`, `starts_at_utc`, `ends_at_utc`, `operation`,
+  `matched_lesson_id`. Existing corrected Lesson types remain untouched;
+  future update/restore must preserve them. The matched ID is diagnostic only.
+- Dedicated columns hold B3 `status`, B2 `fingerprint` (nullable) and final
+  field-oriented `validation_errors`; no-error values are consistently `[]`.
+  No fingerprint or separate resolution-error field is duplicated in JSON.
+
+Counters count persisted occurrences and satisfy
+`total_rows = valid_rows + invalid_rows + duplicate_rows`:
+
+| Processing result | Batch status | HTTP response |
+|---|---|---|
+| Preview with no invalid rows, duplicates allowed | validated | 201 |
+| Preview with one or more invalid rows | uploaded | 201 |
+| Controlled parser/materialization failure, no useful preview | failed, zero counters/rows | 201 |
+| Request/file/owned-period validation fails | no batch | 422 |
+
+Failed attempts retain a safe understandable processing message, without paths
+or stack traces. Unexpected infrastructure/programming errors propagate and
+roll back persistence rather than becoming fake failed/validation outcomes.
+`committed_at` remains null. The real workbook and two-week Kyiv period produce
+exactly **30 persisted valid/create rows** when all exact references exist and
+the schedule is empty.
+
+Authenticated `GET /api/schedule-imports/{scheduleImportBatch}`
+(`schedule-imports.show`) authorizes Batch ownership with `denyAsNotFound()`
+for foreign batches, eagerly loads rows by ordinal, and returns the stored
+snapshot without rerunning processing or modifying data. Batch/Row Resources
+expose counts/status, filename, period, preview names/IDs, dates/times, type,
+operations, provenance and errors. User IDs, internal row batch IDs, hashes and
+fingerprints are not public. Both responses use the usual `data` resource wrapper.
+
+Preview is a snapshot. Future confirmed commit must revalidate identity,
+ownership, current lifecycle and conflicts under locks, and must never blindly
+trust `matched_lesson_id`. C1 provides no commit/cancel/revalidate endpoints.
 
 ## Remaining scope
 
-Excel upload/storage, persisted preview/batches/rows, AcademicPeriod selection,
-upload/materialization orchestration, explicit mapping/create workflows,
-persisted-preview revalidation, commit/re-import reconciliation and
-Lesson mutations remain deferred to later import stages. The fixed V1
+Explicit mapping/create workflows, persisted-preview revalidation,
+confirmed commit/re-import reconciliation and Lesson mutations remain deferred
+to later import stages. Permanent workbook storage and asynchronous processing
+are not part of V1 C1. The fixed V1
 fingerprint contract is unchanged. The Excel import feature is not complete.
 Task/Subtask workflows, free-time calculation, study planning/rescheduling,
 reminders, statistics, AI tools, and frontend work are also unimplemented.

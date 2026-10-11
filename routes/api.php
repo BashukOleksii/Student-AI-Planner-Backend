@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\PlanningPreferenceController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ScheduleController;
+use App\Http\Controllers\Api\ScheduleImportController;
 use App\Http\Controllers\Api\StudyAvailabilityWindowController;
 use App\Http\Controllers\Api\SubjectController;
 use App\Http\Controllers\Api\TeacherController;
@@ -63,4 +64,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/schedule/today', [ScheduleController::class, 'today'])->name('schedule.today');
     Route::get('/schedule/date/{date}', [ScheduleController::class, 'date'])->where('date', '.*')->name('schedule.date');
     Route::get('/schedule/week/{date}', [ScheduleController::class, 'week'])->where('date', '.*')->name('schedule.week');
+
+    Route::post('/schedule-imports', [ScheduleImportController::class, 'store'])->name('schedule-imports.store');
+    Route::get('/schedule-imports/{scheduleImportBatch}', [ScheduleImportController::class, 'show'])->name('schedule-imports.show');
 });

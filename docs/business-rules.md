@@ -1,7 +1,7 @@
 # Business Rules
 
 Status: approved persistence baseline with current API enforcement recorded\
-Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. Task/Subtask APIs/workflows, planning, reminder delivery, statistics, AI orchestration/tools, and import upload/preview/commit remain future work. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B1 adds transient calendar/parity/timezone materialization. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
+Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. Task/Subtask APIs/workflows, planning, reminder delivery, statistics, AI orchestration/tools, and import commit remain future work. Import C1 implements authenticated upload and persisted preview. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B1 adds transient calendar/parity/timezone materialization. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
 
 Lesson association/replacement ownership, self-replacement/chain prohibition, Lesson lifecycle transitions and active overlap validation are implemented. Task/import/Reminder association ownership, task/subtask consistency, self-rescheduling, Task/StudySession lifecycle transitions, deadlines and overlaps, task deletion cleanup, and Reminder target count/compatibility/recalculation/purge reconciliation remain future Service requirements. MySQL enforces supported scalar/timestamp CHECKs, FK existence/actions, and approved uniqueness; it does not enforce cross-row ownership or checks prohibited by AUTO_INCREMENT/SET NULL restrictions.
 
@@ -94,7 +94,7 @@ errors; missing or duplicate exact Teachers are errors, without institution
 preference, fuzzy/LLM matching, code aliases or automatic creation. The fixed V1
 fingerprint uses only the resolved Subject ID and UTC interval: Subject failure
 leaves it null, while Teacher errors may retain it. Candidates/errors remain
-transient without import-row status until future duplicate/conflict preview.
+transient without import-row status until B3 classification and C1 preview persistence.
 
 **BR-IMP-008 — Transient projected re-import classification**\
 Import B3 classifies resolved candidates with the existing row status enum, without
@@ -107,6 +107,20 @@ owned effective external Lessons block normally, including exact manual matches.
 Matched active histories are excluded together in favor of target positions.
 Errors propagate through repeated identities; eventual commit is atomic and must
 revalidate. See [the B3 contract](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
+
+**BR-IMP-009 — Persisted occurrence preview**\
+Import C1 accepts authenticated, content/extension-validated XLSX uploads up to
+5 MiB for an owned AcademicPeriod. The temporary file is hashed over its bytes
+and parsed before owner locks; a transaction reloads/locks User and period and
+persists one coherent materialized/resolved/classified preview. One persisted
+row is one concrete calendar occurrence; `row_number` is its 1-based preview
+ordinal and Excel coordinates live in `raw_data`. Counters count final row
+statuses: zero invalids means validated, including duplicates; any invalids
+keep the batch uploaded. Controlled workbook/materialization failure persists
+a failed batch with zero counters/rows. Request-level rejection creates no batch.
+Repeated file hashes are allowed, uploads are not permanently stored, and no
+Lessons change. Preview retrieval is owned/read-only; future confirmed commit
+must revalidate the current database state. See [the C1 contract](schedule.md#import-c1-xlsx-upload-and-persisted-preview-api).
 
 ## 4. Task rules
 
