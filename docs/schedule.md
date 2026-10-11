@@ -98,6 +98,53 @@ Teacher and room may be null. Subject code/color retain null keys when unset. A 
 
 Metadata contains inclusive local calendar labels, not internal UTC query boundaries. For the week anchored at 2026-10-07, labels are 2026-10-05 through 2026-10-11. Empty day/week schedules return 200 with `data: []` and the same metadata.
 
+## Import A: workbook parser foundation
+
+`App\Services\Imports\ScheduleWorkbookParser::parse(string $path)` uses
+PhpSpreadsheet directly to return a weekly template without booting Laravel or
+accessing the database. The real `tests/Fixtures/ScheduleImports/Приклад розкладу.xlsx`
+regression fixture yields group `ПІ-231` and exactly **16 weekly rules**.
+
+The supported dialect has a `Група` header and five contiguous Monday–Friday
+blocks, each with four four-row pair slots. Detection validates the relative
+header/weekday/pair merge geometry and the presence of time cells; the table may
+be shifted on the worksheet. Only the detected six-column table is interpreted.
+The explanatory examples on the right of the real fixture are ignored. Multiple
+supported regions are rejected as ambiguous; unsupported geometry/content and
+semantic formulas raise `ScheduleWorkbookParserException` with cell context
+where available. Formulas are never evaluated. This is a known dialect parser,
+not a general spreadsheet importer.
+
+The returned associative array contains `group`, workbook `source` (`worksheet`,
+`range`), and `rules` in weekday/pair order. Each rule contains:
+
+- `weekday`: ISO integer 1–5;
+- `pair_label`: workbook label, such as `1-2`;
+- `starts_at_local`, `ends_at_local`: local `HH:MM:SS` read from numeric Excel day
+  fractions or explicit `HH:MM[:SS]` cells, without a timezone;
+- `parity`: `all`, `numerator`, or `denominator`;
+- `subject_name`, `teacher_name`, `room`: whitespace-normalized workbook text,
+  preserving Ukrainian spelling and Cyrillic room suffixes; empty room is null;
+- `source`: `worksheet`, inclusive 1-based content `rows`, content `range`, and
+  the containing `pair_range`.
+
+An ordinary slot has subject/teacher rows in its middle two rows. An empty slot
+emits no rule. A slot with four content rows has two subject/teacher pairs:
+upper is numerator, lower is denominator (Tuesday `7-8` in the real fixture).
+Only expected merge anchors are read; values are never globally filled down.
+No lesson type is present or inferred.
+
+Parser tests use plain PHPUnit and require no MySQL:
+`vendor/bin/phpunit tests/Unit/ScheduleWorkbookParserTest.php`.
+PhpSpreadsheet requires its Composer-declared PHP extensions, including GD and ZIP.
+
 ## Remaining scope
 
-Excel upload/parsing, preview/commit, fingerprint generation, duplicate resolution, import APIs, and imported Lesson reconciliation remain deferred. Task/Subtask workflows, free-time calculation, study planning/rescheduling, reminders, statistics, AI tools, and frontend work are also unimplemented. Schedule retrieval is not free-time calculation.
+Excel upload/storage, persisted preview/batches/rows, AcademicPeriod selection,
+date expansion and parity anchoring, timezone conversion, Subject/Teacher
+resolution, fingerprints, duplicate/conflict handling, commit/re-import and
+Lesson persistence remain deferred to later import stages. The fixed V1
+fingerprint contract is unchanged. The Excel import feature is not complete.
+Task/Subtask workflows, free-time calculation, study planning/rescheduling,
+reminders, statistics, AI tools, and frontend work are also unimplemented.
+Schedule retrieval is not free-time calculation.
