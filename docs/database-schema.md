@@ -618,7 +618,7 @@ The contract remains fixed. Import B2 implements its pure generator and exact ow
 
 ### 3.11 tasks
 
-Implemented persistence for user-owned academic work; task workflows remain future Service work.
+Implemented persistence for user-owned academic work. T1 adds basic create/detail/PATCH with Service-owned Subject and parent deadline validation; see [tasks.md](tasks.md). Listing, lifecycle, deletion/cleanup and planning remain deferred; the schema is unchanged.
 
 | Column | MySQL type | Null |
 |---|---|---:|

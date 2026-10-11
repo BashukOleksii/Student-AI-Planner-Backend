@@ -14,13 +14,15 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
-        // Validate the exact Lesson wire format instead of silently trimming timestamps.
+        // Validate exact UTC wire formats instead of silently trimming timestamps.
         $middleware->trimStrings(except: [
+            'deadline_at',
             fn (Request $request) => $request->is('api/lessons', 'api/lessons/*'),
         ]);
-        // Subject color distinguishes explicit null from an invalid empty string.
+        // Subject color and Task deadlines distinguish null from an invalid empty string.
         $middleware->convertEmptyStringsToNull(except: [
             fn (Request $request) => $request->is('api/subjects', 'api/subjects/*'),
+            fn (Request $request) => $request->is('api/tasks', 'api/tasks/*'),
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

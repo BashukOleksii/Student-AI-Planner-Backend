@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\ScheduleImportController;
 use App\Http\Controllers\Api\StudyAvailabilityWindowController;
 use App\Http\Controllers\Api\SubjectController;
+use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TeacherController;
 use Illuminate\Support\Facades\Route;
 
@@ -69,4 +70,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/schedule-imports/{scheduleImportBatch}', [ScheduleImportController::class, 'show'])->name('schedule-imports.show');
     Route::post('/schedule-imports/{scheduleImportBatch}/revalidate', [ScheduleImportController::class, 'revalidate'])->name('schedule-imports.revalidate');
     Route::post('/schedule-imports/{scheduleImportBatch}/commit', [ScheduleImportController::class, 'commit'])->name('schedule-imports.commit');
+
+    Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
+    Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
+    Route::patch('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
 });

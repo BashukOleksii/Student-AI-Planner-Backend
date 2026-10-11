@@ -171,7 +171,7 @@ Task and subtask statuses are only `pending` and `completed`, stored in bounded 
 An unfinished task whose deadline has passed is overdue. Derive this from completion state, deadline, and current time; V1 persists neither an overdue status nor an overdue flag.
 
 **BR-TSK-007 — Subject association**  
-Subject association is optional. If a task references a subject, it must belong to the same user. SubjectService blocks deletion for all Lesson history, including soft-deleted Lessons. Allowed removal nulls same-owner Task references, including soft-deleted Tasks; foreign Task references block removal to prevent cross-user FK side effects. Task-subject assignment validation remains future Task application work.
+Subject association is optional. If a task references a subject, it must belong to the same user. SubjectService blocks deletion for all Lesson history, including soft-deleted Lessons. Allowed removal nulls same-owner Task references, including soft-deleted Tasks; foreign Task references block removal to prevent cross-user FK side effects. T1 TaskService validates the complete owned Subject association on create/PATCH; see [the basic Task API](tasks.md).
 
 **BR-TSK-008 — Deletion preserves session history**\
 Normal task deletion soft-deletes the task and its subtasks, cancels affected future planned study sessions, and preserves historical completed/missed/rescheduled sessions. Scheduled reminders targeting the task are cancelled or removed by the Reminder service. Administrative/account hard purge is separate from normal application deletion.
@@ -188,7 +188,7 @@ A subtask inherits ownership from its parent task and cannot be moved across use
 Every subtask has a positive, deterministic `position` within its parent task. Reordering is transactional.
 
 **BR-SUB-004 — Deadline bound**  
-If both task and subtask deadlines exist, the subtask deadline must not be later than the parent's. Warning-only behavior requires a later explicit product decision; it is not the approved baseline.
+If both task and subtask deadlines exist, the subtask deadline must not be later than the parent's. T1 TaskService enforces this bound for parent updates against non-deleted Subtasks, including completed records. Subtask mutation APIs remain deferred. Warning-only behavior requires a later explicit product decision; it is not the approved baseline.
 
 **BR-SUB-005 — Progress calculation**  
 For V1, when a task has active (non-soft-deleted) subtasks, task progress percentage is calculated from completed active subtasks over total active subtasks. Do not persist a separate progress percentage.
