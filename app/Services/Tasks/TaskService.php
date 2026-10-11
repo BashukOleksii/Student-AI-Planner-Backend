@@ -46,6 +46,35 @@ class TaskService
         });
     }
 
+    public function complete(User $user, Task $task): Task
+    {
+        return DB::transaction(function () use ($user, $task): Task {
+            $this->lockOwner($user);
+            $task = $user->tasks()->lockForUpdate()->findOrFail($task->getKey());
+            if ($task->status === TaskStatus::Pending) {
+                $task->update([
+                    'status' => TaskStatus::Completed,
+                    'completed_at' => CarbonImmutable::now('UTC')->startOfSecond(),
+                ]);
+            }
+
+            return $task->refresh();
+        });
+    }
+
+    public function reopen(User $user, Task $task): Task
+    {
+        return DB::transaction(function () use ($user, $task): Task {
+            $this->lockOwner($user);
+            $task = $user->tasks()->lockForUpdate()->findOrFail($task->getKey());
+            if ($task->status === TaskStatus::Completed) {
+                $task->update(['status' => TaskStatus::Pending, 'completed_at' => null]);
+            }
+
+            return $task->refresh();
+        });
+    }
+
     private function lockOwner(User $user): void
     {
         User::whereKey($user->getKey())->lockForUpdate()->firstOrFail();

@@ -1,8 +1,8 @@
-# Tasks — T1 basic API
+# Tasks — T1 basic API and T2 lifecycle
 
-Implemented: authenticated Task creation, detail retrieval and partial updates.
-Persistence uses the existing MySQL Task/Subtask schema and enums. T1 does not
-implement listing/filtering, lifecycle transitions, deletion/cleanup, Subtask
+Implemented: authenticated Task creation, detail retrieval, partial updates,
+completion and reopening. Persistence uses the existing MySQL Task/Subtask
+schema and enums. T1/T2 do not implement listing/filtering, deletion/cleanup, Subtask
 CRUD/reordering, progress, planning, reminders or AI tools.
 
 ## Endpoints
@@ -14,6 +14,8 @@ All routes require `auth:sanctum` and use the normal `data` Resource wrapper.
 | POST | `/api/tasks` | `tasks.store` | 201 |
 | GET | `/api/tasks/{task}` | `tasks.show` | 200 |
 | PATCH | `/api/tasks/{task}` | `tasks.update` | 200 |
+| POST | `/api/tasks/{task}/complete` | `tasks.complete` | 200 |
+| POST | `/api/tasks/{task}/reopen` | `tasks.reopen` | 200 |
 
 Unauthenticated requests return 401. Missing, soft-deleted and foreign Tasks
 return 404; PATCH authorizes before validating the body. Validation failures
@@ -38,9 +40,42 @@ also rejected. Ordinary text input follows Laravel trimming.
 
 Ownership comes exclusively from authentication. Internal attributes including
 `id`, `user_id`, `status`, `completed_at` and audit/deletion timestamps are ignored
-on both write endpoints. Creation uses pending status, normal priority and null
+on the create/PATCH endpoints. Creation uses pending status, normal priority and null
 completion metadata. PATCH preserves status and completion metadata, including
-already completed Tasks. No lifecycle transition is exposed.
+already completed Tasks. Lifecycle changes use only the dedicated endpoints below.
+
+## Completion and reopening
+
+Both lifecycle endpoints accept no editable input; unexpected body fields are
+ignored. They authorize with TaskPolicy's existing `update` ability and return
+the unchanged TaskResource representation with HTTP 200.
+
+`complete` transitions pending to completed and records the current application
+UTC instant, truncated to whole-second precision, as `completed_at`. Deadlines
+in the past or absent do not block completion. Late completion retains its actual
+instant; no overdue status or flag is introduced. Completing an already completed
+Task preserves its original completion instant and performs no UPDATE.
+
+`reopen` transitions completed to pending and clears `completed_at`. Reopening
+an already pending Task performs no UPDATE. Idempotent calls leave `updated_at`
+unchanged. Completion after reopening records a new instant; no completion
+history is stored in the current schema.
+
+TaskService runs each lifecycle operation in a transaction, locks the owner
+first, then reloads/locks the current owned Task before deciding its transition.
+Status and completion timestamp change together in one database operation,
+preserving the existing `tasks_completion_consistency` CHECK. This serializes
+competing mutations rather than trusting stale route-bound models. The clock
+and stored completion instant are independent of server/User/client timezones.
+
+Task and Subtask completion are independent. Pending Subtasks do not block
+manual parent completion; completing/reopening a parent does not alter any
+Subtask, and completed Subtasks do not automatically complete their parent.
+These endpoints change only Task lifecycle fields (plus normal `updated_at` on
+an actual transition). Subject, title, description, priority, estimates and
+deadlines remain unchanged; no StudySession or Reminder workflow runs and no
+progress is calculated. A malformed legacy foreign Subject remains masked in
+the response without silent repair; ordinary PATCH still requires explicit repair.
 
 ## Service and persistence guarantees
 

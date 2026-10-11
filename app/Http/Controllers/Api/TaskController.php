@@ -29,4 +29,18 @@ class TaskController extends Controller
     {
         return new TaskResource($service->update($request->user(), $task, $request->validated()));
     }
+
+    public function complete(Request $request, Task $task, TaskService $service): TaskResource
+    {
+        Gate::authorize('update', $task);
+
+        return new TaskResource($service->complete($request->user(), $task));
+    }
+
+    public function reopen(Request $request, Task $task, TaskService $service): TaskResource
+    {
+        Gate::authorize('update', $task);
+
+        return new TaskResource($service->reopen($request->user(), $task));
+    }
 }
