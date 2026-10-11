@@ -1,9 +1,9 @@
-# Planning Foundation — PF1 checkpoints C1 and C2
+# Planning Foundation — PF1 checkpoints C1–C3
 
-These checkpoints provide pure computation only. FreeTimeService, database
-retrieval, Lesson/StudySession subtraction and the free-slots REST API remain
-unimplemented (C3/C4). PF2 capacity, breaks, workload limits and scheduling remain
-separate future work. No preference defaults or persistence are introduced.
+C1/C2 provide pure computation. C3 adds read-only FreeTimeService integration
+with owned availability, Lessons and StudySessions. The free-slots REST API
+remains unimplemented (C4). PF2 capacity, breaks, workload limits and scheduling
+remain separate future work. No preference defaults or persistence are introduced.
 
 ## C1 interval engine
 
@@ -57,5 +57,54 @@ including adjacency across local dates. Output is sorted and non-overlapping;
 it describes allowed availability, not free time after blockers or guaranteed
 session capacity. There are no database reads/writes, application bootstrap,
 authentication, HTTP, or current-clock dependencies. Calculations use the IANA
-timezone data installed with PHP. C3/C4 must supply trusted user data and request
-bounds; no range limit or planning policy is imposed by this pure C2 component.
+timezone data installed with PHP. C3 supplies trusted user data and bounded ranges;
+C4 will validate HTTP input. No range limit or planning policy is imposed by this
+pure C2 component.
+
+## C3 read-only allowed free time
+
+`FreeTimeService::calculate($user, $startDate, $endDate, $minimumSeconds = null)`
+returns `list<array{start: int, end: int}>` with the same half-open UTC-second
+representation. It validates canonical calendar dates, ordered inclusive ranges
+of at most 31 local dates, and a positive integer minimum when supplied. Calendar
+date counting is independent of elapsed UTC seconds, so a range spanning a DST
+change still has its correct local-date length. Invalid direct arguments raise
+InvalidArgumentException; scalar minimum values are checked without coercion.
+
+The caller supplies a trusted User; this Service does not select an owner from
+authentication globals or request IDs. All reads use that User's
+`studyAvailabilityWindows()`, `lessons()` and `studySessions()` relationships.
+Timezone comes exclusively from the supplied User's persisted `timezone` value.
+Only the three recurring definition fields are loaded and passed to C2. Missing
+or nonmatching availability, gap-only windows and skipped dates yield no allowed
+intervals; empty expansion skips both blocker queries.
+
+The earliest expanded availability start and latest end define a safe UTC query
+envelope. Blockers are included with `starts_at < rangeEnd AND ends_at > rangeStart`,
+including events beginning before the requested range. Lessons block only when
+active and non-soft-deleted: cancelled/replaced originals do not block, while an
+active replacement does. StudySessions block only when planned, even for a
+historical requested date. Completed, missed, rescheduled and cancelled sessions
+are excluded. No current-clock or parent-work lifecycle filter is inferred.
+
+Blocker queries retrieve only start/end fields. Raw database DATETIME values are
+parsed explicitly in UTC; model presentation casts and the server's default
+timezone never determine their instants. Query bounds are also formatted in UTC.
+C1 subtraction normalizes overlapping, adjacent and duplicate-equivalent blockers
+across both tables and preserves exact seconds. Since subtraction only removes
+instants from C2's expanded availability, every result retains its requested
+local-date and allowed-window membership. Additional midnight conversion or
+clipping to an approximate UTC day is unnecessary and could distort DST semantics.
+
+When provided, the minimum filters the remaining intervals after subtraction,
+including equality at the exact second boundary. Absence means no minimum filter.
+PlanningPreference is neither read nor created: configured session bounds,
+breaks and daily/weekly limits are not applied or used as defaults here.
+
+Calculation performs only scoped SELECTs, with no locks, transactions, writes,
+cleanup, lifecycle changes or cached/persisted slots. Tests verify query behavior
+and unchanged database tables after repeated calculations. Independent reads are
+not an atomic planning/commit snapshot; future plan creation must revalidate
+current state transactionally. Output is allowed study free time, not unrestricted
+calendar free time or guaranteed schedulable capacity. C4's authenticated REST
+workflow and PF2's workload/break/session-capacity policies remain unimplemented.
