@@ -1,9 +1,11 @@
-# Tasks — T1 basic API, T2 lifecycle and T3 collection
+# Tasks and Subtasks — T1–T3 and S1
 
 Implemented: authenticated Task creation, detail retrieval, partial updates,
 completion, reopening and filtered/paginated listing. Persistence uses the existing
-MySQL Task/Subtask schema and enums. T1–T3 do not implement deletion/cleanup, Subtask
-CRUD/reordering, progress, planning, reminders or AI tools.
+MySQL Task/Subtask schema and enums. S1 adds nested Subtask creation, ordered
+listing, detail, partial editing and completion/reopening. Task/Subtask deletion,
+restore, cleanup, Subtask reordering, progress, planning, reminders and AI tools
+remain deferred.
 
 ## Endpoints
 
@@ -136,8 +138,8 @@ When the candidate parent deadline is non-null, no non-deleted Subtask with a
 deadline may exceed it. The Service checks relevant Subtasks under locks;
 completed but non-deleted records participate, while deleted/null-deadline
 records do not. Equal deadlines and clearing the parent deadline are allowed.
-No Subtasks are mutated. Future Subtask mutations must enforce the same bound
-and owner serialization convention.
+No Subtasks are mutated by Task updates. S1 SubtaskService enforces the reciprocal
+deadline bound under the same owner and parent serialization locks.
 
 Existing MySQL checks preserve pending/completed completion consistency,
 priority 1–3 and positive estimates. Same-owner association and cross-row
@@ -154,3 +156,82 @@ string enum value; priority is an integer enum value. Nullable dates are null or
 canonical UTC whole-second strings. Storage and serialization explicitly use
 UTC, independent of server or User timezone. No ownership IDs, audit metadata,
 relationship objects, Subtask collections or calculated progress are exposed.
+
+## S1 Subtask API
+
+All six routes require `auth:sanctum` and use SubtaskResource under `data`.
+
+| Method | Path | Route name | Success |
+|---|---|---|---|
+| GET | `/api/tasks/{task}/subtasks` | `tasks.subtasks.index` | 200 |
+| POST | `/api/tasks/{task}/subtasks` | `tasks.subtasks.store` | 201 |
+| GET | `/api/tasks/{task}/subtasks/{subtask}` | `tasks.subtasks.show` | 200 |
+| PATCH | `/api/tasks/{task}/subtasks/{subtask}` | `tasks.subtasks.update` | 200 |
+| POST | `/api/tasks/{task}/subtasks/{subtask}/complete` | `tasks.subtasks.complete` | 200 |
+| POST | `/api/tasks/{task}/subtasks/{subtask}/reopen` | `tasks.subtasks.reopen` | 200 |
+
+Ownership is inherited from the exact route parent. The parent must be owned and
+non-deleted, and the child must be non-deleted and belong to that parent. Scoped
+binding, TaskPolicy and SubtaskPolicy reject missing/deleted/foreign/mismatched
+targets with 404 before body validation. Authentication failure returns 401;
+input and deadline/capacity errors return Laravel 422 field errors. Service calls
+independently reload the current owned parent and scoped child, protecting direct
+calls from forged or stale model attributes.
+
+### Basic creation, listing and editing (S1a)
+
+Input fields are `title` (required on create, optional on PATCH), `description`,
+`estimated_minutes` and `deadline_at`. They follow the Task contract: non-empty
+title up to 255 characters, nullable description up to 65535 UTF-8 bytes, nullable
+strict integer estimate 1–65535 and nullable canonical UTC whole-second deadline
+in years 1000–9999. Past deadlines are valid. Omitted PATCH fields retain current
+values; explicit null clears nullable fields. Internal fields (`id`, `task_id`,
+`position`, `status`, `completed_at`, audit/deletion timestamps and ownership)
+are ignored. Subtasks cannot move between Tasks.
+
+Creation is allowed under pending or completed parents and never changes parent
+state. New Subtasks are pending with null completion metadata. After locking the
+owner and current parent, SubtaskService allocates position 1 when no non-deleted
+children exist, otherwise maximum non-deleted position + 1. Deleted history is
+excluded; existing rows are never renumbered or restored. Position 65535 is the
+last available value; exhaustion returns a `position` validation error. Allocation
+uses the owner/parent serialization locks, without adding a uniqueness constraint.
+
+The collection is read-only and unpaginated, ordered by position then ID ascending,
+including an ID tie-breaker for historical duplicate positions. Deleted children
+are excluded and an empty collection returns `data: []`.
+
+Create/PATCH validate the complete candidate against the latest parent deadline:
+if both deadlines exist, the Subtask deadline must be no later than its parent's.
+Equal/earlier values or null on either side are allowed. An unrelated PATCH on a
+legacy invalid relation fails until explicitly repaired with a valid deadline or
+null. Validation failure rolls back without changing parent/child state.
+
+Subtask mutations use one transaction and owner → parent → child lock order (the
+allocation query locks the current maximum child when present). This is compatible
+with TaskService's parent deadline changes. PATCH preserves parent, position and
+lifecycle metadata; StudySessions and Reminders are untouched.
+
+### Completion and reopening (S1b)
+
+The dedicated lifecycle endpoints ignore all body fields. They reload/lock the
+owner, parent and child, then change status/completion together in one UPDATE.
+Completion transitions pending → completed using current application UTC time
+truncated to seconds. Late completion is allowed. Reopening transitions completed
+→ pending and clears completion metadata. Already completed/pending operations
+are idempotent: no UPDATE, no timestamp replacement and no `updated_at` change.
+Completion after reopening records a new instant; no completion history is stored.
+
+Task/Subtask status remains independent in both directions, including when all
+Subtasks are completed. Lifecycle operations change no unrelated fields, do not
+repair legacy deadline relations, and do not alter parents, siblings, StudySessions
+or Reminders. No progress calculation or planning/reminder workflow runs.
+
+### Public Subtask representation
+
+Only `id`, `task_id`, `title`, `description`, `position`, `status`,
+`estimated_minutes`, `deadline_at` and `completed_at` are exposed. Status uses
+the existing pending/completed string values. Dates are null or canonical UTC
+whole-second strings, independent of server/User timezone. No audit fields,
+ownership IDs, relationship objects or derived progress are exposed. Existing
+TaskResource remains unchanged and contains no Subtask collection.
