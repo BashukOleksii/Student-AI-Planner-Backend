@@ -68,4 +68,5 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/schedule-imports', [ScheduleImportController::class, 'store'])->name('schedule-imports.store');
     Route::get('/schedule-imports/{scheduleImportBatch}', [ScheduleImportController::class, 'show'])->name('schedule-imports.show');
     Route::post('/schedule-imports/{scheduleImportBatch}/revalidate', [ScheduleImportController::class, 'revalidate'])->name('schedule-imports.revalidate');
+    Route::post('/schedule-imports/{scheduleImportBatch}/commit', [ScheduleImportController::class, 'commit'])->name('schedule-imports.commit');
 });

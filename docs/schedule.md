@@ -211,8 +211,7 @@ The real workbook pipeline produces **30** fully resolved candidates for the B1
 two-week Kyiv fixture period when exact owned academic references exist. Resolver
 Feature tests cover read-only batching, ownership, strict matching and ambiguity;
 fingerprint Unit tests require no database. B2 does not classify duplicates or
-conflicts; that is the B3 responsibility below. B2 remains transient; C1 persists its classified output. Commit
-remains deferred. Excel import is not complete.
+conflicts; that is the B3 responsibility below. B2 remains transient; C1 persists its classified output and C2b commits the confirmed snapshot atomically. Excel import is not complete.
 
 ## Import B3: transient identity and projected schedule classification
 
@@ -227,7 +226,7 @@ Identity remains `(user_id, academic_period_id, fingerprint)`, loaded in a batch
 with `withTrashed()`. A missing import-batch FK does not remove imported identity.
 Source-authoritative comparison covers Subject/period/Teacher IDs, room and UTC
 start/end only. Excel provides no type: type-only differences cause no update.
-The B2 candidate `type` remains unchanged, but future updates/restores **must
+The B2 candidate `type` remains unchanged, but C2b updates/restores **must
 retain the existing Lesson type**, including manual corrections. New creations
 use the B1 technical Other fallback.
 
@@ -266,7 +265,7 @@ batch from committing until correction/revalidation.
 The real two-week workbook pipeline yields **30 valid/create candidates** in an
 empty schedule. Classifier Feature tests cover lifecycle/type preservation,
 intra-file groups, manual/effective blockers, swaps, adjacency, batched reads and
-unchanged database snapshots. `matched_lesson_id` is diagnostic only: future
+unchanged database snapshots. `matched_lesson_id` is diagnostic only: C2b
 commit must reload/revalidate identity, ownership, lifecycle and conflicts.
 The classifier remains read-only; C1 persists its output as described below.
 
@@ -301,7 +300,7 @@ ordinal. C1 uses explicit scalar JSON snapshots:
 - `normalized_data`: `academic_period_id`, `subject_id`, `teacher_id`, `room`,
   scalar technical `type = other`, `starts_at_utc`, `ends_at_utc`, `operation`,
   `matched_lesson_id`. Existing corrected Lesson types remain untouched;
-  future update/restore must preserve them. The matched ID is diagnostic only.
+  C2b update/restore preserves them. The matched ID is diagnostic only.
 - Dedicated columns hold B3 `status`, B2 `fingerprint` (nullable) and final
   field-oriented `validation_errors`; no-error values are consistently `[]`.
   No fingerprint or separate resolution-error field is duplicated in JSON.
@@ -331,7 +330,7 @@ expose counts/status, filename, period, preview names/IDs, dates/times, type,
 operations, provenance and errors. User IDs, internal row batch IDs, hashes and
 fingerprints are not public. Both responses use the usual `data` resource wrapper.
 
-Preview is a snapshot. Future confirmed commit must revalidate identity,
+Preview is a snapshot. Confirmed C2b commit must revalidate identity,
 ownership, current lifecycle and conflicts under locks, and must never blindly
 trust `matched_lesson_id`. C1 provides no commit/cancel endpoints; C2a adds
 revalidation below.
@@ -365,7 +364,7 @@ start/end and the refreshed Subject ID. Stored fingerprints, statuses,
 operations, matched IDs and errors are discarded and recomputed. Subject failure
 leaves fingerprint null; Teacher failure may retain it. Reconstructed candidates
 carry the technical Other fallback; existing corrected Lesson types are still
-preserved by B3's future-update/restore contract.
+preserved by B3/C2b's type-preservation contract.
 
 Before any preview updates, integrity checks require the stored total to match
 the actual row count, contiguous ordinals `1..N`, all typed C1 raw fields,
@@ -391,15 +390,86 @@ validated; an empty legitimate preview stays validated with all counters zero.
 GET subsequently returns this stored snapshot. All refresh writes are atomic;
 unexpected exceptions propagate and roll back.
 
-Confirmed Lesson commit remains a separate future operation and must revalidate
-again under its transaction; an earlier successful revalidation is not permission
-to trust a stale preview or diagnostic matched Lesson ID.
+Confirmed Lesson commit is a separate C2b operation that revalidates again under
+its transaction; an earlier successful revalidation is not permission to trust
+a stale preview or diagnostic matched Lesson ID.
+
+## Import C2b: confirmed atomic Lesson commit
+
+The supported V1 workflow is upload → persisted preview → optional reference
+fixes/revalidation → explicit commit → atomic Lesson reconciliation.
+Authenticated `POST /api/schedule-imports/{scheduleImportBatch}/commit`
+(`schedule-imports.commit`) requires no body: this endpoint is the confirmation
+action. Owners receive the Batch Resource with ordered rows; foreign batches
+return 404 and unauthenticated requests return 401. A new commit requires a
+validated batch; uploaded/failed/cancelled return 422 with
+`schedule_import: ["This import preview is not ready to commit."]`.
+
+`ScheduleImportCommitService::commit(User $user, ScheduleImportBatch $batch)`
+starts one transaction and reloads/locks User → owned Batch → owned Period →
+ordered Rows. It captures confirmation semantics, then calls C2a's shared
+`refreshLocked` core within that same transaction. There is no separate
+revalidation commit or owner-lock gap. B2 reference/fingerprint refresh, source
+integrity validation, B3 projected conflict logic and counter refresh are reused.
+
+Confirmation compares status/counters/error_message plus every row's ordinal,
+status, fingerprint, explicit C1 normalized fields (including operation/matched
+ID) and errors. JSON object key order and audit timestamps are ignored. Raw
+source remains immutable. Any semantic change returns HTTP 409 with the normal
+refreshed Resource under `data` and top-level message
+`The import preview changed. Review it and confirm again.` The refresh persists,
+including an uploaded state if conflicts/errors appeared; no Lessons change.
+The caller must review and confirm again. No newly discovered operation is
+silently applied, including create → noop or noop/update → restore.
+
+Only unchanged, still-validated confirmation reaches reconciliation:
+
+| Confirmed row | Lesson operation |
+|---|---|
+| valid / create | New owned active imported Lesson, Other type, null replacement link |
+| valid / update | Same active identity; refresh source-authoritative fields, retain current type and replacement links |
+| valid / restore | Same physical deleted identity; refresh source fields, restore as active, retain current type and links |
+| valid / preserve | No Lesson mutation; cancelled/replaced lifecycle remains unchanged |
+| duplicate / noop | No Lesson mutation, including repeated intra-file identity rows |
+
+Mutation targets are reloaded with `withTrashed()` and `lockForUpdate()` by
+`(user_id, academic_period_id, fingerprint)`. Cached matched IDs never select a
+target. Unexpected identity/lifecycle or operation/status mismatches fail and
+roll back; commit does not substitute operations. B3 validates the coherent
+projected target schedule, so the mutation loop does not rerun a competing
+per-row overlap engine (including manually swapped current positions).
+
+Source-authoritative updates cover period, Subject, Teacher, room and UTC
+interval. Instants are explicitly interpreted in UTC, without current timezone
+or period rematerialization. Only new Lessons receive the technical Other type;
+updates/restores preserve the latest existing type, including corrections after
+preview. No Subject/Teacher/Period is automatically created.
+
+`Lesson.schedule_import_batch_id` means **last applying import batch**: it changes
+only for create/update/restore. Noop/preserve retain the previous FK/provenance.
+Ordinary re-import never deletes, cancels or synchronizes historical Lessons
+absent from the new workbook. Replacements and manual Lessons are not adopted or
+undone; manual active overlaps remain conflicts.
+
+All refresh writes, Lesson mutations and final transition are atomic. Any later
+mutation/final-transition failure rolls back earlier creates, updates and
+restores. Success returns HTTP 200, status committed and `committed_at` set once
+to the current whole-second UTC instant. Counters and rows retain the confirmed
+applied preview operations; create rows are not rewritten as duplicates after
+creation. A repeated commit on an owned committed Batch returns its stored
+history with 200, without refresh, Lesson changes or timestamp changes. C2a
+still rejects committed batches. An empty validated preview can commit normally.
+
+The real two-week Kyiv workbook commits exactly **30 active imported Lessons**.
+Uploading the same file again produces 30 duplicate/noop rows; its commit keeps
+all Lesson IDs, fields and original applying Batch FKs unchanged. Integration
+tests also cover type/lifecycle preservation, stale reconfirmation, invariant
+checks, ordered locks, and full rollback across mixed mutation operations.
 
 ## Remaining scope
 
-Explicit mapping/create workflows, confirmed commit/re-import reconciliation
-and Lesson mutations remain deferred
-to later import stages. Permanent workbook storage and asynchronous processing
+Explicit import mapping/create workflows, Batch cancellation and destructive
+semester replacement/deletion remain deferred. Permanent workbook storage and asynchronous processing
 are not part of V1 C1. The fixed V1
 fingerprint contract is unchanged. The Excel import feature is not complete.
 Task/Subtask workflows, free-time calculation, study planning/rescheduling,

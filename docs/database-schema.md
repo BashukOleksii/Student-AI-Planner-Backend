@@ -37,9 +37,9 @@ projected-conflict classification with transient row statuses, without staging
 or Lesson writes. No schema, enums or fixed fingerprint contract changed.
 See [schedule.md](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
 
-**Still unimplemented:** actual free-time calculation, automatic study planning, task/subtask application workflows, import commit, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
+**Still unimplemented:** actual free-time calculation, automatic study planning, task/subtask application workflows, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
 
-Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. Task/import/Reminder association ownership, task deletion cleanup, rescheduling, and reminder target validation/recalculation remain unimplemented; product defaults remain undecided. Import staging exists, but uploads/file storage, preview endpoints, persisted validation/commit Services and import-driven Lesson creation remain unimplemented. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. StudySession self-rescheduling and other domain lifecycle transitions remain future Service work.
+Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. Task/Reminder association ownership, task deletion cleanup, rescheduling, and reminder target validation/recalculation remain unimplemented; product defaults remain undecided. Import C1/C2a/C2b now implement temporary XLSX upload, persisted preview/revalidation and confirmed atomic Lesson reconciliation. Destructive semester replacement is deferred. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. StudySession self-rescheduling and other domain lifecycle transitions remain future Service work.
 
 The companion [DBML source](database-schema.dbml) preserves the supplied `student-ai-planner.dbml` diagram. It uses numeric shorthand and omits SQL CHECK expressions; the MySQL types and constraints below remain authoritative. See [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [the earlier draft review](database-review-notes.md) for context. Known implementation issues are recorded in section 8 without changing approved tables, columns, keys, or delete actions.
 
@@ -401,7 +401,7 @@ Eloquent:
 
 Implemented persistence for import staging/history. Import C1 now creates owned
 upload attempts and persisted previews through the existing schema; Lesson commit
-remains deferred. Identical file hashes can identify separate attempts. Uploaded
+is implemented by C2b without schema changes. Identical file hashes can identify separate attempts. Uploaded
 files are temporary only; `original_filename` is safe basename metadata.
 
 | Column | MySQL type | Null |
@@ -440,7 +440,12 @@ Indexes:
 - `INDEX(user_id, academic_period_id, created_at)`;
 - `INDEX(user_id, file_hash)`.
 
-No unique constraint on `file_hash`: the same file may be uploaded again for preview, while duplicate protection must be enforced by the future Lesson/import commit behavior.
+No unique constraint on `file_hash`: the same file may be uploaded again for preview, while duplicate protection is enforced by B3 identity classification and C2b atomic reconciliation.
+
+C2b sets committed_at once in UTC after an atomic confirmed commit. Counters and
+rows preserve the operations actually confirmed; retries return this stored
+history without updates. A stale confirmation instead persists C2a's refreshed
+preview and returns 409, with no Lesson mutation.
 
 The non-unique period/date index is named `schedule_import_batches_user_period_created_index` to stay within MySQL's identifier-length limit; the hash index is `schedule_import_batches_user_id_file_hash_index`.
 
@@ -511,7 +516,7 @@ Implemented Eloquent:
 
 ### 3.10 lessons
 
-Implemented persistence and manual Lesson CRUD/lifecycle plus bounded schedule views; see [schedule.md](schedule.md). Import C1 processes/persists preview without Lesson mutation; confirmed commit remains unimplemented.
+Implemented persistence and manual Lesson CRUD/lifecycle plus bounded schedule views; see [schedule.md](schedule.md). Import C1 processes/persists preview without Lesson mutation; C2b implements confirmed atomic reconciliation.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -577,7 +582,7 @@ Important service invariants:
 - imported lesson identity follows the fixed V1 contract below, scoped by the unique user/academic-period key;
 - schedule overlap/conflict detection is handled by a deterministic Service.
 
-LessonService implements the manual Subject/Teacher/AcademicPeriod and replacement ownership, interval, overlap, and lifecycle rules above. Import-batch compatibility and fingerprint restore/update reconciliation remain future import responsibilities. ScheduleService implements effective local date/week querying; free-time calculation remains unimplemented.
+LessonService implements the manual Subject/Teacher/AcademicPeriod and replacement ownership, interval, overlap, and lifecycle rules above. C2b implements confirmed owner-locked imported identity reconciliation using C2a/B3 validation. The Lesson Batch FK marks the last import that actually created/updated/restored the row; noop/preserve do not change it. Update/restore retain existing type and replacement links; ordinary import never deletes missing occurrences. ScheduleService implements effective local date/week querying; free-time calculation remains unimplemented.
 
 Eloquent:
 
@@ -607,7 +612,7 @@ Verified example: Subject ID `42`, UTC start `2026-10-05T06:00:00Z`, UTC end `20
 
 Result: `aaef02b0a645f0b15b7583ce6b0f21ece2ab2f8ea3d7a8dd2f0c1e6104ed8806`.
 
-The contract remains fixed. Import B2 implements its pure generator and exact owned reference resolution; Import B3 classifies identity/lifecycle/duplicates/conflicts transiently; Import C1 persists these preview snapshots without changing Lessons. Import commit remains unimplemented. Persistence tests retain the verified stored result; focused generator tests cover this example.
+The contract remains fixed. Import B2 implements its pure generator and exact owned reference resolution; Import B3 classifies identity/lifecycle/duplicates/conflicts transiently; Import C1 persists these preview snapshots without changing Lessons. C2b applies the confirmed preview atomically using this unchanged contract. Persistence tests retain the verified stored result; focused generator tests cover this example.
 
 ---
 
@@ -950,10 +955,10 @@ Messages are treated as append-oriented records; `updated_at` is absent. `AiMess
 
 These are deterministic application responsibilities, separate from MySQL enforcement. Recurring availability overlap, current API ownership protection, Academic Context institution/deletion invariants, and manual Lesson/schedule rules are implemented; other domain rules remain future work:
 
-1. lesson overlap and schedule conflicts (implemented by LessonService for manual create/update/replacement/revert; import remains pending);
+1. lesson overlap and schedule conflicts (implemented by LessonService for manual create/update/replacement/revert; import uses B3 projected checks inside C2b);
 2. study-session overlap and free-time validation;
-3. cross-user ownership checks (implemented for current profile/preferences/availability and Academic Context APIs; Lesson Subject/Teacher/AcademicPeriod compatibility is implemented; Task/import/Reminder association compatibility remains pending);
-4. subject/teacher/academic-period institution ownership compatibility (implemented by Academic Services); Lesson references are owner-validated by LessonService; Task/import operations remain pending;
+3. cross-user ownership checks (implemented for current profile/preferences/availability and Academic Context APIs; Lesson Subject/Teacher/AcademicPeriod compatibility is implemented; Task/Reminder association compatibility remains pending);
+4. subject/teacher/academic-period institution ownership compatibility (implemented by Academic Services); Lesson references are owner-validated by LessonService; Task operations remain pending; import validates owned references without requiring institution equality;
 5. replacement lesson and original lesson ownership (implemented by LessonService, including malformed legacy guards);
 6. subtask belongs to the study session's task;
 7. deadline feasibility;
@@ -1042,4 +1047,4 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
   introduced by the completed Stage 03 APIs.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup. Group 4 tests on MySQL 8.4.10 show that directly deleting a User who owns both a period and its import batch is rejected with error 1451 by `schedule_import_batches_academic_period_id_foreign`. Group 5 confirms that an isolated User/Subject/manual-Lesson graph can cascade, while a combined period/batch/Lesson history graph blocks direct User deletion with 1451. Hard-removing Lessons first still leaves the batch/period restriction; deleting batches next cascades their rows and then permits User deletion. Soft deletion does not remove restrictive references. Account hard purge is an ordered administrative operation, distinct from normal domain deletion; the approved FKs are unchanged.
 
-Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Further backend verticals must add task/subtask workflows, other domain ownership compatibility, free-time/planning algorithms, rescheduling, and reminder cleanup. Import commit, delivery, statistics, and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.
+Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Further backend verticals must add task/subtask workflows, other domain ownership compatibility, free-time/planning algorithms, rescheduling, and reminder cleanup. Import C2b now implements confirmed atomic reconciliation; delivery, statistics and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.

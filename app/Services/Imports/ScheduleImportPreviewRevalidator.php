@@ -4,6 +4,7 @@ namespace App\Services\Imports;
 
 use App\Enums\LessonType;
 use App\Enums\ScheduleImportBatchStatus;
+use App\Models\AcademicPeriod;
 use App\Models\ScheduleImportBatch;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use LogicException;
 
 class ScheduleImportPreviewRevalidator
 {
@@ -40,91 +42,104 @@ class ScheduleImportPreviewRevalidator
                 throw ValidationException::withMessages(['academic_period_id' => ['The selected academic period is invalid.']]);
             }
             $rows = $batch->rows()->orderBy('row_number')->lockForUpdate()->get();
-            $this->validateStructure($batch, $rows);
 
-            // Preserve valid owned mappings, including renamed catalog entries.
-            $subjectIds = $this->ownedIds($owner, $rows, 'subject_id', 'subjects');
-            $teacherIds = $this->ownedIds($owner, $rows, 'teacher_id', 'teachers');
-            $subjectNames = [];
-            $teacherNames = [];
-            foreach ($rows as $row) {
-                if (! in_array($row->normalized_data['subject_id'] ?? null, $subjectIds, true)) {
-                    $subjectNames[] = $row->raw_data['subject_name'];
-                }
-                if (! in_array($row->normalized_data['teacher_id'] ?? null, $teacherIds, true)) {
-                    $teacherNames[] = $row->raw_data['teacher_name'];
-                }
-            }
-            $references = $this->resolver->resolveNames($owner, $subjectNames, $teacherNames);
-            $occurrences = [];
-            foreach ($rows as $row) {
-                $raw = $row->raw_data;
-                $subjectId = $row->normalized_data['subject_id'] ?? null;
-                $teacherId = $row->normalized_data['teacher_id'] ?? null;
-                $errors = [];
-                if (! in_array($subjectId, $subjectIds, true)) {
-                    $subject = $references['subjects'][$raw['subject_name']];
-                    $subjectId = $subject['id'];
-                    if ($subject['errors'] !== []) {
-                        $errors['subject_name'] = $subject['errors'];
-                    }
-                }
-                if (! in_array($teacherId, $teacherIds, true)) {
-                    $teacher = $references['teachers'][$raw['teacher_name']];
-                    $teacherId = $teacher['id'];
-                    if ($teacher['errors'] !== []) {
-                        $errors['teacher_name'] = $teacher['errors'];
-                    }
-                }
-                $fingerprint = null;
-                try {
-                    // Validate even unresolved Subjects; no invalid interval reaches B3 projection.
-                    $this->fingerprint->validateInterval($raw['starts_at_utc'], $raw['ends_at_utc']);
-                    if ($subjectId !== null) {
-                        $fingerprint = $this->fingerprint->generate($subjectId, $raw['starts_at_utc'], $raw['ends_at_utc']);
-                    }
-                } catch (InvalidArgumentException) {
-                    $errors['preview_integrity'] = [self::UTC_ERROR];
-                }
-                $occurrences[] = [
-                    ...Arr::only($raw, [
-                        'local_date', 'weekday', 'pair_label', 'parity', 'subject_name', 'teacher_name',
-                        'room', 'starts_at_local', 'ends_at_local', 'starts_at_utc', 'ends_at_utc', 'source',
-                    ]),
-                    'type' => LessonType::Other, 'academic_period_id' => $period->getKey(),
-                    'subject_id' => $subjectId, 'teacher_id' => $teacherId,
-                    'fingerprint' => $fingerprint, 'resolution_errors' => $errors,
-                ];
-            }
-            $firstRaw = $rows->first()?->raw_data;
-            $classified = $this->classifier->classify($owner, $period, [
-                'group' => $firstRaw['group'] ?? null, 'source' => $firstRaw['workbook_source'] ?? [],
-                'academic_period_id' => $period->getKey(), 'occurrences' => $occurrences,
-            ]);
-            $counts = ['valid' => 0, 'invalid' => 0, 'duplicate' => 0];
-            foreach ($classified['occurrences'] as $index => $occurrence) {
-                $rows[$index]->update([
-                    'status' => $occurrence['status'],
-                    'normalized_data' => Arr::only([
-                        ...$occurrence, 'type' => $occurrence['type']->value,
-                    ], [
-                        'academic_period_id', 'subject_id', 'teacher_id', 'room', 'type',
-                        'starts_at_utc', 'ends_at_utc', 'operation', 'matched_lesson_id',
-                    ]),
-                    'validation_errors' => $occurrence['validation_errors'],
-                    'fingerprint' => $occurrence['fingerprint'],
-                ]);
-                $counts[$rows[$index]->status->value]++;
-            }
-            $batch->update([
-                'total_rows' => $rows->count(), 'valid_rows' => $counts['valid'],
-                'invalid_rows' => $counts['invalid'], 'duplicate_rows' => $counts['duplicate'],
-                'status' => $counts['invalid'] === 0 ? ScheduleImportBatchStatus::Validated : ScheduleImportBatchStatus::Uploaded,
-                'error_message' => null, 'committed_at' => null,
-            ]);
-
-            return $batch->setRelation('rows', $rows);
+            return $this->refreshLocked($owner, $batch, $period, $rows);
         });
+    }
+
+    /**
+     * Shared C2a/C2b refresh. Caller holds User, owned Batch/Period and ordered Row
+     * locks in the current transaction; this method never commits that transaction.
+     */
+    public function refreshLocked(User $owner, ScheduleImportBatch $batch, AcademicPeriod $period, Collection $rows): ScheduleImportBatch
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('Preview refresh requires a locked transaction.');
+        }
+        $this->validateStructure($batch, $rows);
+
+        // Preserve valid owned mappings, including renamed catalog entries.
+        $subjectIds = $this->ownedIds($owner, $rows, 'subject_id', 'subjects');
+        $teacherIds = $this->ownedIds($owner, $rows, 'teacher_id', 'teachers');
+        $subjectNames = [];
+        $teacherNames = [];
+        foreach ($rows as $row) {
+            if (! in_array($row->normalized_data['subject_id'] ?? null, $subjectIds, true)) {
+                $subjectNames[] = $row->raw_data['subject_name'];
+            }
+            if (! in_array($row->normalized_data['teacher_id'] ?? null, $teacherIds, true)) {
+                $teacherNames[] = $row->raw_data['teacher_name'];
+            }
+        }
+        $references = $this->resolver->resolveNames($owner, $subjectNames, $teacherNames);
+        $occurrences = [];
+        foreach ($rows as $row) {
+            $raw = $row->raw_data;
+            $subjectId = $row->normalized_data['subject_id'] ?? null;
+            $teacherId = $row->normalized_data['teacher_id'] ?? null;
+            $errors = [];
+            if (! in_array($subjectId, $subjectIds, true)) {
+                $subject = $references['subjects'][$raw['subject_name']];
+                $subjectId = $subject['id'];
+                if ($subject['errors'] !== []) {
+                    $errors['subject_name'] = $subject['errors'];
+                }
+            }
+            if (! in_array($teacherId, $teacherIds, true)) {
+                $teacher = $references['teachers'][$raw['teacher_name']];
+                $teacherId = $teacher['id'];
+                if ($teacher['errors'] !== []) {
+                    $errors['teacher_name'] = $teacher['errors'];
+                }
+            }
+            $fingerprint = null;
+            try {
+                // Validate even unresolved Subjects; no invalid interval reaches B3 projection.
+                $this->fingerprint->validateInterval($raw['starts_at_utc'], $raw['ends_at_utc']);
+                if ($subjectId !== null) {
+                    $fingerprint = $this->fingerprint->generate($subjectId, $raw['starts_at_utc'], $raw['ends_at_utc']);
+                }
+            } catch (InvalidArgumentException) {
+                $errors['preview_integrity'] = [self::UTC_ERROR];
+            }
+            $occurrences[] = [
+                ...Arr::only($raw, [
+                    'local_date', 'weekday', 'pair_label', 'parity', 'subject_name', 'teacher_name',
+                    'room', 'starts_at_local', 'ends_at_local', 'starts_at_utc', 'ends_at_utc', 'source',
+                ]),
+                'type' => LessonType::Other, 'academic_period_id' => $period->getKey(),
+                'subject_id' => $subjectId, 'teacher_id' => $teacherId,
+                'fingerprint' => $fingerprint, 'resolution_errors' => $errors,
+            ];
+        }
+        $firstRaw = $rows->first()?->raw_data;
+        $classified = $this->classifier->classify($owner, $period, [
+            'group' => $firstRaw['group'] ?? null, 'source' => $firstRaw['workbook_source'] ?? [],
+            'academic_period_id' => $period->getKey(), 'occurrences' => $occurrences,
+        ]);
+        $counts = ['valid' => 0, 'invalid' => 0, 'duplicate' => 0];
+        foreach ($classified['occurrences'] as $index => $occurrence) {
+            $rows[$index]->update([
+                'status' => $occurrence['status'],
+                'normalized_data' => Arr::only([
+                    ...$occurrence, 'type' => $occurrence['type']->value,
+                ], [
+                    'academic_period_id', 'subject_id', 'teacher_id', 'room', 'type',
+                    'starts_at_utc', 'ends_at_utc', 'operation', 'matched_lesson_id',
+                ]),
+                'validation_errors' => $occurrence['validation_errors'],
+                'fingerprint' => $occurrence['fingerprint'],
+            ]);
+            $counts[$rows[$index]->status->value]++;
+        }
+        $batch->update([
+            'total_rows' => $rows->count(), 'valid_rows' => $counts['valid'],
+            'invalid_rows' => $counts['invalid'], 'duplicate_rows' => $counts['duplicate'],
+            'status' => $counts['invalid'] === 0 ? ScheduleImportBatchStatus::Validated : ScheduleImportBatchStatus::Uploaded,
+            'error_message' => null, 'committed_at' => null,
+        ]);
+
+        return $batch->setRelation('rows', $rows);
     }
 
     private function ownedIds(User $user, Collection $rows, string $field, string $relation): array

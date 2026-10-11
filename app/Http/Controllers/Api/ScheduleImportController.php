@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreScheduleImportRequest;
 use App\Http\Resources\ScheduleImportBatchResource;
 use App\Models\ScheduleImportBatch;
+use App\Services\Imports\ScheduleImportCommitService;
 use App\Services\Imports\ScheduleImportPreviewRevalidator;
 use App\Services\Imports\ScheduleImportPreviewService;
 use Illuminate\Http\JsonResponse;
@@ -34,5 +35,17 @@ class ScheduleImportController extends Controller
         Gate::authorize('revalidate', $scheduleImportBatch);
 
         return new ScheduleImportBatchResource($service->revalidate($request->user(), $scheduleImportBatch));
+    }
+
+    public function commit(Request $request, ScheduleImportBatch $scheduleImportBatch, ScheduleImportCommitService $service): JsonResponse
+    {
+        Gate::authorize('commit', $scheduleImportBatch);
+        $result = $service->commit($request->user(), $scheduleImportBatch);
+        $resource = new ScheduleImportBatchResource($result['batch']);
+        if ($result['preview_changed']) {
+            $resource->additional(['message' => 'The import preview changed. Review it and confirm again.']);
+        }
+
+        return $resource->response()->setStatusCode($result['preview_changed'] ? 409 : 200);
     }
 }

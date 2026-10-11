@@ -17,4 +17,9 @@ class ScheduleImportBatchPolicy
     {
         return $user->id === $batch->user_id ? Response::allow() : Response::denyAsNotFound();
     }
+
+    public function commit(User $user, ScheduleImportBatch $batch): Response
+    {
+        return $user->id === $batch->user_id ? Response::allow() : Response::denyAsNotFound();
+    }
 }
