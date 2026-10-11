@@ -466,6 +466,12 @@ technical type, UTC interval, operation and diagnostic matched Lesson ID.
 The fingerprint stays in its dedicated column; final `validation_errors` is
 an array (empty `[]` for no errors), without separate B2 resolution errors.
 See [the explicit JSON/API contract](schedule.md#import-c1-xlsx-upload-and-persisted-preview-api).
+Import C2a updates existing rows in place under owner/batch/period/row locks.
+IDs, ordinals and raw source remain immutable; owned reference mappings survive
+renames, invalid mappings retry exact names, and fingerprints/classification
+refresh from current state. Core integrity failures roll back; row UTC integrity
+errors persist as invalid preview rows. Counters/status refresh without Lesson
+mutation or schema changes; see [the C2a contract](schedule.md#import-c2a-persisted-preview-revalidation).
 
 | Column | MySQL type | Null |
 |---|---|---:|

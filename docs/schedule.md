@@ -333,12 +333,72 @@ fingerprints are not public. Both responses use the usual `data` resource wrappe
 
 Preview is a snapshot. Future confirmed commit must revalidate identity,
 ownership, current lifecycle and conflicts under locks, and must never blindly
-trust `matched_lesson_id`. C1 provides no commit/cancel/revalidate endpoints.
+trust `matched_lesson_id`. C1 provides no commit/cancel endpoints; C2a adds
+revalidation below.
+
+## Import C2a: persisted preview revalidation
+
+Authenticated `POST /api/schedule-imports/{scheduleImportBatch}/revalidate`
+(`schedule-imports.revalidate`) requires no body and returns the refreshed Batch
+Resource with ordered rows and HTTP 200. The ownership Policy hides foreign
+batches with 404; unauthenticated requests return 401. Only uploaded/validated
+batches may revalidate. Failed/committed/cancelled batches return standard 422
+`schedule_import` errors without changing the preview.
+
+`ScheduleImportPreviewRevalidator::revalidate(User $user, ScheduleImportBatch $batch)`
+transactionally reloads/locks User → owned Batch → owned AcademicPeriod → ordered
+Rows, then rebuilds candidates from the immutable C1 raw snapshot. It never
+reopens XLSX or calls the materializer: even changes to the period range or user
+timezone leave the exact concrete dates, UTC intervals, parity and row order
+unchanged. Upload again to rematerialize a workbook for a different period.
+
+Existing positive integer Subject/Teacher mappings are checked in owned ID
+batches and retained while the entities remain owned, even after harmless
+catalog renames or new same-name Teachers. Null, deleted, foreign or otherwise
+invalid mappings retry B2's batched exact-name matcher using the imported raw
+names and strict PHP equality. Missing references remain field-oriented errors;
+multiple exact Teachers remain ambiguous. There is no fuzzy/LLM matching, code
+alias, institution preference or automatic entity creation.
+
+Fingerprint validation/generation uses the unchanged V1 contract on raw UTC
+start/end and the refreshed Subject ID. Stored fingerprints, statuses,
+operations, matched IDs and errors are discarded and recomputed. Subject failure
+leaves fingerprint null; Teacher failure may retain it. Reconstructed candidates
+carry the technical Other fallback; existing corrected Lesson types are still
+preserved by B3's future-update/restore contract.
+
+Before any preview updates, integrity checks require the stored total to match
+the actual row count, contiguous ordinals `1..N`, all typed C1 raw fields,
+coherent workbook provenance and an owned period. Core corruption returns a
+generic 422 asking for a new preview, without partial updates. An otherwise
+intact occurrence with malformed whole-second UTC timestamps or an unordered
+UTC interval becomes invalid under `preview_integrity`, with null fingerprint
+and operation; malformed values are never normalized into valid instants.
+UTC validation also runs when Subject resolution fails.
+
+B3 reruns its existing identity/lifecycle/projected-conflict rules against the
+current Lesson state. A new active manual blocker can change create → invalid;
+a matching imported identity can change create → duplicate/noop; a matching
+soft-deleted Lesson can change noop → valid/restore. Revalidation performs no
+Lesson creation, update, restoration, deletion, status/FK or replacement change.
+
+Rows update in place, retaining IDs, `row_number`, `raw_data` and creation time.
+Only status, the explicit scalar C1 normalized snapshot, final errors and
+fingerprint refresh. Actual refreshed statuses determine all four counters;
+zero invalids means validated (duplicates allowed), otherwise uploaded.
+`error_message` and `committed_at` are null. Revalidation can move uploaded ↔
+validated; an empty legitimate preview stays validated with all counters zero.
+GET subsequently returns this stored snapshot. All refresh writes are atomic;
+unexpected exceptions propagate and roll back.
+
+Confirmed Lesson commit remains a separate future operation and must revalidate
+again under its transaction; an earlier successful revalidation is not permission
+to trust a stale preview or diagnostic matched Lesson ID.
 
 ## Remaining scope
 
-Explicit mapping/create workflows, persisted-preview revalidation,
-confirmed commit/re-import reconciliation and Lesson mutations remain deferred
+Explicit mapping/create workflows, confirmed commit/re-import reconciliation
+and Lesson mutations remain deferred
 to later import stages. Permanent workbook storage and asynchronous processing
 are not part of V1 C1. The fixed V1
 fingerprint contract is unchanged. The Excel import feature is not complete.

@@ -12,17 +12,23 @@ class ScheduleImportFingerprint
         if ($subjectId <= 0) {
             throw new InvalidArgumentException('Subject ID must be a positive integer.');
         }
+        $this->validateInterval($startsAtUtc, $endsAtUtc);
+
+        $canonical = json_encode([(string) $subjectId, $startsAtUtc, $endsAtUtc],
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        return hash('sha256', $canonical, false);
+    }
+
+    /** The same strict contract also applies to persisted rows without a resolved Subject. */
+    public function validateInterval(string $startsAtUtc, string $endsAtUtc): void
+    {
         $this->validateInstant($startsAtUtc);
         $this->validateInstant($endsAtUtc);
         // Validated, fixed-width UTC strings sort in instant order.
         if ($startsAtUtc >= $endsAtUtc) {
             throw new InvalidArgumentException('UTC start must precede end.');
         }
-
-        $canonical = json_encode([(string) $subjectId, $startsAtUtc, $endsAtUtc],
-            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-
-        return hash('sha256', $canonical, false);
     }
 
     private function validateInstant(string $instant): void

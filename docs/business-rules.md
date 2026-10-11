@@ -122,6 +122,19 @@ Repeated file hashes are allowed, uploads are not permanently stored, and no
 Lessons change. Preview retrieval is owned/read-only; future confirmed commit
 must revalidate the current database state. See [the C1 contract](schedule.md#import-c1-xlsx-upload-and-persisted-preview-api).
 
+**BR-IMP-010 — Revalidate the concrete persisted preview**\
+Import C2a revalidates only owned uploaded/validated batches under ordered
+User/Batch/Period/Rows locks. It preserves row IDs, ordinals and raw source;
+period/timezone changes never regenerate or remove occurrences. Existing owned
+Subject/Teacher IDs survive renames. Invalid/missing mappings retry exact raw
+names through B2; strict equality and Teacher ambiguity rules still apply.
+Fingerprints and B3 classification are recomputed, discarding stale diagnostic
+IDs/status/operations/errors. Core corruption fails without partial refresh;
+invalid UTC intervals become row integrity errors, never normalized instants.
+Rows/counters refresh atomically: zero invalids means validated, otherwise
+uploaded. No catalog or Lesson mutations occur; commit remains separate and
+must revalidate again. See [the C2a contract](schedule.md#import-c2a-persisted-preview-revalidation).
+
 ## 4. Task rules
 
 **BR-TSK-001 — Task ownership**  

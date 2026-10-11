@@ -71,6 +71,12 @@ concrete generated occurrence, with a 1-based preview ordinal and original Excel
 coordinates in raw JSON. No Lesson changes before future confirmed commit;
 the stored preview is a snapshot that commit must revalidate. See
 [the C1 contract](schedule.md#import-c1-xlsx-upload-and-persisted-preview-api).
+Import C2a refreshes this exact persisted occurrence set against current owned
+references and Lesson state. Valid owned IDs survive catalog renames; invalid
+mappings retry exact imported names. Fingerprints/classification are recomputed
+and rows updated atomically in place, preserving raw source and preview order.
+Revalidation does not reopen/rematerialize the workbook or change Lessons;
+confirmed commit remains future work. See [the C2a contract](schedule.md#import-c2a-persisted-preview-revalidation).
 
 **Schedule Import Batch**  
 A persisted process entity representing one Excel import attempt, its academic period, source-file identity, validation state, and commit history. Persisted import rows retain preview data and row-level errors. The fixed imported Lesson fingerprint contract uses the resolved persisted Subject ID and UTC whole-second start/end instants in an ordered JSON array, hashed to lowercase SHA-256; subject name/code, teacher, room, and type are excluded. Import B2 implements the pure fingerprint generator; import commit remains unimplemented; see [the exact contract](database-schema.md#fixed-v1-import-fingerprint-contract).

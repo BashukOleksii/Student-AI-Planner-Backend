@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreScheduleImportRequest;
 use App\Http\Resources\ScheduleImportBatchResource;
 use App\Models\ScheduleImportBatch;
+use App\Services\Imports\ScheduleImportPreviewRevalidator;
 use App\Services\Imports\ScheduleImportPreviewService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
 class ScheduleImportController extends Controller
@@ -25,5 +27,12 @@ class ScheduleImportController extends Controller
         $scheduleImportBatch->load(['rows' => fn ($query) => $query->orderBy('row_number')]);
 
         return new ScheduleImportBatchResource($scheduleImportBatch);
+    }
+
+    public function revalidate(Request $request, ScheduleImportBatch $scheduleImportBatch, ScheduleImportPreviewRevalidator $service): ScheduleImportBatchResource
+    {
+        Gate::authorize('revalidate', $scheduleImportBatch);
+
+        return new ScheduleImportBatchResource($service->revalidate($request->user(), $scheduleImportBatch));
     }
 }

@@ -44,6 +44,44 @@ class ScheduleOccurrenceResolver
 
         $subjectNames = array_values(array_unique(array_column($materialized['occurrences'], 'subject_name'), SORT_STRING));
         $teacherNames = array_values(array_unique(array_column($materialized['occurrences'], 'teacher_name'), SORT_STRING));
+        $references = $this->resolveNames($user, $subjectNames, $teacherNames);
+
+        $occurrences = [];
+        foreach ($materialized['occurrences'] as $occurrence) {
+            $subject = $references['subjects'][$occurrence['subject_name']];
+            $teacher = $references['teachers'][$occurrence['teacher_name']];
+            $errors = [];
+            if ($subject['errors'] !== []) {
+                $errors['subject_name'] = $subject['errors'];
+            }
+            if ($teacher['errors'] !== []) {
+                $errors['teacher_name'] = $teacher['errors'];
+            }
+            $occurrences[] = [
+                ...Arr::only($occurrence, self::OCCURRENCE_FIELDS),
+                'academic_period_id' => $period->getKey(),
+                'subject_id' => $subject['id'],
+                'teacher_id' => $teacher['id'],
+                'fingerprint' => $subject['id'] === null ? null : $this->fingerprint->generate($subject['id'], $occurrence['starts_at_utc'], $occurrence['ends_at_utc']),
+                'resolution_errors' => $errors,
+            ];
+        }
+
+        return [
+            'group' => $materialized['group'], 'source' => $materialized['source'],
+            'academic_period_id' => $period->getKey(), 'occurrences' => $occurrences,
+        ];
+    }
+
+    /**
+     * Batched exact owned names shared by initial resolution and unmapped preview refresh.
+     *
+     * @return array{subjects: array<string, array{id: ?int, errors: list<string>}>, teachers: array<string, array{id: ?int, errors: list<string>}>}
+     */
+    public function resolveNames(User $user, array $subjectNames, array $teacherNames): array
+    {
+        $subjectNames = array_values(array_unique($subjectNames, SORT_STRING));
+        $teacherNames = array_values(array_unique($teacherNames, SORT_STRING));
         $subjects = [];
         $teachers = [];
         if ($subjectNames !== []) {
@@ -62,32 +100,24 @@ class ScheduleOccurrenceResolver
             }
         }
 
-        $occurrences = [];
-        foreach ($materialized['occurrences'] as $occurrence) {
-            $subjectId = $subjects[$occurrence['subject_name']] ?? null;
-            $teacherIds = $teachers[$occurrence['teacher_name']] ?? [];
-            $errors = [];
-            if ($subjectId === null) {
-                $errors['subject_name'] = ['No owned subject exactly matches this imported name.'];
-            }
-            if (count($teacherIds) !== 1) {
-                $errors['teacher_name'] = [count($teacherIds) === 0
+        $result = ['subjects' => [], 'teachers' => []];
+        foreach ($subjectNames as $name) {
+            $id = $subjects[$name] ?? null;
+            $result['subjects'][$name] = [
+                'id' => $id,
+                'errors' => $id === null ? ['No owned subject exactly matches this imported name.'] : [],
+            ];
+        }
+        foreach ($teacherNames as $name) {
+            $ids = $teachers[$name] ?? [];
+            $result['teachers'][$name] = [
+                'id' => count($ids) === 1 ? $ids[0] : null,
+                'errors' => count($ids) === 1 ? [] : [count($ids) === 0
                     ? 'No owned teacher exactly matches this imported name.'
-                    : 'Multiple owned teachers exactly match this imported name.'];
-            }
-            $occurrences[] = [
-                ...Arr::only($occurrence, self::OCCURRENCE_FIELDS),
-                'academic_period_id' => $period->getKey(),
-                'subject_id' => $subjectId,
-                'teacher_id' => count($teacherIds) === 1 ? $teacherIds[0] : null,
-                'fingerprint' => $subjectId === null ? null : $this->fingerprint->generate($subjectId, $occurrence['starts_at_utc'], $occurrence['ends_at_utc']),
-                'resolution_errors' => $errors,
+                    : 'Multiple owned teachers exactly match this imported name.'],
             ];
         }
 
-        return [
-            'group' => $materialized['group'], 'source' => $materialized['source'],
-            'academic_period_id' => $period->getKey(), 'occurrences' => $occurrences,
-        ];
+        return $result;
     }
 }

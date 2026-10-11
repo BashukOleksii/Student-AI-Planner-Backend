@@ -351,8 +351,16 @@ Each row represents one concrete occurrence; its ordinal is distinct from Excel
 coordinates. Invalid rows keep the batch uploaded; zero invalids means validated
 (duplicates allowed). Controlled workbook-processing failure leaves a failed
 zero-row attempt. Files are not permanently stored and Lessons never change.
-Preview is a snapshot; confirmed commit and current-state revalidation remain
-future work. See [the C1 contract](schedule.md#import-c1-xlsx-upload-and-persisted-preview-api).
+Preview is a snapshot; confirmed commit remains future work. See [the C1 contract](schedule.md#import-c1-xlsx-upload-and-persisted-preview-api).
+
+Import C2a adds `ScheduleImportPreviewRevalidator` and an owned POST revalidate
+endpoint for uploaded/validated previews. User/Batch/Period/Rows are reloaded
+under locks. Existing owned reference IDs survive renames; invalid/missing IDs
+retry the shared B2 exact-name matcher. Raw UTC intervals are validated and
+fingerprints recomputed, then B3 reclassifies against current Lessons. Rows
+refresh atomically in place with new counters/status; raw source and ordinals
+remain immutable. No parsing, rematerialization or Lesson mutation occurs.
+Commit is still separate; see [the C2a contract](schedule.md#import-c2a-persisted-preview-revalidation).
 
 Import is a two-phase use case:
 
