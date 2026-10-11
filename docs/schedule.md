@@ -170,14 +170,53 @@ occurrences**: 15 in each week. Tests use in-memory AcademicPeriod attributes an
 plain PHPUnit, including partial weeks, year boundaries, DST changes and gaps/folds:
 `vendor/bin/phpunit tests/Unit/ScheduleOccurrenceMaterializerTest.php`.
 
-Candidates remain transient: there is no neutral import-row status, and entity
-resolution, duplicate/conflict validation and commit have not happened. No batch,
-row, preview row number, Subject/Teacher ID, fingerprint or Lesson is produced.
+B1 candidates remain transient and have not yet undergone entity resolution or
+duplicate/conflict validation. B1 produces no batch, row, preview row number,
+Subject/Teacher ID, fingerprint or Lesson.
+
+## Import B2: exact references and fixed fingerprints
+
+`ScheduleOccurrenceResolver::resolve(User $user, AcademicPeriod $academicPeriod, array $materialized)`
+reloads the period through the user's scoped relationship and rejects foreign or
+missing periods with a generic `academic_period_id` validation error. It resolves
+distinct imported Subject/Teacher names in batches using only owned records.
+Final matching uses strict PHP string equality against the normalized Import A
+name: MySQL case/accent/space-insensitive collation cannot redefine exactness.
+Persisted names are not normalized or renamed. No fuzzy matching, code/alias
+matching, LLM resolution, institution preference or automatic creation is used.
+
+An exact owned Subject supplies its ID. An exact unique owned Teacher supplies
+its ID; zero matches are missing, multiple exact matches are ambiguous. A supplied
+teacher name is never silently discarded. Subject/Teacher institutions need not
+match the period's institution. Resolution makes no database mutations.
+
+The result preserves `group`, workbook `source`, and occurrence order/provenance,
+and adds trusted `academic_period_id` at workbook and occurrence levels. Each
+candidate also receives nullable `subject_id`, `teacher_id`, `fingerprint`, and
+`resolution_errors` (field names mapped to lists of stable messages). Incoming
+ownership/association IDs, fingerprints, status and row numbers are ignored.
+Missing Subjects produce null fingerprints; missing/ambiguous Teachers retain
+fingerprints when their Subject resolves. No `ScheduleImportRowStatus` is assigned.
+
+`ScheduleImportFingerprint::generate(int $subjectId, string $startsAtUtc, string $endsAtUtc): string`
+implements the unchanged [fixed V1 contract](database-schema.md#fixed-v1-import-fingerprint-contract):
+positive Subject ID as an ASCII decimal string plus strict whole-second UTC start
+and end, in that ordered JSON array, hashed with lowercase SHA-256. Non-positive
+IDs, malformed instants or non-increasing intervals raise `InvalidArgumentException`.
+Teacher, room, type, Subject name/code and all workbook metadata are excluded;
+renaming a persisted Subject preserves identity. Bad core timestamp input is
+rejected rather than hashed; B1 normally guarantees valid timestamps already.
+
+The real workbook pipeline produces **30** fully resolved candidates for the B1
+two-week Kyiv fixture period when exact owned academic references exist. Resolver
+Feature tests cover read-only batching, ownership, strict matching and ambiguity;
+fingerprint Unit tests require no database. Duplicate/conflict classification,
+persisted preview and commit remain deferred. Excel import is not complete.
 
 ## Remaining scope
 
 Excel upload/storage, persisted preview/batches/rows, AcademicPeriod selection,
-ownership orchestration, Subject/Teacher resolution, fingerprints,
+upload/materialization orchestration, explicit mapping/create workflows,
 duplicate/conflict handling, commit/re-import and
 Lesson persistence remain deferred to later import stages. The fixed V1
 fingerprint contract is unchanged. The Excel import feature is not complete.

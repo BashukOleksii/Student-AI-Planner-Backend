@@ -31,11 +31,13 @@ Important: this is the canonical repository adaptation of the approved `stage-02
 **Implemented Import foundations:** Import A parses the known XLSX weekly template;
 Import B1 expands it within an AcademicPeriod with numerator anchoring, per-endpoint
 IANA timezone conversion and the technical Other type fallback. Results remain
-transient; no schema/enums or fixed fingerprint contract changed. See [schedule.md](schedule.md#import-b1-transient-calendar-occurrences).
+transient. Import B2 adds read-only exact owned reference resolution and the pure
+fixed fingerprint generator, without preview statuses or persistence. No schema,
+enums or fixed fingerprint contract changed. See [schedule.md](schedule.md#import-b2-exact-references-and-fixed-fingerprints).
 
 **Still unimplemented:** actual free-time calculation, automatic study planning, task/subtask application workflows, import upload/persisted preview/commit, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
 
-Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. Task/import/Reminder association ownership, task deletion cleanup, rescheduling, and reminder target validation/recalculation remain unimplemented; product defaults remain undecided. Import staging exists, but uploads/file storage, preview endpoints, validation/commit Services, duplicate resolution, fingerprint generation, and import-driven Lesson creation remain unimplemented. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. StudySession self-rescheduling and other domain lifecycle transitions remain future Service work.
+Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. Task/import/Reminder association ownership, task deletion cleanup, rescheduling, and reminder target validation/recalculation remain unimplemented; product defaults remain undecided. Import staging exists, but uploads/file storage, preview endpoints, validation/commit Services, duplicate resolution and import-driven Lesson creation remain unimplemented. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. StudySession self-rescheduling and other domain lifecycle transitions remain future Service work.
 
 The companion [DBML source](database-schema.dbml) preserves the supplied `student-ai-planner.dbml` diagram. It uses numeric shorthand and omits SQL CHECK expressions; the MySQL types and constraints below remain authoritative. See [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [the earlier draft review](database-review-notes.md) for context. Known implementation issues are recorded in section 8 without changing approved tables, columns, keys, or delete actions.
 
@@ -478,7 +480,7 @@ Indexes:
 - `UNIQUE(schedule_import_batch_id, row_number)`;
 - `INDEX(schedule_import_batch_id, status)`.
 
-The unique constraint is named `schedule_import_rows_schedule_import_batch_id_row_number_unique`; the status index is `schedule_import_rows_schedule_import_batch_id_status_index`. `fingerprint` is nullable and non-unique; matching fingerprints can be stored within one batch or across batches. The V1 identity contract is fixed in section 3.10; fingerprint generation remains unimplemented.
+The unique constraint is named `schedule_import_rows_schedule_import_batch_id_row_number_unique`; the status index is `schedule_import_rows_schedule_import_batch_id_status_index`. `fingerprint` is nullable and non-unique; matching fingerprints can be stored within one batch or across batches. The V1 identity contract is fixed in section 3.10; Import B2 implements the pure generator without persisting candidates.
 
 Implemented Eloquent:
 
@@ -571,7 +573,7 @@ Eloquent:
 
 #### Fixed V1 import fingerprint contract
 
-After subject resolution, the canonical subject component is the persisted Subject database ID only, expressed as a positive ASCII decimal string without leading zeros or floating-point conversion. Subject name/code, teacher, room, and lesson type are excluded. Text normalization is not part of fingerprinting; resolving source names/codes to a Subject remains a separate future importer responsibility. Re-importing the same Subject ID and interval preserves identity across renames; resolving to a different Subject ID changes identity.
+After subject resolution, the canonical subject component is the persisted Subject database ID only, expressed as a positive ASCII decimal string without leading zeros or floating-point conversion. Subject name/code, teacher, room, and lesson type are excluded. Text normalization is not part of fingerprinting; resolving source names/codes to a Subject is separate from fingerprinting. Import B2 implements strict exact-name resolution only. Re-importing the same Subject ID and interval preserves identity across renames; resolving to a different Subject ID changes identity.
 
 Serialize both instants explicitly in UTC as `YYYY-MM-DDTHH:MM:SSZ`, with whole-second precision and no fractional seconds, independent of PHP/server default timezone. Persisted lesson DATETIME values represent UTC.
 
@@ -585,7 +587,7 @@ Verified example: Subject ID `42`, UTC start `2026-10-05T06:00:00Z`, UTC end `20
 
 Result: `aaef02b0a645f0b15b7583ce6b0f21ece2ab2f8ea3d7a8dd2f0c1e6104ed8806`.
 
-The contract is fixed; fingerprint generation, subject resolution, duplicate resolution, and import commit are not implemented by this persistence slice. Tests store the verified result without adding a generator Service.
+The contract remains fixed. Import B2 implements its pure generator and exact owned reference resolution; duplicate resolution and import commit remain unimplemented. Persistence tests retain the verified stored result; focused generator tests now cover this example.
 
 ---
 
@@ -1014,11 +1016,10 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
 
 ### 8.4 Remaining application work and product decisions
 
-- Implement fingerprint generation and import commit later using the fixed contract in section 3.10; normalization/serialization is no longer an unresolved design question. Groups 4–5 store fingerprints without generating them.
+- Import B2 implements the pure fingerprint generator; implement import commit later using the fixed contract in section 3.10; normalization/serialization is no longer an unresolved design question. Groups 4–5 store fingerprints without generating them.
 - Define product defaults and any conflict override policy in a future
   planning/product-decision stage; no defaults or override behavior are
   introduced by the completed Stage 03 APIs.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup. Group 4 tests on MySQL 8.4.10 show that directly deleting a User who owns both a period and its import batch is rejected with error 1451 by `schedule_import_batches_academic_period_id_foreign`. Group 5 confirms that an isolated User/Subject/manual-Lesson graph can cascade, while a combined period/batch/Lesson history graph blocks direct User deletion with 1451. Hard-removing Lessons first still leaves the batch/period restriction; deleting batches next cascades their rows and then permits User deletion. Soft deletion does not remove restrictive references. Account hard purge is an ordered administrative operation, distinct from normal domain deletion; the approved FKs are unchanged.
 
-Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Further backend verticals must add task/subtask workflows, other domain ownership compatibility, free-time/planning algorithms, rescheduling, and reminder cleanup. Import upload/persisted preview/commit, fingerprint generation, duplicate resolution, delivery, statistics, and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.
-
+Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Further backend verticals must add task/subtask workflows, other domain ownership compatibility, free-time/planning algorithms, rescheduling, and reminder cleanup. Import upload/persisted preview/commit, duplicate resolution, delivery, statistics, and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.
