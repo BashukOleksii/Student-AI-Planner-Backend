@@ -5,7 +5,7 @@ Important: this document defines **domain concepts and ownership**. The approved
 
 Implemented models are `User`, `PlanningPreference`, `StudyAvailabilityWindow`, `EducationInstitution`, `AcademicPeriod`, `Subject`, `Teacher`, `ScheduleImportBatch`, `ScheduleImportRow`, `Lesson`, `Task`, `Subtask`, `StudySession`, `Reminder`, `AiConversation`, and `AiMessage`. PHP backed enums, scalar/date/datetime/JSON-array casts, factories, and MySQL-backed persistence tests support all groups. Lessons, tasks, and subtasks use soft deletion; sessions/reminders retain lifecycle states; AI messages have `created_at` without `updated_at`.
 
-Authentication + User Profile now implements the first-party Sanctum session/cookie API; see [the contract](auth-profile.md). Planning Preferences and Study Availability Windows also have authenticated APIs and focused Services/ownership protection; see [planning settings](planning-settings.md). Academic Context CRUD and its ownership Policies, institution validation, and guarded lifecycle Services are implemented; see [the Academic Context contract](academic-context.md). Lesson CRUD/lifecycle and user-timezone today/date/ISO-week views are implemented; see [schedule.md](schedule.md). Task/Subtask, Reminder, import, statistics, and AI application APIs and their ownership compatibility, plus planning/free-time algorithms, reminder delivery, statistics, and AI orchestration/tools remain future work. Import A implements database-independent weekly-template parsing; see [the parser contract](schedule.md#import-a-workbook-parser-foundation). Import B1 adds transient calendar/parity/timezone materialization. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Preview/commit behavior and duplicate resolution remain future work. LessonService prohibits self-replacement and replacement chains. Self-rescheduling and Reminder target compatibility remain future Service invariants, not unsupported DB CHECKs. References below to an earlier SQL/ER draft are historical Stage 01 review context; its source is not present in the repository. See [database review notes](database-review-notes.md).
+Authentication + User Profile now implements the first-party Sanctum session/cookie API; see [the contract](auth-profile.md). Planning Preferences and Study Availability Windows also have authenticated APIs and focused Services/ownership protection; see [planning settings](planning-settings.md). Academic Context CRUD and its ownership Policies, institution validation, and guarded lifecycle Services are implemented; see [the Academic Context contract](academic-context.md). Lesson CRUD/lifecycle and user-timezone today/date/ISO-week views are implemented; see [schedule.md](schedule.md). Task/Subtask, Reminder, import, statistics, and AI application APIs and their ownership compatibility, plus planning/free-time algorithms, reminder delivery, statistics, and AI orchestration/tools remain future work. Import A implements database-independent weekly-template parsing; see [the parser contract](schedule.md#import-a-workbook-parser-foundation). Import B1 adds transient calendar/parity/timezone materialization. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B3 adds transient identity/projected-conflict classification. Persisted preview and commit remain future work. LessonService prohibits self-replacement and replacement chains. Self-rescheduling and Reminder target compatibility remain future Service invariants, not unsupported DB CHECKs. References below to an earlier SQL/ER draft are historical Stage 01 review context; its source is not present in the repository. See [database review notes](database-review-notes.md).
 
 ## 1. Domain boundaries
 
@@ -52,12 +52,19 @@ Import B1 materializes that template into transient calendar occurrences inside
 an AcademicPeriod, anchored to its starting numerator week, with independently
 resolved local endpoints and UTC instants. Source lesson type remains unknown;
 `LessonType::Other` supplies only the technical domain fallback. Persisted
-preview/commit and duplicate/conflict handling remain future work; see
+preview/commit remain future work; see
 [the B1 contract](schedule.md#import-b1-transient-calendar-occurrences).
 Import B2 resolves exact owned Subject/Teacher names in read-only batches and
 generates the fixed fingerprint from Subject ID and UTC interval. Duplicate
 Teacher names are ambiguous; missing references produce field-oriented errors
 without automatic creation or import-row status. See [the B2 contract](schedule.md#import-b2-exact-references-and-fixed-fingerprints).
+Import B3 classifies these transient candidates using the existing row status enum
+and projected create/update/restore/noop/preserve operations. Imported identity
+includes deleted history; explicit non-deleted cancellation/replacement remains
+preserved. Exact manual overlaps are conflicts, and existing type corrections
+are retained because the source provides none. Projected target intervals replace
+matched active histories during conflict checks. Persisted preview and Lesson
+mutations remain deferred; see [the B3 contract](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
 
 **Schedule Import Batch**  
 A persisted process entity representing one Excel import attempt, its academic period, source-file identity, validation state, and commit history. Persisted import rows retain preview data and row-level errors. The fixed imported Lesson fingerprint contract uses the resolved persisted Subject ID and UTC whole-second start/end instants in an ordered JSON array, hashed to lowercase SHA-256; subject name/code, teacher, room, and type are excluded. Import B2 implements the pure fingerprint generator; import commit remains unimplemented; see [the exact contract](database-schema.md#fixed-v1-import-fingerprint-contract).

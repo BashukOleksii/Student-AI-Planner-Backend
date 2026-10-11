@@ -210,15 +210,72 @@ rejected rather than hashed; B1 normally guarantees valid timestamps already.
 The real workbook pipeline produces **30** fully resolved candidates for the B1
 two-week Kyiv fixture period when exact owned academic references exist. Resolver
 Feature tests cover read-only batching, ownership, strict matching and ambiguity;
-fingerprint Unit tests require no database. Duplicate/conflict classification,
-persisted preview and commit remain deferred. Excel import is not complete.
+fingerprint Unit tests require no database. B2 does not classify duplicates or
+conflicts; that is the B3 responsibility below. Persisted preview and commit
+remain deferred. Excel import is not complete.
+
+## Import B3: transient identity and projected schedule classification
+
+`ScheduleImportCandidateClassifier::classify(User $user, AcademicPeriod $academicPeriod, array $resolved)`
+reloads the owned period, preserves B2 fields/order, and adds `status`
+(`ScheduleImportRowStatus`), nullable `operation`, `validation_errors` and nullable
+`matched_lesson_id`. It performs read-only queries and creates no staging records.
+Resolution errors immediately become Invalid and are copied into validation
+errors; existing Lessons cannot rescue an unresolved reference.
+
+Identity remains `(user_id, academic_period_id, fingerprint)`, loaded in a batch
+with `withTrashed()`. A missing import-batch FK does not remove imported identity.
+Source-authoritative comparison covers Subject/period/Teacher IDs, room and UTC
+start/end only. Excel provides no type: type-only differences cause no update.
+The B2 candidate `type` remains unchanged, but future updates/restores **must
+retain the existing Lesson type**, including manual corrections. New creations
+use the B1 technical Other fallback.
+
+| Matching history | Transient status | Operation |
+|---|---|---|
+| No imported identity | valid | create |
+| Active, source-authoritative values equal | duplicate | noop |
+| Active, source-authoritative values changed | valid | update |
+| Non-deleted cancelled/replaced | valid | preserve |
+| Soft-deleted identity, regardless of former status | valid | restore |
+| Resolution, contradictory identity or schedule errors | invalid | null |
+
+Resolution-clean rows sharing a fingerprint are grouped before conflict checks.
+The first row in B2's deterministic order is canonical. Identical authoritative
+data produces later duplicate/noop rows; type/provenance differences are ignored
+for this comparison. Contradictory Teacher/room/other authoritative values make
+the entire identity Invalid under `import_identity`, without choosing a winner.
+
+Each create/update/restore and active noop identity supplies exactly one projected
+interval. Preserve supplies none and leaves current replacements untouched.
+All represented active matched rows are excluded from external blockers together:
+manually moved/swapped histories are checked at their proposed source positions.
+Current owned, active, non-deleted Lessons across all periods block normally.
+Manual Lessons (null fingerprint), including exact Subject/interval matches,
+are conflicts and are never silently adopted as imported duplicates.
+
+Overlap is `a.start < b.end AND a.end > b.start`; adjacency is allowed. A bounded
+overall UTC range loads external blockers. Different overlapping projected
+identities both become Invalid under `schedule`; all repeated clean rows inherit
+their identity's conflict. Projected checks retain the coherent proposed set
+when errors are found, rather than simulating partial commits. Initial resolution
+or contradictory-identity failures have no projection, so their current active
+histories remain blockers. Any invalid candidate prevents the eventual atomic
+batch from committing until correction/revalidation.
+
+The real two-week workbook pipeline yields **30 valid/create candidates** in an
+empty schedule. Classifier Feature tests cover lifecycle/type preservation,
+intra-file groups, manual/effective blockers, swaps, adjacency, batched reads and
+unchanged database snapshots. `matched_lesson_id` is diagnostic only: future
+commit must reload/revalidate identity, ownership, lifecycle and conflicts.
+Persisted preview, confirmation and all Lesson mutations remain future work.
 
 ## Remaining scope
 
 Excel upload/storage, persisted preview/batches/rows, AcademicPeriod selection,
 upload/materialization orchestration, explicit mapping/create workflows,
-duplicate/conflict handling, commit/re-import and
-Lesson persistence remain deferred to later import stages. The fixed V1
+persisted-preview revalidation, commit/re-import reconciliation and
+Lesson mutations remain deferred to later import stages. The fixed V1
 fingerprint contract is unchanged. The Excel import feature is not complete.
 Task/Subtask workflows, free-time calculation, study planning/rescheduling,
 reminders, statistics, AI tools, and frontend work are also unimplemented.

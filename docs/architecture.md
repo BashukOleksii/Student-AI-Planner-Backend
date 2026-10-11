@@ -331,8 +331,16 @@ period reload and batched exact Subject/Teacher names with strict PHP equality)
 and pure `ScheduleImportFingerprint` (the unchanged V1 Subject ID/UTC interval
 contract). Duplicate Teacher names are ambiguous; no LLM, fuzzy matching or
 automatic reference creation is used. Resolved candidates and field-oriented
-errors remain transient without import-row status. Upload, persisted preview,
-duplicate/conflict handling and commit remain deferred; see [the B2 contract](schedule.md#import-b2-exact-references-and-fixed-fingerprints).
+errors remain transient without import-row status; see [the B2 contract](schedule.md#import-b2-exact-references-and-fixed-fingerprints).
+
+Import B3 adds `Services/Imports/ScheduleImportCandidateClassifier`: batched owned
+import-history lookup, lifecycle operations, grouped identities and projected
+schedule validation. It uses the existing import-row status enum transiently,
+without database writes. Active matched histories are replaced by their proposed
+intervals during validation; manual Lessons remain external conflicts. Cancelled/
+replaced histories are preserved, deleted identities are proposed for restore,
+and existing Lesson type corrections are never source-authoritative changes.
+Upload, persisted preview and commit remain deferred; see [the B3 contract](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
 
 Import is a two-phase use case:
 

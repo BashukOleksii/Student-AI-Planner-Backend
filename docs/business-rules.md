@@ -42,14 +42,14 @@ Lesson statuses are `active`, `cancelled`, and `replaced`. Cancelled, replaced, 
 The replacement lesson references the original through `replaces_lesson_id`. Both belong to the same user; the original becomes `replaced` and the replacement is `active`. Planning must not double-block them as two active occurrences of the same change. LessonService implements this atomically, prohibits chains/self-replacement, and reuses deleted manual replacement history. Cancelling a replacement leaves the original replaced. Deleting a replacement restores the original only if conflict validation succeeds; a current replacement prevents direct original deletion.
 
 **BR-SCH-005 — Schedule conflicts are deterministic**  
-Overlapping effective lessons are detected by a Service. Manual creation/import must return a conflict result rather than silently accepting inconsistent scheduling. Manual create/update, replacement, and revert checks are implemented using strict interval overlap against owned active non-deleted Lessons; adjacency is allowed, and conflicts return 422 under schedule. Import conflict handling remains deferred.
+Overlapping effective lessons are detected by a Service. Manual creation/import must return a conflict result rather than silently accepting inconsistent scheduling. Manual create/update, replacement, and revert checks are implemented using strict interval overlap against owned active non-deleted Lessons; adjacency is allowed, and conflicts return 422 under schedule. Import B3 implements transient projected conflict classification; committing imports remains deferred.
 
 **BR-SCH-006 — Duplicate detection**  
 Imported lessons use the resolved persisted Subject database ID only, expressed as a positive ASCII decimal string without leading zeros or floating-point conversion, and the lesson's UTC start/end instants. Subject names/codes, teacher, room, and lesson type are excluded. Subject resolution is a separate importer responsibility; fingerprinting requires no text normalization. Re-importing the same Subject ID and interval preserves identity across subject renames.
 
 Serialize times explicitly in UTC as `YYYY-MM-DDTHH:MM:SSZ`, with whole-second precision and no fractional seconds, independent of PHP/server default timezone; persisted lesson DATETIME values represent UTC. Canonical serialization is an ordered JSON array of exactly three strings `[subject_id, starts_at_utc, ends_at_utc]`, encoded with `JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE`, without pretty printing, BOM, or trailing newline. `hash('sha256', canonical_serialization, false)` produces lowercase 64-character hexadecimal SHA-256. The verified example is recorded in [database-schema.md §3.10](database-schema.md#fixed-v1-import-fingerprint-contract).
 
-Imported duplicate identity is scoped to `(user_id, academic_period_id, import_fingerprint)`. The database requires a period for a non-NULL fingerprint and retains fingerprint uniqueness after soft deletion. The contract is fixed; Import B2 implements its pure generator. Import commit remains unimplemented. Exact duplicate manual active intervals are rejected by application overlap validation; import duplicate handling remains future work.
+Imported duplicate identity is scoped to `(user_id, academic_period_id, import_fingerprint)`. The database requires a period for a non-NULL fingerprint and retains fingerprint uniqueness after soft deletion. The contract is fixed; Import B2 implements its pure generator. Import commit remains unimplemented. Exact duplicate manual active intervals are rejected by application overlap validation; Import B3 implements transient identity/duplicate classification; persisted reconciliation remains future work.
 
 **BR-SCH-007 — Schedule views**  
 Today's, a specific date's, and a week's schedule are calculated using the user's timezone and return only effective schedule entries for the requested range. Implemented views use strict YYYY-MM-DD anchors, ISO Monday-first weeks, interval overlap (not starts-at-only selection), exclusive next-midnight boundaries, and starts_at/ends_at/id ordering. They are read-only and mask malformed foreign presentation relations.
@@ -95,6 +95,18 @@ preference, fuzzy/LLM matching, code aliases or automatic creation. The fixed V1
 fingerprint uses only the resolved Subject ID and UTC interval: Subject failure
 leaves it null, while Teacher errors may retain it. Candidates/errors remain
 transient without import-row status until future duplicate/conflict preview.
+
+**BR-IMP-008 — Transient projected re-import classification**\
+Import B3 classifies resolved candidates with the existing row status enum, without
+persistence. Same-user/period fingerprints reserve deleted identity and propose
+create/update/restore/noop; non-deleted cancelled/replaced identities propose
+preserve. Type corrections are retained because Excel supplies no type. Repeated
+identical identities project once; contradictory authoritative data invalidates
+all repeated rows. Different projected overlaps invalidate both identity groups;
+owned effective external Lessons block normally, including exact manual matches.
+Matched active histories are excluded together in favor of target positions.
+Errors propagate through repeated identities; eventual commit is atomic and must
+revalidate. See [the B3 contract](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
 
 ## 4. Task rules
 
