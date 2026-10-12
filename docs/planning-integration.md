@@ -187,8 +187,9 @@ candidate constraints under an appropriate owner-first transaction/lock strategy
 before committing. Accepted in-transaction batch candidates must also contribute
 to later validation. Diagnostic success cannot authorize a later stale write.
 
-Remaining work: automatic task selection, remaining effort, splitting, plan
-creation, session persistence/lifecycle, rescheduling, reminder delivery, REST/AI
+Stage A now implements [work selection and remaining effort](planning-work-selection.md)
+separately, without changing C10. Remaining work: splitting, plan creation,
+session persistence/lifecycle, rescheduling, reminder delivery, REST/AI
 adapters and LLM orchestration. Future product defaults, creation past-start rules
 and additional future lookahead remain separate decisions. C10 stops at evaluation.
 

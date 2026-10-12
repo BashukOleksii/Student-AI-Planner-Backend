@@ -77,9 +77,11 @@ At the C9 checkpoint PF1/PF2 (C1–C8) were already implemented. C10 now adds
 the read-only assembler and MySQL Feature tests; see [the C10 contract](planning-integration.md).
 The historical record below describes the earlier proposal, not current implementation status.
 
-Deferred write-side policies remain future work: work eligibility and remaining
-effort, past-start restrictions for creation, any additional lookahead/defaults,
-confirmed session creation, bulk planning/rescheduling and graph reconciliation,
+At C9/C10 completion, work eligibility and remaining effort were deferred;
+Stage A now implements their read-only selection/accounting contract. Remaining
+write-side work includes past-start restrictions for creation, any additional
+lookahead/defaults, confirmed session creation, bulk planning/rescheduling and
+graph reconciliation,
 reminders and AI orchestration. Future mutations must reload/revalidate current
 owned work, timezone, preferences and sources under appropriate owner-first
 transactions/locks, include accepted batch candidates, and persist atomically.
@@ -89,6 +91,10 @@ The proposal's optional workload omission/clipping optimizations and illustrativ
 model-argument signature are not adopted by this final contract. Full scheduled
 source intervals are passed to C7; bounded selection replaces entire-history reads.
 No critical policy outside approvals A–E is introduced.
+
+Stage A subsequently implements read-only work eligibility and remaining effort;
+see [its contract](planning-work-selection.md). This follow-up does not change the
+approved C9/C10 source policies or historical proposal preserved below.
 
 ## Previously proposed decisions — preserved historical record
 

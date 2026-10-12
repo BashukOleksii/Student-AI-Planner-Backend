@@ -17,6 +17,14 @@ No endpoint, session writer, automatic planner, rescheduler or AI adapter is
 added. Diagnostic reads are advisory; future writers must revalidate current
 state transactionally. See [the integration contract](planning-integration.md).
 
+Stage A implements remaining-effort calculation and deterministic owned planning
+work selection through two focused Services. RemainingEffortService uses pure
+actual-first completed credit and separate future scheduled reservations;
+PlanningWorkSelectionService assembles owned persistence, validates source
+compatibility, excludes ineligible work and orders authoritative Task/Subtask units.
+C9/C10 scheduled workload is unchanged. No schema, endpoint, planner/writer or AI
+adapter is added. See [the Stage A contract](planning-work-selection.md).
+
 ## 1. Domain boundaries
 
 ### Identity & Profile

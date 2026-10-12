@@ -302,8 +302,10 @@ Parent and child statuses remain independent: a pending Task can report 100%, an
 a completed Task can report 0%. Child completion/reopening changes the next result;
 parent completion/reopening and child reordering do not. Positions, estimates,
 completion dates and study sessions do not define this count-based metric. Remaining
-schedulable duration, effort accounting, feasibility and planning remain deferred;
-BR-SUB-006's future planner must not double-count parent and child estimates.
+schedulable duration and effort accounting are now implemented separately by
+[Stage A](planning-work-selection.md), without changing this count-based progress.
+Feasibility and automatic allocation remain deferred; parent/child estimates are
+not double-counted.
 
 ## S3 safe deletion and dependency cleanup
 

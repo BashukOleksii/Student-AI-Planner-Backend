@@ -156,7 +156,7 @@ historical occurrences. See [the C2b contract](schedule.md#import-c2b-confirmed-
 Every task belongs to one user. T3 lists only that authenticated owner's non-deleted Tasks, using AND filters and owned Subject validation. Collection order is deadline ascending then ID, with null deadlines last; this is presentation order, not planning priority ranking. Pagination is ordinary offset pagination; see [tasks.md](tasks.md).
 
 **BR-TSK-002 — Planning estimate requirement**  
-A task may exist without a complete planning estimate if the product allows it, but automatic scheduling requires a positive remaining duration.
+A task may exist without a complete planning estimate if the product allows it, but automatic scheduling requires a positive remaining duration. Stage A excludes missing-estimate units with `missing_estimate`, preserving null effort bounds and known credit/reservations without defaults.
 
 **BR-TSK-003 — Deadline semantics**  
 When a deadline exists, no generated study session for the task may end after that deadline. C9 diagnostics use the nullable owned active Task deadline and accept end equality; historical candidates are allowed without authorizing past creation.
@@ -165,7 +165,7 @@ When a deadline exists, no generated study session for the task may end after th
 Task priority is LOW = 1, NORMAL = 2, HIGH = 3, with NORMAL as the persisted default. Store it as TINYINT UNSIGNED and use a PHP integer-backed enum when implemented. It is not arbitrary LLM text.
 
 **BR-TSK-005 — Completion**  
-Task and subtask statuses are only `pending` and `completed`, stored in bounded VARCHAR columns and represented by PHP backed enums when implemented. Completed work requires `completed_at`; pending work has no completion timestamp. A completed task is excluded from future automatic planning unless explicitly reopened. T2 implements owner-locked, idempotent manual Task completion/reopening: completion records the current UTC whole-second instant, reopening clears it, and subsequent completion records a new instant. Late completion is allowed. Task and Subtask completion statuses are independent; no planning/reminder side effects are implemented.
+Task and subtask statuses are only `pending` and `completed`, stored in bounded VARCHAR columns and represented by PHP backed enums when implemented. Completed work requires `completed_at`; pending work has no completion timestamp. A completed task is excluded from future automatic planning unless explicitly reopened. T2 implements owner-locked, idempotent manual Task completion/reopening: completion records the current UTC whole-second instant, reopening clears it, and subsequent completion records a new instant. Late completion is allowed. Task and Subtask completion statuses are independent; no planning/reminder side effects are implemented. Stage A read-only selection excludes completed parents and their pending children without changing independent statuses.
 
 **BR-TSK-006 — Overdue is derived**  
 An unfinished task whose deadline has passed is overdue. Derive this from completion state, deadline, and current time; V1 persists neither an overdue status nor an overdue flag.
@@ -194,7 +194,7 @@ If both task and subtask deadlines exist, the subtask deadline must not be later
 For V1, when a task has active (non-soft-deleted) subtasks, task progress percentage is calculated from completed active subtasks over total active subtasks. Do not persist a separate progress percentage. S2 exposes counts and an integer percentage using nearest, half-up rounding in a separate read-only Resource; no active Subtasks yields null percentage and zero counts. Parent status, positions, estimates and sessions do not define this metric, and no lifecycle changes are inferred.
 
 **BR-SUB-006 — Avoid double-counting effort**  
-When active (non-soft-deleted) subtasks exist, their estimates are authoritative schedulable work; completed subtasks contribute no remaining effort. Do not also schedule the parent's full `estimated_minutes` for that same work. If no active subtasks exist, use the task's estimate directly. Missing required subtask estimates are not a reason to double-count the parent estimate.
+When active (non-soft-deleted) subtasks exist, their estimates are authoritative schedulable work; completed subtasks contribute no remaining effort. Do not also schedule the parent's full `estimated_minutes` for that same work. If no active subtasks exist, use the task's estimate directly. Missing required subtask estimates are not a reason to double-count the parent estimate. Stage A implements this authority rule, retaining valid pending siblings when a child estimate is missing. Parent-level and deleted-child session history is diagnosed without reassignment.
 
 **BR-SUB-007 — Completion and deletion**\
 Subtasks use the same `pending`/`completed` vocabulary and completion-timestamp consistency as tasks. Parent completion/reopening never changes Subtask status; completing all Subtasks does not automatically complete the parent. S1 implements idempotent Subtask completion/reopening with current UTC whole-second completion instants and atomic status/timestamp updates, without parent or planning/reminder side effects. S3 normal subtask deletion is soft deletion with scoped future planned session and scheduled reminder cancellation; ownership and historical session references remain tied to the parent task. Parent status and surviving positions remain unchanged.
@@ -239,7 +239,7 @@ If a user has not configured a limit, a documented system default may be used. E
 ## 8. Automatic planning rules
 
 **BR-PLAN-001 — Deterministic priority order**  
-Candidate work is ordered using a deterministic strategy. Baseline V1: earlier deadline first, then higher explicit priority, then a stable tie-breaker such as creation/order ID. Tasks without deadlines are ordered after deadline-bound tasks unless the requested planning operation specifically targets them.
+Candidate work is ordered using a deterministic strategy. Baseline V1: earlier deadline first, then higher explicit priority, then a stable tie-breaker such as creation/order ID. Tasks without deadlines are ordered after deadline-bound tasks unless the requested planning operation specifically targets them. Stage A fixes the tie-breakers to ascending Task ID, then Subtask position and Subtask ID. Children inherit parent priority and use the earliest present parent/child UTC deadline; expired deadlines are explicitly excluded. Null deadlines remain last, including explicit eligible targets.
 
 **BR-PLAN-002 — Deadline protection**  
 No generated session may be placed after the work item's deadline. C9 diagnostics select the earliest present Task/Subtask deadline in raw UTC seconds; end equality passes and one second later violates the rule.
@@ -251,7 +251,7 @@ Generated sessions may not overlap effective lessons or other active study sessi
 Work that does not fit one valid slot may be divided into multiple study sessions.
 
 **BR-PLAN-005 — Remaining effort only**  
-Planning uses remaining required effort, not total historical estimate already completed.
+Planning uses remaining required effort, not total historical estimate already completed. Approved Stage A A2 credits completed sessions by positive actual_minutes × 60, or exact scheduled seconds when actual is null. Remaining work is max(0, estimate - completed credit). A3 separately subtracts correctly attributed future planned reservations starting at/after one full-precision captured UTC instant and ending by the effective deadline, clamping unallocated work at zero and reporting excess. Past-start plans never reserve new effort; no status changes occur.
 
 **BR-PLAN-006 — Feasibility reporting**  
 If all required effort cannot fit before the deadline under current constraints, the planner returns a structured infeasibility result including unscheduled duration and relevant blocking constraints.
@@ -271,7 +271,7 @@ A study session has a required `task_id` and optional `subtask_id`. When present
 Study-session statuses are `planned`, `completed`, `missed`, `rescheduled`, and `cancelled`. Sessions use lifecycle states rather than soft deletes to preserve history. C9 diagnostics perform no status transitions and allow historical candidates. Future creation and rescheduling restrictions remain deferred.
 
 **BR-SES-003 — Completion and actual effort**\
-Scheduled start/end define planned duration. `completed_at` is present exactly when status is `completed`; optional `actual_minutes` is positive when provided and is allowed only for completed sessions. Actual effort and planned duration are separate measures. C9 completed sessions contribute their original scheduled interval to local day/week budgets; actual completed effort does not replace this contribution.
+Scheduled start/end define planned duration. `completed_at` is present exactly when status is `completed`; optional `actual_minutes` is positive when provided and is allowed only for completed sessions. Actual effort and planned duration are separate measures. C9 completed sessions contribute their original scheduled interval to local day/week budgets; actual completed effort does not replace this contribution. Stage A actual-first completed effort credit is separate from C9 scheduled workload. Distinct completed records remain additive, raw excess credit is diagnostic, and future reservations do not constitute completion.
 
 ## 9. Rescheduling rules
 
@@ -398,3 +398,12 @@ assembles bounded Eloquent inputs, and delegates unchanged calculations to
 PF1/C8. Missing preferences remain five nulls. No clock restrictions, defaults,
 status repair, session persistence or automatic planning are introduced.
 See [the complete application contract](planning-integration.md).
+
+## Stage A remaining effort and work selection
+
+Approved A1–A6 policies are implemented by RemainingEffortService (pure accounting)
+and PlanningWorkSelectionService (trusted owned reads, eligibility and ordering).
+See [planning-work-selection.md](planning-work-selection.md) for exact contracts,
+exclusions/warnings, conservative historical attribution and read-only guarantees.
+C9/C10 workload remains scheduled-duration accounting and is unchanged. Automatic
+allocation, session persistence, rescheduling and AI orchestration remain deferred.

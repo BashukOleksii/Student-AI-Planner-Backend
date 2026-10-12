@@ -203,8 +203,9 @@ shorter candidate, but C5 does not perform that choice or splitting.
 
 An empty C5 result establishes duration suitability only; C8 additionally checks
 the supplied free time, anchors, workload and deadline. Free slots remain allowed
-study time, not guaranteed session capacity or a generated plan. Remaining effort,
-priorities, splitting, multi-session feasibility, automatic planning, rescheduling,
+study time, not guaranteed session capacity or a generated plan. [Stage A](planning-work-selection.md)
+now implements remaining effort and deterministic work ordering separately.
+Splitting, multi-session feasibility, automatic planning, rescheduling,
 session persistence and reminder workflows remain deferred. C10 implements diagnostic selection and enforcement of BR-FREE-004 and
 BR-LIM-001/BR-LIM-002 against owned database state; see [its contract](planning-integration.md).
 Future writers must revalidate transactionally. The PF1 API is unchanged.
