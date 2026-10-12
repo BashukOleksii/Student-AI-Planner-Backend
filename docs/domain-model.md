@@ -7,6 +7,16 @@ Implemented models are `User`, `PlanningPreference`, `StudyAvailabilityWindow`, 
 
 Authentication + User Profile now implements the first-party Sanctum session/cookie API; see [the contract](auth-profile.md). Planning Preferences and Study Availability Windows also have authenticated APIs and focused Services/ownership protection; see [planning settings](planning-settings.md). Academic Context CRUD and its ownership Policies, institution validation, and guarded lifecycle Services are implemented; see [the Academic Context contract](academic-context.md). Lesson CRUD/lifecycle and user-timezone today/date/ISO-week views are implemented; see [schedule.md](schedule.md). PF1 free-time calculation and its read-only API are implemented; see [planning-foundation.md](planning-foundation.md). General Reminder, statistics, and AI application APIs and their ownership compatibility, plus automatic planning, reminder delivery, statistics, and AI orchestration/tools remain future work. Import A implements database-independent weekly-template parsing; see [the parser contract](schedule.md#import-a-workbook-parser-foundation). Import B1 adds transient calendar/parity/timezone materialization. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B3 adds transient identity/projected-conflict classification. Import C1 adds owned upload/persisted preview; C2a revalidates and C2b commits it atomically after confirmation. LessonService prohibits self-replacement and replacement chains. S3 validates live deletion dependencies; general self-rescheduling and Reminder target validation remain future Service invariants, not unsupported DB CHECKs. References below to an earlier SQL/ER draft are historical Stage 01 review context; its source is not present in the repository. See [database review notes](database-review-notes.md).
 
+C9 approves V1 planning integration policies; C10 implements the read-only
+`PlanningCandidateEvaluationService` through trusted owned Eloquent relationships,
+PF1 free-time retrieval and unchanged pure C8 checks. Planned and completed
+scheduled sessions count toward workload; break anchors are effective Lessons
+and planned sessions. Earliest parent/child deadlines, 31-date local horizons,
+historical diagnostics and fail-closed source compatibility are enforced.
+No endpoint, session writer, automatic planner, rescheduler or AI adapter is
+added. Diagnostic reads are advisory; future writers must revalidate current
+state transactionally. See [the integration contract](planning-integration.md).
+
 ## 1. Domain boundaries
 
 ### Identity & Profile
@@ -262,4 +272,4 @@ Planning runs, generated report history, and reminder-delivery history are also 
 
 The former Stage 02 ownership, academic-period, target-reference, replacement, enum, and deletion/history questions are resolved by [the approved physical schema](database-schema.md). Its implementation gate records the resolved DB-versus-Service enforcement decisions without reopening those domain decisions.
 
-Future planning work still needs to define product defaults for study hours, breaks, and session bounds, and conflict handling/override policy. The V1 fingerprint normalization/serialization contract is fixed; Import B2 implements its generator and C1 persists preview snapshots; C2b implements confirmed atomic commit. Groups 1–9 complete persistence only; Authentication/Profile, Planning Settings, Academic Context, and manual Lesson/lifecycle/schedule-view application behavior is implemented. Other domain workflows remain unimplemented.
+C9/C10 use nullable configured constraints without defaults or conflict overrides. Any later product defaults or override behavior require a separate decision. The V1 fingerprint normalization/serialization contract is fixed; Import B2 implements its generator and C1 persists preview snapshots; C2b implements confirmed atomic commit. Groups 1–9 complete persistence only; Authentication/Profile, Planning Settings, Academic Context, and manual Lesson/lifecycle/schedule-view application behavior is implemented. Other domain workflows remain unimplemented.

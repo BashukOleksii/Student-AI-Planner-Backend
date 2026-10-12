@@ -197,16 +197,16 @@ Eloquent:
 
 ### 3.2 planning_preferences
 
-At most one row per user. The primary key prevents multiple preference rows. The singleton API returns an all-null configuration without persistence on GET when missing; complete PUT materializes/replaces the current user’s row. Nullable constraints use documented system defaults when implemented; this specification does not choose product default study hours, break duration, or session bounds.
+At most one row per user. The primary key prevents multiple preference rows. The singleton API returns an all-null configuration without persistence on GET when missing; complete PUT materializes/replaces the current user’s row. Nullable constraints mean unconfigured in PF2 and C10, with no default; any future system defaults require a separate documented product decision.
 
 | Column | MySQL type | Null | Notes |
 |---|---|---:|---|
 | `user_id` | BIGINT UNSIGNED | NO | PK + FK |
-| `max_daily_study_minutes` | SMALLINT UNSIGNED | YES | NULL = system default |
-| `max_weekly_study_minutes` | SMALLINT UNSIGNED | YES | NULL = system default |
-| `preferred_break_minutes` | SMALLINT UNSIGNED | YES | NULL = system default |
-| `min_session_minutes` | SMALLINT UNSIGNED | YES | NULL = system default |
-| `max_session_minutes` | SMALLINT UNSIGNED | YES | NULL = system default |
+| `max_daily_study_minutes` | SMALLINT UNSIGNED | YES | NULL = unconfigured; no default |
+| `max_weekly_study_minutes` | SMALLINT UNSIGNED | YES | NULL = unconfigured; no default |
+| `preferred_break_minutes` | SMALLINT UNSIGNED | YES | NULL = unconfigured; no default |
+| `min_session_minutes` | SMALLINT UNSIGNED | YES | NULL = unconfigured; no default |
+| `max_session_minutes` | SMALLINT UNSIGNED | YES | NULL = unconfigured; no default |
 | `created_at` | TIMESTAMP | YES | |
 | `updated_at` | TIMESTAMP | YES | |
 
@@ -582,7 +582,7 @@ Important service invariants:
 - imported lesson identity follows the fixed V1 contract below, scoped by the unique user/academic-period key;
 - schedule overlap/conflict detection is handled by a deterministic Service.
 
-LessonService implements the manual Subject/Teacher/AcademicPeriod and replacement ownership, interval, overlap, and lifecycle rules above. C2b implements confirmed owner-locked imported identity reconciliation using C2a/B3 validation. The Lesson Batch FK marks the last import that actually created/updated/restored the row; noop/preserve do not change it. Update/restore retain existing type and replacement links; ordinary import never deletes missing occurrences. ScheduleService implements effective local date/week querying; free-time calculation remains unimplemented.
+LessonService implements the manual Subject/Teacher/AcademicPeriod and replacement ownership, interval, overlap, and lifecycle rules above. C2b implements confirmed owner-locked imported identity reconciliation using C2a/B3 validation. The Lesson Batch FK marks the last import that actually created/updated/restored the row; noop/preserve do not change it. Update/restore retain existing type and replacement links; ordinary import never deletes missing occurrences. ScheduleService implements effective local date/week querying; PF1 implements free-time calculation and C10 adds read-only candidate integration; see [planning-integration.md](planning-integration.md).
 
 Eloquent:
 
@@ -736,7 +736,7 @@ Eloquent:
 
 ### 3.13 study_sessions
 
-Implemented persistence for a concrete reserved study block; planning and rescheduling Services remain unimplemented. No soft deletes.
+Implemented persistence for a concrete reserved study block. C10 implements read-only candidate evaluation using owned planned/completed scheduled workload and effective break sources. Session creation, automatic planning and rescheduling remain unimplemented. No soft deletes.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -1047,4 +1047,4 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
   introduced by the completed Stage 03 APIs.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup. Group 4 tests on MySQL 8.4.10 show that directly deleting a User who owns both a period and its import batch is rejected with error 1451 by `schedule_import_batches_academic_period_id_foreign`. Group 5 confirms that an isolated User/Subject/manual-Lesson graph can cascade, while a combined period/batch/Lesson history graph blocks direct User deletion with 1451. Hard-removing Lessons first still leaves the batch/period restriction; deleting batches next cascades their rows and then permits User deletion. Soft deletion does not remove restrictive references. Account hard purge is an ordered administrative operation, distinct from normal domain deletion; the approved FKs are unchanged.
 
-Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Further backend verticals must add task/subtask workflows, other domain ownership compatibility, free-time/planning algorithms, rescheduling, and reminder cleanup. Import C2b now implements confirmed atomic reconciliation; delivery, statistics and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.
+Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Task/Subtask workflows and deletion cleanup, PF1/PF2 algorithms and C10 read-only candidate evaluation are implemented. Further backend verticals must add other domain ownership compatibility, automatic planning, session creation, rescheduling and reminder lifecycle/delivery. Import C2b now implements confirmed atomic reconciliation; delivery, statistics and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.

@@ -2,7 +2,8 @@
 
 The pure constraint foundation includes C5 duration, verified C6 separation,
 C7 workload and C8 combined candidate checks. This does not implement automatic
-planning, database source selection or StudySession persistence.
+planning or StudySession persistence. C10 now implements owned database source
+selection separately in [the integration Service](planning-integration.md).
 [PF1](planning-foundation.md) remains the read-only allowed-free-time calculation.
 
 ## C5 configured session duration
@@ -73,13 +74,13 @@ than a representable integer duration, remain usable without float arithmetic.
 
 C6 is pure computation without Eloquent, HTTP, authentication, database or clock
 dependencies. It does not select anchors or know their event types or lifecycle
-statuses. In particular, whether Lessons or particular StudySession statuses
-require breaks remains an explicit product decision for application integration. It does
+statuses. C9 approves effective Lessons and planned StudySessions as V1 anchors; C10
+selects them in the application Service. C6 itself does
 not change PF1 free slots, reserve breaks or claim complete enforcement of
 BR-FREE-004. C6 was re-audited and passed its focused and full regression gate
-before C7 implementation, without code changes. Future application integration
-must select break-relevant events and reconcile the overlap code with its wider
-scheduling conflict policy; C8 accepts explicit caller inputs.
+before C7 implementation, without code changes. C10 now selects the approved
+break-relevant events and retains overlap codes alongside PF1 containment
+violations; C8 continues accepting explicit caller inputs.
 
 ## C7 daily and ISO-week workload
 
@@ -117,8 +118,8 @@ existing sessions on other days in an affected week still count toward that week
 Already excessive workload in unrelated periods does not invalidate this candidate.
 Results are unique and ordered: `daily_study_limit_exceeded`, then
 `weekly_study_limit_exceeded`; satisfying configured limits returns `[]`.
-Source/status selection and transactional persistence remain future application
-integration responsibilities. C7 does not create plans or sessions.
+C10 implements approved source/status selection; transactional persistence
+remains future work. C7 does not create plans or sessions.
 C7's focused tests, complete regression suite, Pint and diff checks passed before
 starting C8; plain PHPUnit also verifies it without application bootstrap.
 
@@ -146,7 +147,7 @@ Preferences must contain exactly these five keys, in any order:
 `min_session_minutes`, `max_session_minutes`, `preferred_break_minutes`,
 `max_daily_study_minutes`, `max_weekly_study_minutes`. Each value is null or a
 configured integer in 1–65535. Missing or extra keys are invalid; C5–C7 enforce
-value types and bound ordering. A future caller with no persisted preferences
+value types and bound ordering. An application caller with no persisted preferences
 must explicitly supply all five nulls; no record or product default is created.
 
 C8 delegates duration to C5, separation to C6 and workload to C7. C1 subtracts
@@ -187,9 +188,9 @@ BR-PLAN-002 without changing their approved meanings. BR-LIM-003 introduces no
 override here: violations are reported, not bypassed to fit a plan. BR-LIM-004's
 possible documented defaults remain a future product decision; C5–C8 invent none.
 BR-PLAN-003 conflict/source correctness remains the application's responsibility
-when obtaining and revalidating PF1 inputs. Break-anchor event types and statuses,
-workload status selection, source-record deduplication, ownership checks and
-transactional current-state revalidation require a future application integration.
+when obtaining and revalidating PF1 inputs. C9 approves break-anchor event types/statuses and workload selection; C10
+implements owned source assembly and per-record selection. Transactional
+current-state revalidation remains future write-side work.
 
 ## Free slots and candidate sessions
 
@@ -204,6 +205,6 @@ An empty C5 result establishes duration suitability only; C8 additionally checks
 the supplied free time, anchors, workload and deadline. Free slots remain allowed
 study time, not guaranteed session capacity or a generated plan. Remaining effort,
 priorities, splitting, multi-session feasibility, automatic planning, rescheduling,
-session persistence and reminder workflows remain deferred. Integrated selection
-and enforcement of BR-FREE-004 and BR-LIM-001/BR-LIM-002 against current owned
-database state also remain future work; approved rules and the PF1 API are unchanged.
+session persistence and reminder workflows remain deferred. C10 implements diagnostic selection and enforcement of BR-FREE-004 and
+BR-LIM-001/BR-LIM-002 against owned database state; see [its contract](planning-integration.md).
+Future writers must revalidate transactionally. The PF1 API is unchanged.

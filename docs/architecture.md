@@ -5,6 +5,16 @@ Scope: Laravel backend only
 Persistence target: MySQL through Eloquent ORM  
 Frontend: independent Vue application communicating through REST API
 
+C9 approves V1 planning integration policies; C10 implements the read-only
+`PlanningCandidateEvaluationService` through trusted owned Eloquent relationships,
+PF1 free-time retrieval and unchanged pure C8 checks. Planned and completed
+scheduled sessions count toward workload; break anchors are effective Lessons
+and planned sessions. Earliest parent/child deadlines, 31-date local horizons,
+historical diagnostics and fail-closed source compatibility are enforced.
+No endpoint, session writer, automatic planner, rescheduler or AI adapter is
+added. Diagnostic reads are advisory; future writers must revalidate current
+state transactionally. See [the integration contract](planning-integration.md).
+
 ## 1. Architectural goals
 
 The backend must support schedule management, academic tasks, free-time calculation, automatic study planning, rescheduling, reminders, progress analytics, Excel schedule import, authentication, and an AI agent that orchestrates deterministic application capabilities.

@@ -1,12 +1,12 @@
 # Planning Foundation — PF1 checkpoints C1–C4
 
-Status: **PF1 complete (C1–C4 verified).** PF2 has begun with
-[C5 duration checks](planning-constraints.md); remaining PF2 policies are deferred.
+Status: **PF1 complete (C1–C4 verified).** [PF2 C5–C8 checks](planning-constraints.md)
+and [C9/C10 read-only integration](planning-integration.md) are implemented.
 
 C1/C2 provide pure computation. C3 adds read-only FreeTimeService integration
 with owned availability, Lessons and StudySessions. C4 exposes this calculation
-through an authenticated free-slots REST API. PF2 capacity, breaks, workload
-limits and scheduling remain separate future work. No preference defaults or
+through an authenticated free-slots REST API. PF2 duration, break and workload checks are implemented separately with C10
+candidate integration. Automatic scheduling remains future work. No preference defaults or
 persistence are introduced.
 
 ## C1 interval engine
@@ -111,7 +111,7 @@ and unchanged database tables after repeated calculations. Independent reads are
 not an atomic planning/commit snapshot; future plan creation must revalidate
 current state transactionally. Output is allowed study free time, not unrestricted
 calendar free time or guaranteed schedulable capacity. C4 exposes this read-only
-workflow; PF2's workload/break/session-capacity policies remain unimplemented.
+workflow; PF2 checks and C10 candidate integration are separate implemented capabilities.
 
 ## C4 free-slots REST API
 

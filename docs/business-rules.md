@@ -10,19 +10,19 @@ These are intended requirements, not a claim that the backend implements all of 
 ## 1. Global and ownership rules
 
 **BR-GEN-001 — Ownership isolation**  
-A user may read or mutate only resources that belong to that user, directly or through an owned parent. Education institutions, subjects, and teachers are user-owned in V1, not shared global catalogs. Optional institution references must resolve to the same owner. Academic Context APIs enforce this through Policies, user-scoped relationships and Services. Their destructive guards also prevent FK side effects on foreign malformed children, including soft-deleted Tasks/Lessons; unsafe legacy institution IDs are masked on reads without altering data. Lesson APIs enforce owned Subject/Teacher/AcademicPeriod and replacement links; schedule views query only the trusted owner and mask foreign presentation relations without repairing persistence.
+A user may read or mutate only resources that belong to that user, directly or through an owned parent. Education institutions, subjects, and teachers are user-owned in V1, not shared global catalogs. Optional institution references must resolve to the same owner. Academic Context APIs enforce this through Policies, user-scoped relationships and Services. Their destructive guards also prevent FK side effects on foreign malformed children, including soft-deleted Tasks/Lessons; unsafe legacy institution IDs are masked on reads without altering data. Lesson APIs enforce owned Subject/Teacher/AcademicPeriod and replacement links; schedule views query only the trusted owner and mask foreign presentation relations without repairing persistence. C9 requires candidate evaluation source reads through the trusted owner, with fail-closed batch validation of selected session Task/Subtask compatibility, including valid deleted history.
 
 **BR-GEN-002 — Trusted user context**  
-Public API requests and AI tool arguments must not be able to choose another user's ID. The authenticated user is obtained from trusted server context. This is enforced by all current identity/profile, planning-settings, Academic Context, and Lesson/Schedule APIs; other domain/AI entry points remain future work.
+Public API requests and AI tool arguments must not be able to choose another user's ID. The authenticated user is obtained from trusted server context. This is enforced by all current identity/profile, planning-settings, Academic Context, and Lesson/Schedule APIs; other domain/AI entry points remain future work. C9 candidate evaluation accepts a trusted User from an application caller, never a public owner ID; authentication globals cannot substitute another owner.
 
 **BR-GEN-003 — Deterministic business logic**  
-Deadline checks, free-time calculation, conflicts, priority ordering, workload limits, progress metrics, and schedule import validation are implemented in PHP Services, not delegated to the LLM.
+Deadline checks, free-time calculation, conflicts, priority ordering, workload limits, progress metrics, and schedule import validation are implemented in PHP Services, not delegated to the LLM. C9 integration assembles Eloquent inputs and delegates calculations to unchanged C1–C8.
 
 **BR-GEN-004 — Timezone awareness**  
-All user-facing date concepts are evaluated in the user's IANA timezone persisted in `users.timezone`. Concrete domain instants use UTC DATETIME values; recurring local availability uses TIME values. Server timezone must not change planning results. Implemented schedule views construct local midnight/ISO Monday boundaries first, then convert each boundary to UTC independently; DST days/weeks do not assume fixed UTC durations. Lesson CRUD retains UTC whole-second Z timestamps; schedule presentation uses local numeric offsets and IANA timezone metadata.
+All user-facing date concepts are evaluated in the user's IANA timezone persisted in `users.timezone`. Concrete domain instants use UTC DATETIME values; recurring local availability uses TIME values. Server timezone must not change planning results. Implemented schedule views construct local midnight/ISO Monday boundaries first, then convert each boundary to UTC independently; DST days/weeks do not assume fixed UTC durations. Lesson CRUD retains UTC whole-second Z timestamps; schedule presentation uses local numeric offsets and IANA timezone metadata. C9 uses raw UTC DATETIME instants and persisted user timezone, complete local ISO-week membership and exact elapsed break seconds. The candidate horizon is 31 inclusive nominal local dates; the exclusive end is excluded using its preceding second. DST and skipped-date semantics are preserved.
 
 **BR-GEN-005 — Valid intervals**  
-For every time interval, start must be earlier than end.
+For every time interval, start must be earlier than end. C9 candidates use exactly two genuine integer UTC Unix endpoints and representable positive duration/query bounds; malformed arguments fail explicitly.
 
 **BR-GEN-006 — Atomic multi-record operations**  
 An operation that would leave an invalid partial state if interrupted must execute atomically where practical.
@@ -36,10 +36,10 @@ Every personal schedule lesson is scoped to one user.
 A lesson considered by planning has a valid date/time interval.
 
 **BR-SCH-003 — Cancelled lesson does not block time**  
-Lesson statuses are `active`, `cancelled`, and `replaced`. Cancelled, replaced, and soft-deleted lessons do not block free time. Normal application deletion of a lesson is soft deletion. These effective filters and active-to-cancelled transitions are implemented; PF1 free-time calculation uses these filters; see [planning-foundation.md](planning-foundation.md).
+Lesson statuses are `active`, `cancelled`, and `replaced`. Cancelled, replaced, and soft-deleted lessons do not block free time. Normal application deletion of a lesson is soft deletion. These effective filters and active-to-cancelled transitions are implemented; PF1 free-time calculation uses these filters; see [planning-foundation.md](planning-foundation.md). C9 also excludes cancelled/replaced/deleted Lessons from break anchors.
 
 **BR-SCH-004 — Replacement precedence**  
-The replacement lesson references the original through `replaces_lesson_id`. Both belong to the same user; the original becomes `replaced` and the replacement is `active`. Planning must not double-block them as two active occurrences of the same change. LessonService implements this atomically, prohibits chains/self-replacement, and reuses deleted manual replacement history. Cancelling a replacement leaves the original replaced. Deleting a replacement restores the original only if conflict validation succeeds; a current replacement prevents direct original deletion.
+The replacement lesson references the original through `replaces_lesson_id`. Both belong to the same user; the original becomes `replaced` and the replacement is `active`. Planning must not double-block them as two active occurrences of the same change. LessonService implements this atomically, prohibits chains/self-replacement, and reuses deleted manual replacement history. Cancelling a replacement leaves the original replaced. Deleting a replacement restores the original only if conflict validation succeeds; a current replacement prevents direct original deletion. C9 includes active replacements as break anchors without Lesson exemptions.
 
 **BR-SCH-005 — Schedule conflicts are deterministic**  
 Overlapping effective lessons are detected by a Service. Manual creation/import must return a conflict result rather than silently accepting inconsistent scheduling. Manual create/update, replacement, and revert checks are implemented using strict interval overlap against owned active non-deleted Lessons; adjacency is allowed, and conflicts return 422 under schedule. Import B3 implements transient projected conflict classification; confirmed atomic import commit is implemented by C2b.
@@ -159,7 +159,7 @@ Every task belongs to one user. T3 lists only that authenticated owner's non-del
 A task may exist without a complete planning estimate if the product allows it, but automatic scheduling requires a positive remaining duration.
 
 **BR-TSK-003 — Deadline semantics**  
-When a deadline exists, no generated study session for the task may end after that deadline.
+When a deadline exists, no generated study session for the task may end after that deadline. C9 diagnostics use the nullable owned active Task deadline and accept end equality; historical candidates are allowed without authorizing past creation.
 
 **BR-TSK-004 — Priority is deterministic**  
 Task priority is LOW = 1, NORMAL = 2, HIGH = 3, with NORMAL as the persisted default. Store it as TINYINT UNSIGNED and use a PHP integer-backed enum when implemented. It is not arbitrary LLM text.
@@ -188,7 +188,7 @@ A subtask inherits ownership from its parent task and cannot be moved across use
 Every subtask has a positive, deterministic `position` within its parent task. S1 allocates maximum non-deleted position + 1 (or 1 when empty) under owner/parent locks, with a 65535 capacity error. Reads order by position then ID; creation does not renumber/restore. S2 accepts a complete active permutation and normalizes positions to 1..N transactionally under owner/parent/child locks; stale/invalid sets return 422 without mutation. Deleted history is untouched and unchanged positions receive no UPDATE.
 
 **BR-SUB-004 — Deadline bound**  
-If both task and subtask deadlines exist, the subtask deadline must not be later than the parent's. T1 TaskService enforces this bound for parent updates against non-deleted Subtasks, including completed records. S1 SubtaskService enforces the reciprocal bound on create and complete-candidate PATCH under the same owner/parent lock order; legacy invalid deadlines require explicit repair. Warning-only behavior requires a later explicit product decision; it is not the approved baseline.
+If both task and subtask deadlines exist, the subtask deadline must not be later than the parent's. T1 TaskService enforces this bound for parent updates against non-deleted Subtasks, including completed records. S1 SubtaskService enforces the reciprocal bound on create and complete-candidate PATCH under the same owner/parent lock order; legacy invalid deadlines require explicit repair. Warning-only behavior requires a later explicit product decision; it is not the approved baseline. C9 diagnostics use the earliest non-null parent/child deadline, including parent fallback. This does not change write-side deadline validation or repair stored legacy deadlines.
 
 **BR-SUB-005 — Progress calculation**  
 For V1, when a task has active (non-soft-deleted) subtasks, task progress percentage is calculated from completed active subtasks over total active subtasks. Do not persist a separate progress percentage. S2 exposes counts and an integer percentage using nearest, half-up rounding in a separate read-only Resource; no active Subtasks yields null percentage and zero counts. Parent status, positions, estimates and sessions do not define this metric, and no lifecycle changes are inferred.
@@ -208,10 +208,10 @@ Free time is a computed result, not user-entered schedule data.
 The calculation begins from the user's recurring `study_availability_windows` and typed numeric `planning_preferences`. There is at most one preferences row per user; GET does not materialize missing rows and complete PUT requires all five nullable minute keys (configured values 1–65535), enforcing session/workload bound ordering. No product defaults are supplied; deterministic constraints are not kept in one opaque JSON column. Availability uses ISO weekdays 1-7 and local `HH:MM:SS`; starts are 00:00:00–23:59:59, and ends also permit 24:00:00. Overnight windows must be explicitly split into two rows, with no automatic split or UTC conversion. `StudyAvailabilityService` rejects same-user/day overlaps using `existing.starts_at < candidate.ends_at AND existing.ends_at > candidate.starts_at`; adjacent windows are valid. PATCH evaluates the complete candidate and excludes itself. Ownership comes only from authentication; the window Policy returns 404 for cross-user update/delete.
 
 **BR-FREE-003 — Blocking intervals**  
-Effective lessons and already reserved study sessions are subtracted from allowed study windows.
+Effective lessons and already reserved study sessions are subtracted from allowed study windows. PF1 subtracts active non-deleted Lessons and planned sessions; C9 preserves that behavior and passes unfiltered PF1 intervals to C8.
 
 **BR-FREE-004 — Breaks**  
-Configured break requirements are applied by the deterministic calculation.
+Configured break requirements are applied by the deterministic calculation. Approved C9 V1 anchors are all effective active Lessons and planned StudySessions only. Null break has no default; configured preferred_break_minutes uses exact elapsed UTC seconds, with equality valid and overlap distinct. PF1 does not reserve break time.
 
 **BR-FREE-005 — Minimum slot**  
 Slots shorter than the requested/configured minimum are not returned.
@@ -225,10 +225,10 @@ Returned free slots must not overlap blocking intervals or each other.
 ## 7. Workload constraint rules
 
 **BR-LIM-001 — Daily maximum**  
-Generated study sessions must not make planned study workload exceed the user's daily maximum.
+Generated study sessions must not make planned study workload exceed the user's daily maximum. Approved C9 V1 planned workload includes planned and completed scheduled StudySession intervals, each database record once, including distinct equal/overlapping intervals; excludes missed/rescheduled/cancelled. Completed actual_minutes is a separate statistics measure. Historical planned/completed sessions count without clock-based status inference.
 
 **BR-LIM-002 — Weekly maximum**  
-Generated study sessions must not make planned study workload exceed the user's weekly maximum.
+Generated study sessions must not make planned study workload exceed the user's weekly maximum. The same C9 status/duration policy applies to ISO weeks in the persisted user timezone. Sources cover whole relevant weeks, including earlier/later sessions and those crossing query boundaries; weeks are not fixed 604800-second periods.
 
 **BR-LIM-003 — User restrictions override convenience**  
 The planner may not violate configured study hours merely to produce a full plan. It must report infeasibility instead.
@@ -242,10 +242,10 @@ If a user has not configured a limit, a documented system default may be used. E
 Candidate work is ordered using a deterministic strategy. Baseline V1: earlier deadline first, then higher explicit priority, then a stable tie-breaker such as creation/order ID. Tasks without deadlines are ordered after deadline-bound tasks unless the requested planning operation specifically targets them.
 
 **BR-PLAN-002 — Deadline protection**  
-No generated session may be placed after the work item's deadline.
+No generated session may be placed after the work item's deadline. C9 diagnostics select the earliest present Task/Subtask deadline in raw UTC seconds; end equality passes and one second later violates the rule.
 
 **BR-PLAN-003 — No conflicts**  
-Generated sessions may not overlap effective lessons or other active study sessions.
+Generated sessions may not overlap effective lessons or other active study sessions. C9 combines PF1 full containment with explicit effective Lesson/planned-session break anchors; overlap and insufficient separation remain distinct C8 codes. No session writer or generator is implemented.
 
 **BR-PLAN-004 — Split large work**  
 Work that does not fit one valid slot may be divided into multiple study sessions.
@@ -265,13 +265,13 @@ If a generated plan is accepted and creates multiple sessions, the persistence s
 ### Study-session persistence semantics
 
 **BR-SES-001 — Task and subtask consistency**\
-A study session has a required `task_id` and optional `subtask_id`. When present, the subtask must belong to that task. The task, subtask, and session must resolve to the same user; a single FK must not reference both work tables.
+A study session has a required `task_id` and optional `subtask_id`. When present, the subtask must belong to that task. The task, subtask, and session must resolve to the same user; a single FK must not reference both work tables. C9 selected source sessions must have an owned Task and, if present, its exact child. Invalid references cause a generic integrity failure rather than dropping workload; valid owned soft-deleted work history remains countable.
 
 **BR-SES-002 — Lifecycle and retention**\
-Study-session statuses are `planned`, `completed`, `missed`, `rescheduled`, and `cancelled`. Sessions use lifecycle states rather than soft deletes to preserve history.
+Study-session statuses are `planned`, `completed`, `missed`, `rescheduled`, and `cancelled`. Sessions use lifecycle states rather than soft deletes to preserve history. C9 diagnostics perform no status transitions and allow historical candidates. Future creation and rescheduling restrictions remain deferred.
 
 **BR-SES-003 — Completion and actual effort**\
-Scheduled start/end define planned duration. `completed_at` is present exactly when status is `completed`; optional `actual_minutes` is positive when provided and is allowed only for completed sessions. Actual effort and planned duration are separate measures.
+Scheduled start/end define planned duration. `completed_at` is present exactly when status is `completed`; optional `actual_minutes` is positive when provided and is allowed only for completed sessions. Actual effort and planned duration are separate measures. C9 completed sessions contribute their original scheduled interval to local day/week budgets; actual completed effort does not replace this contribution.
 
 ## 9. Rescheduling rules
 
@@ -389,3 +389,12 @@ Stage 02 status, priority, targeting, effort, deletion/history, and fingerprint 
 - later requirements for report-history retention (no V1 report-history table).
 
 No product defaults or conflict override policy are invented here. Resolved MySQL/application enforcement decisions are recorded in the physical schema's implementation gate; remaining domain application invariants still require future Services. Each resolved rule should retain its ID and receive implementation tests.
+
+## C9/C10 integration implementation status
+
+The C9 V1 source policies above are approved and implemented by the read-only
+C10 PlanningCandidateEvaluationService. It reloads trusted ownership/timezone,
+assembles bounded Eloquent inputs, and delegates unchanged calculations to
+PF1/C8. Missing preferences remain five nulls. No clock restrictions, defaults,
+status repair, session persistence or automatic planning are introduced.
+See [the complete application contract](planning-integration.md).
