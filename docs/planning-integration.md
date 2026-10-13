@@ -13,6 +13,10 @@ previously accepted in-memory proposals to free-time, break and workload inputs
 before C8 validation. Repeated C10 evaluation alone still sees persisted state.
 See [automatic study planning](automatic-study-planning.md).
 
+[Stage C](study-plan-persistence.md) now reuses these sources for independent batch
+revalidation inside owner-locked confirmation. C10 diagnostic behavior is unchanged;
+new persistence resides in a separate application Service.
+
 ## Public contract
 
 ```php

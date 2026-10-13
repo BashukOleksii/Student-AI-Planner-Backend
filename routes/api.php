@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\ScheduleImportController;
 use App\Http\Controllers\Api\StudyAvailabilityWindowController;
+use App\Http\Controllers\Api\StudyPlanController;
+use App\Http\Controllers\Api\StudySessionController;
 use App\Http\Controllers\Api\SubjectController;
 use App\Http\Controllers\Api\SubtaskController;
 use App\Http\Controllers\Api\TaskController;
@@ -27,6 +29,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
     Route::get('/planning/free-slots', [FreeSlotController::class, 'index'])->name('planning.free-slots.index');
+    Route::post('/planning/study-plans/preview', [StudyPlanController::class, 'preview'])->name('planning.study-plans.preview');
+    Route::post('/planning/study-plans/confirm', [StudyPlanController::class, 'confirm'])->name('planning.study-plans.confirm');
+    Route::get('/study-sessions', [StudySessionController::class, 'index'])->name('study-sessions.index');
+    Route::get('/study-sessions/{studySession}', [StudySessionController::class, 'show'])->whereNumber('studySession')->name('study-sessions.show');
 
     Route::get('/planning-preferences', [PlanningPreferenceController::class, 'show'])->name('planning-preferences.show');
     Route::put('/planning-preferences', [PlanningPreferenceController::class, 'update'])->name('planning-preferences.update');

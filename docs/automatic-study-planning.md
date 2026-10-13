@@ -5,6 +5,12 @@ Stage A's approved A1–A6 work accounting/order and the existing PF1/PF2/C9
 policies. It is independent of an LLM. There is no schema change, endpoint,
 session writer, cache entry, reminder, planning history or lifecycle mutation.
 
+[Stage C](study-plan-persistence.md) now exposes preview and explicit transactional
+confirmation through separate Services/REST adapters. Stage B itself remains
+unchanged and read-only. Stage C regenerates under the owner lock, compares the
+reviewed result and validates the full batch before any persistence. The Stage B
+design and historical verification record below retain their checkpoint meaning.
+
 ## Public application contract
 
 ```php

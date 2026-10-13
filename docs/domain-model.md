@@ -31,6 +31,12 @@ accepted proposals into PF2 break/workload checks. Results include exact remaini
 seconds and evidence-based greedy search diagnostics, without persisting sessions
 or adding a planning-run entity. See [the Stage B contract](automatic-study-planning.md).
 
+Stage C adds explicit confirmation and atomic persistence of matching, revalidated
+proposals as ordinary planned StudySessions. Preview tokens are encrypted,
+short-lived and stateless; no Planning Run/history entity is added. Owned session
+list/detail exposes saved history without lifecycle changes. See [the Stage C
+contract](study-plan-persistence.md).
+
 ## 1. Domain boundaries
 
 ### Identity & Profile

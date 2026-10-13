@@ -736,7 +736,7 @@ Eloquent:
 
 ### 3.13 study_sessions
 
-Implemented persistence for a concrete reserved study block. C10 implements read-only candidate evaluation using owned planned/completed scheduled workload and effective break sources. Session creation, automatic planning and rescheduling remain unimplemented. No soft deletes.
+Implemented persistence for a concrete reserved study block. C10 implements read-only candidate evaluation using owned planned/completed scheduled workload and effective break sources. Stage B implements advisory deterministic planning. Stage C adds explicitly confirmed atomic planned-session creation and owned session list/detail using the existing schema; see [study plan persistence](study-plan-persistence.md). General session editing/lifecycle and rescheduling remain deferred. No soft deletes.
 
 | Column | MySQL type | Null |
 |---|---|---:|

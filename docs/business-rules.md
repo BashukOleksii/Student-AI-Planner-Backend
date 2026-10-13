@@ -13,6 +13,10 @@ captured-clock/horizon protection, effective deadlines and exact partial results
 It preserves Stage A and C9 policies and adds no persistence or endpoint.
 See [automatic study planning](automatic-study-planning.md).
 
+Stage C now implements confirmed planned-session creation and read-only session
+retrieval through [study plan persistence](study-plan-persistence.md). Preview
+remains read-only; confirmation cannot silently substitute a changed proposal.
+
 ## 1. Global and ownership rules
 
 **BR-GEN-001 — Ownership isolation**  
@@ -251,7 +255,7 @@ Candidate work is ordered using a deterministic strategy. Baseline V1: earlier d
 No generated session may be placed after the work item's deadline. C9 diagnostics select the earliest present Task/Subtask deadline in raw UTC seconds; end equality passes and one second later violates the rule.
 
 **BR-PLAN-003 — No conflicts**  
-Generated sessions may not overlap effective lessons or other active study sessions. C9 combines PF1 full containment with explicit effective Lesson/planned-session break anchors; overlap and insufficient separation remain distinct C8 codes. Stage B proposals also participate in subsequent free-time, break and scheduled-workload checks. No session writer is implemented.
+Generated sessions may not overlap effective lessons or other active study sessions. C9 combines PF1 full containment with explicit effective Lesson/planned-session break anchors; overlap and insufficient separation remain distinct C8 codes. Stage B proposals also participate in subsequent free-time, break and scheduled-workload checks. Stage C independently revalidates the complete batch under the owner lock before saving.
 
 **BR-PLAN-004 — Split large work**  
 Work that does not fit one valid slot may be divided into multiple study sessions.
@@ -272,13 +276,20 @@ The AI response may explain planner output but may not claim that capacity exist
 **BR-PLAN-008 — Plan creation is transactional**  
 If a generated plan is accepted and creates multiple sessions, the persistence step should not leave only a random subset of sessions because of a mid-operation failure.
 
+Stage C requires a valid owner-bound 15-minute protected preview token and an
+unchanged canonical planning outcome after transactional regeneration. Partial
+plans require explicit acceptance; empty plans cannot be saved. Owner-first
+serialization and complete-batch revalidation precede atomic insertion, and
+replayed reservations conflict. Every new start must remain strictly future at
+the final pre-commit check. The Service owns a fresh outermost transaction.
+
 ### Study-session persistence semantics
 
 **BR-SES-001 — Task and subtask consistency**\
 A study session has a required `task_id` and optional `subtask_id`. When present, the subtask must belong to that task. The task, subtask, and session must resolve to the same user; a single FK must not reference both work tables. C9 selected source sessions must have an owned Task and, if present, its exact child. Invalid references cause a generic integrity failure rather than dropping workload; valid owned soft-deleted work history remains countable.
 
 **BR-SES-002 — Lifecycle and retention**\
-Study-session statuses are `planned`, `completed`, `missed`, `rescheduled`, and `cancelled`. Sessions use lifecycle states rather than soft deletes to preserve history. C9 diagnostics perform no status transitions and allow historical candidates. Future creation and rescheduling restrictions remain deferred.
+Study-session statuses are `planned`, `completed`, `missed`, `rescheduled`, and `cancelled`. Sessions use lifecycle states rather than soft deletes to preserve history. C9 diagnostics perform no status transitions and allow historical candidates. Stage C creates only new `planned` rows with null completion/actual/predecessor fields after reviewed confirmation. General editing, completion/reopening, missed detection and rescheduling remain deferred; GET never changes status.
 
 **BR-SES-003 — Completion and actual effort**\
 Scheduled start/end define planned duration. `completed_at` is present exactly when status is `completed`; optional `actual_minutes` is positive when provided and is allowed only for completed sessions. Actual effort and planned duration are separate measures. C9 completed sessions contribute their original scheduled interval to local day/week budgets; actual completed effort does not replace this contribution. Stage A actual-first completed effort credit is separate from C9 scheduled workload. Distinct completed records remain additive, raw excess credit is diagnostic, and future reservations do not constitute completion.

@@ -33,6 +33,15 @@ diagnostics. It adds no endpoint, schema, writer, cache or LLM dependency. Greed
 results are advisory; Stage C must revalidate and commit transactionally.
 See [the Stage B contract and verification](automatic-study-planning.md).
 
+Stage C implements authenticated study-plan preview/confirmation and owned session
+list/detail. `StudyPlanPersistenceService` protects the reviewed Stage B outcome
+with a 15-minute Laravel-encrypted token, regenerates after acquiring the owner
+lock in a fresh outermost transaction, compares canonical material output and
+independently validates the complete batch before atomic planned-session insertion.
+Partial plans require explicit acceptance; stale previews and reservation replays
+conflict. No new schema, LLM or general session lifecycle is introduced.
+See [study plan persistence](study-plan-persistence.md).
+
 ## 1. Architectural goals
 
 The backend must support schedule management, academic tasks, free-time calculation, automatic study planning, rescheduling, reminders, progress analytics, Excel schedule import, authentication, and an AI agent that orchestrates deterministic application capabilities.
@@ -258,8 +267,9 @@ The agent chooses which operation is needed. Services decide whether a slot is v
 The implemented Stage B application flow is Stage A selection → shared C9 context
 and PF1 free time → pure projected allocation with PF2/C8 acceptance → transient
 sessions and exact unallocated seconds. Its advisory generation performs no
-transaction or persistence; the mutating plan acceptance in section 11 remains
-future Stage C work. There is no AI/HTTP adapter for this planner yet.
+transaction or persistence; the mutating plan acceptance in section 11 is
+implemented by Stage C confirmation. Stage C adds the HTTP adapter; AI tools remain
+future work. Preview continues to be read-only.
 
 ## 8. AI agent boundary
 
@@ -324,6 +334,12 @@ Use database transactions for use cases that must be atomic, for example:
 - operations that update a task together with dependent planning state.
 
 Do not use transactions around LLM network calls. The agent should call the LLM first, then execute short deterministic tool transactions.
+
+Study-plan confirmation owns its outermost transaction and takes the current User
+row lock before any planning SELECT. This ensures a new MySQL REPEATABLE READ
+snapshot forms after acquisition rather than inheriting an older ambient snapshot.
+Existing cooperating mutations use that owner lock; arbitrary direct writers are
+outside this guarantee. See [the precise visibility/locking contract](study-plan-persistence.md#transaction-lock-order-and-mysql-visibility).
 
 ## 12. Asynchronous work
 

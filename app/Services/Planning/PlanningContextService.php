@@ -29,8 +29,7 @@ class PlanningContextService
     public function load(User $user, string $startDate, string $endDate, ?array $anchorEnvelope = null): array
     {
         $this->validateDates($startDate, $endDate);
-        $coverage = $this->fullDays($startDate, $endDate, $user->timezone);
-        $range = $coverage === [] ? null : ['start' => $coverage[0]['start'], 'end' => $coverage[count($coverage) - 1]['end']];
+        $range = $this->dateRange($startDate, $endDate, $user->timezone);
         if ($anchorEnvelope !== null) {
             $this->intervals->durationSeconds($anchorEnvelope);
         }
@@ -78,6 +77,22 @@ class PlanningContextService
         }
     }
 
+    /** UTC envelope of inclusive local-date membership; null for a wholly skipped date. */
+    public function dateRange(string $startDate, string $endDate, string $timezone): ?array
+    {
+        $coverage = $this->dateIntervals($startDate, $endDate, $timezone);
+
+        return $coverage === [] ? null : ['start' => $coverage[0]['start'], 'end' => $coverage[count($coverage) - 1]['end']];
+    }
+
+    /** Exact membership, including disjoint occurrences across historical date-line reversals. */
+    public function dateIntervals(string $startDate, string $endDate, string $timezone): array
+    {
+        $this->validateDates($startDate, $endDate);
+
+        return $this->fullDays($startDate, $endDate, $timezone);
+    }
+
     private function fullDays(string $startDate, string $endDate, string $timezone): array
     {
         $windows = array_map(fn (int $day): array => [
@@ -100,7 +115,7 @@ class PlanningContextService
     }
 
     /** Batch validation includes soft-deleted work history, without loading foreign data. */
-    private function validateSessionReferences(User $user, Collection $sessions): void
+    public function validateSessionReferences(User $user, Collection $sessions): void
     {
         if ($sessions->isEmpty()) {
             return;

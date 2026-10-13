@@ -6,7 +6,9 @@ MySQL Task/Subtask schema and enums. S1 adds nested Subtask creation, ordered
 listing, detail, partial editing and completion/reopening. S2 adds transactional
 Subtask reordering and read-only derived Task progress. S3 adds safe Task/Subtask
 soft deletion with synchronous dependency cancellation. Restore, hard purge,
-planning, Reminder CRUD/delivery and AI tools remain deferred.
+Reminder CRUD/delivery and AI tools remain deferred. [Stage C](study-plan-persistence.md)
+now provides explicit reviewed planning confirmation separately; Task/Subtask
+lifecycle and progress behavior do not change.
 
 ## Endpoints
 

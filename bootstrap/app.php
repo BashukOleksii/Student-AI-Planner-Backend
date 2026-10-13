@@ -1,9 +1,13 @@
 <?php
 
+use App\Exceptions\StudyPlanConflictException;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -20,14 +24,33 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/lessons', 'api/lessons/*'),
             fn (Request $request) => $request->isMethod('GET') && $request->is('api/tasks'),
             fn (Request $request) => $request->isMethod('GET') && $request->is('api/planning/free-slots'),
+            fn (Request $request) => $request->is('api/planning/study-plans/*', 'api/study-sessions', 'api/study-sessions/*'),
         ]);
         // Subject color and Task deadlines distinguish null from an invalid empty string.
         $middleware->convertEmptyStringsToNull(except: [
             fn (Request $request) => $request->is('api/subjects', 'api/subjects/*'),
             fn (Request $request) => $request->is('api/tasks', 'api/tasks/*'),
+            fn (Request $request) => $request->is('api/planning/study-plans/*', 'api/study-sessions', 'api/study-sessions/*'),
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(function (Throwable $exception, Request $request) {
+            if (! $request->is('api/planning/study-plans/*', 'api/study-sessions', 'api/study-sessions/*')) {
+                return null;
+            }
+            if ($exception instanceof StudyPlanConflictException) {
+                return response()->json(['message' => $exception->getMessage()], 409);
+            }
+            if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
+                return null;
+            }
+            if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
+                return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+            }
+
+            // Source corruption, SQL failures and internal bugs never expose details, even with APP_DEBUG.
+            return response()->json(['message' => 'The study plan could not be processed.'], 500);
+        });
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
