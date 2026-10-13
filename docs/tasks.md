@@ -306,8 +306,8 @@ parent completion/reopening and child reordering do not. Positions, estimates,
 completion dates and study sessions do not define this count-based metric. Remaining
 schedulable duration and effort accounting are now implemented separately by
 [Stage A](planning-work-selection.md), without changing this count-based progress.
-Feasibility and automatic allocation remain deferred; parent/child estimates are
-not double-counted.
+Stage B implements advisory feasibility and automatic allocation; parent/child
+estimates are not double-counted.
 
 ## S3 safe deletion and dependency cleanup
 
@@ -358,8 +358,10 @@ and nested routes hide deleted parents; surviving positions are unchanged, and
 new children continue appending after the highest active position. No progress
 or lifecycle changes are persisted by deletion.
 
-Future StudySession/Reminder mutation Services must follow the same owner-first
-serialization and validate active work targets. Arbitrary database writers are
-outside that application guarantee; simultaneous writer races have not been
-experimentally tested. Restore, hard purge, reminder delivery and planning remain
-separate future work.
+Stage D StudySession mutations follow the same owner-first serialization,
+validate historical attribution and require active eligible targets for transfers.
+Arbitrary database writers are outside that application guarantee. Stage D
+separate-process MySQL tests observe actual owner-lock contention between deletion
+and rescheduling. Restore, hard purge and reminder delivery remain future work.
+Planning Stages A–C and [StudySession Stage D](study-session-lifecycle.md) are
+implemented separately.

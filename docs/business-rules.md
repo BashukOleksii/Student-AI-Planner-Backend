@@ -1,9 +1,9 @@
 # Business Rules
 
 Status: approved persistence baseline with current API enforcement recorded\
-Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. T1/T2 Task create/detail/PATCH and manual completion/reopening, plus T3 owned filtered/paginated listing, are implemented; S1 adds nested Subtask basic APIs and independent completion/reopening; S2 adds transactional reordering and read-only count-based Task progress. See [tasks.md](tasks.md). S3 implements safe Task/Subtask soft deletion and scoped synchronous dependency cancellation. PF1 free-time calculation and its read-only API are implemented; see [planning-foundation.md](planning-foundation.md). Automatic planning, reminder delivery, statistics, AI orchestration/tools remain future work. Import C2b implements confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B1 adds transient calendar/parity/timezone materialization. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
+Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. T1/T2 Task create/detail/PATCH and manual completion/reopening, plus T3 owned filtered/paginated listing, are implemented; S1 adds nested Subtask basic APIs and independent completion/reopening; S2 adds transactional reordering and read-only count-based Task progress. See [tasks.md](tasks.md). S3 implements safe Task/Subtask soft deletion and scoped synchronous dependency cancellation. PF1 free-time calculation and its read-only API are implemented; see [planning-foundation.md](planning-foundation.md). Stages A–C implement deterministic work selection, automatic planning and reviewed transactional persistence; Stage D adds session lifecycle and single-session rescheduling. Reminder delivery, statistics and AI orchestration/tools remain future work. Import C2b implements confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B1 adds transient calendar/parity/timezone materialization. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
 
-Lesson association/replacement ownership, self-replacement/chain prohibition, Lesson lifecycle transitions and active overlap validation are implemented. Task Subject ownership, parent deadline bounds and manual completion/reopening are implemented in TaskService. S3 validates ownership, session task/subtask consistency and Reminder target compatibility for affected live deletion dependencies. General Reminder/StudySession APIs, self-rescheduling, other session transitions, planning deadlines/overlaps and reminder recalculation/purge reconciliation remain future Service requirements. MySQL enforces supported scalar/timestamp CHECKs, FK existence/actions, and approved uniqueness; it does not enforce cross-row ownership or checks prohibited by AUTO_INCREMENT/SET NULL restrictions.
+Lesson association/replacement ownership, self-replacement/chain prohibition, Lesson lifecycle transitions and active overlap validation are implemented. Task Subject ownership, parent deadline bounds and manual completion/reopening are implemented in TaskService. S3 validates ownership, session task/subtask consistency and Reminder target compatibility for affected live deletion dependencies. Stage C implements session reads and reviewed creation; Stage D implements lifecycle, rescheduling chains and scoped scheduled-reminder cleanup. General Reminder APIs/recalculation/purge reconciliation remain future Service requirements. MySQL enforces supported scalar/timestamp CHECKs, FK existence/actions, and approved uniqueness; it does not enforce cross-row ownership or checks prohibited by AUTO_INCREMENT/SET NULL restrictions.
 
 These are intended requirements, not a claim that the backend implements all of them. References to "V1" mean the initial product release, not an implemented `/api/v1` route prefix. Deterministic rules must be shared by REST and AI-tool entry points through application Services. Preserve rule IDs when refining requirements so implementation and tests can trace them.
 
@@ -289,18 +289,26 @@ the final pre-commit check. The Service owns a fresh outermost transaction.
 A study session has a required `task_id` and optional `subtask_id`. When present, the subtask must belong to that task. The task, subtask, and session must resolve to the same user; a single FK must not reference both work tables. C9 selected source sessions must have an owned Task and, if present, its exact child. Invalid references cause a generic integrity failure rather than dropping workload; valid owned soft-deleted work history remains countable.
 
 **BR-SES-002 — Lifecycle and retention**\
-Study-session statuses are `planned`, `completed`, `missed`, `rescheduled`, and `cancelled`. Sessions use lifecycle states rather than soft deletes to preserve history. C9 diagnostics perform no status transitions and allow historical candidates. Stage C creates only new `planned` rows with null completion/actual/predecessor fields after reviewed confirmation. General editing, completion/reopening, missed detection and rescheduling remain deferred; GET never changes status.
+Study-session statuses are `planned`, `completed`, `missed`, `rescheduled`, and `cancelled`. Sessions use lifecycle states rather than soft deletes to preserve history. C9 diagnostics perform no status transitions and allow historical candidates. Stage C creates only new `planned` rows with null completion/actual/predecessor fields after reviewed confirmation. Stage D implements explicit completion after start, miss after end, and cancellation/rescheduling strictly before start. Terminal states cannot reopen or overwrite historical effort; GET never changes status. General editing and automatic missed detection remain deferred.
 
 **BR-SES-003 — Completion and actual effort**\
 Scheduled start/end define planned duration. `completed_at` is present exactly when status is `completed`; optional `actual_minutes` is positive when provided and is allowed only for completed sessions. Actual effort and planned duration are separate measures. C9 completed sessions contribute their original scheduled interval to local day/week budgets; actual completed effort does not replace this contribution. Stage A actual-first completed effort credit is separate from C9 scheduled workload. Distinct completed records remain additive, raw excess credit is diagnostic, and future reservations do not constitute completion.
 
 ## 9. Rescheduling rules
 
+Stage D's exact transition and transfer contracts are documented in
+[study-session-lifecycle.md](study-session-lifecycle.md). Completion accepts a
+positive 1–65535 actual-minute integer or omission, storing null on omission.
+It records a whole-second UTC completion instant without changing scheduled time
+or work progress. Miss requires end ≤ captured now; manual cancellation and
+rescheduling require original start > captured full-precision now. S3 deletion
+retains its deliberately inclusive start-equality cleanup.
+
 **BR-RES-001 — Preserve completed work**  
-Rescheduling must not move completed sessions.
+Rescheduling must not move completed sessions. Stage D accepts only upcoming planned sources; all terminal states conflict. Missed history remains intact and unfinished work uses a new Stage C preview.
 
 **BR-RES-002 — Deadline remains binding**  
-A missed/unfinished session may only be moved to a slot that still satisfies the associated deadline.
+New allocation of missed/unfinished work must still satisfy the associated deadline. Stage D transfers an upcoming planned session only; missed sessions use fresh Stage C allocation, preserving their original history.
 
 **BR-RES-003 — Recalculate capacity**  
 Rescheduling uses current schedule, existing future sessions, user constraints, and workload limits rather than assuming the old slot is still representative.
@@ -312,7 +320,7 @@ If only part of unfinished work can be rescheduled, the system reports the unsch
 When the user asks to change one plan element, prefer changing the affected future sessions rather than regenerating unrelated completed/past plan history.
 
 **BR-RES-006 — Rescheduling history**\
-Rescheduling creates a new session referencing its predecessor through `rescheduled_from_session_id`; the previous row becomes `rescheduled`. The approved unique predecessor reference allows at most one direct successor per row. Completed sessions are preserved as required by BR-RES-001.
+Rescheduling creates a new session referencing its predecessor through `rescheduled_from_session_id`; the previous row becomes `rescheduled`. The approved unique predecessor reference allows at most one direct successor per row. Completed sessions are preserved as required by BR-RES-001. Stage D validates connected ownership, exact attribution, predecessor state and acyclic history, and inserts one immediate successor atomically. Replacement duration may not exceed original duration or Stage A unallocated effort after releasing the source.
 
 ## 10. Reminder rules
 
@@ -330,6 +338,12 @@ Retries must not intentionally produce duplicate user notifications for the same
 
 **BR-REM-005 — Target changes**  
 When a deadline/session changes, a deterministic Service recalculates relative reminders from the persisted anchor and offset. Hard-purge handling must reconcile relative reminders before a target is removed; target compatibility and purge reconciliation are explicitly Service-level because MySQL forbids target CHECKs involving the SET NULL FKs.
+
+Stage D preserves original anchor times while retiring session identities. Its
+affected scheduled reminders are cancelled with their metadata retained; no
+reminder is cloned or redirected to the new identity. Sent/cancelled and unrelated
+reminders remain intact. General anchor editing/recalculation remains separate
+from this scoped lifecycle cleanup.
 
 **BR-REM-006 — Relative and absolute triggers**\
 Supported relative anchors are `task_deadline`, `subtask_deadline`, and `session_start`, each requiring its matching target. Persist the anchor, signed `offset_minutes`, and resolved `trigger_at = anchor_time + offset_minutes`; negative offsets mean before the anchor. Anchor and offset are both present or both null. For absolute reminders they are null and `trigger_at` is authoritative.
@@ -405,7 +419,7 @@ Excel imports enforce allowed file type/size and parse content as untrusted inpu
 Stage 02 status, priority, targeting, effort, deletion/history, and fingerprint identity decisions are documented above and in [database-schema.md](database-schema.md). The following remain future planning/product decisions:
 
 - default study-window and break values;
-- minimum/maximum study-session duration;
+- product defaults for minimum/maximum study-session duration (configured bounds are already enforced);
 - any future conflict override policy (current manual Lesson conflicts block saving; no override exists);
 - later requirements for report-history retention (no V1 report-history table).
 
@@ -426,5 +440,6 @@ Approved A1–A6 policies are implemented by RemainingEffortService (pure accoun
 and PlanningWorkSelectionService (trusted owned reads, eligibility and ordering).
 See [planning-work-selection.md](planning-work-selection.md) for exact contracts,
 exclusions/warnings, conservative historical attribution and read-only guarantees.
-C9/C10 workload remains scheduled-duration accounting and is unchanged. Automatic
-allocation, session persistence, rescheduling and AI orchestration remain deferred.
+C9/C10 workload remains scheduled-duration accounting and is unchanged. Stages B–D implement automatic
+allocation, reviewed session persistence and single-session lifecycle/rescheduling.
+AI orchestration remains deferred.

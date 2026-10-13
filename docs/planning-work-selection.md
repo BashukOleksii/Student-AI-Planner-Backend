@@ -245,8 +245,9 @@ including historical planned rows. Stage A completed credit is actual-first, and
 stale plans do not reserve unallocated work. These are different measures; neither
 changes PF1 blocking or C10 workload/break behavior.
 
-Still deferred: session creation/lifecycle, transactional
-plan acceptance, rescheduling, reminder delivery, REST/AI adapters and LLM calls.
+Stages C/D now implement confirmed session creation, transactional plan acceptance,
+explicit lifecycle and single-session rescheduling in separate Services/REST
+adapters. Reminder delivery, AI adapters and LLM calls remain deferred.
 Historical attribution needs an explicit future user/data decision; Stage A never
 redistributes it. Whole rescheduling-graph validation and retrospective estimate/
 credit reconciliation are outside this selection checkpoint.

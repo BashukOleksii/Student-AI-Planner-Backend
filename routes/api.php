@@ -33,6 +33,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/planning/study-plans/confirm', [StudyPlanController::class, 'confirm'])->name('planning.study-plans.confirm');
     Route::get('/study-sessions', [StudySessionController::class, 'index'])->name('study-sessions.index');
     Route::get('/study-sessions/{studySession}', [StudySessionController::class, 'show'])->whereNumber('studySession')->name('study-sessions.show');
+    Route::post('/study-sessions/{studySession}/complete', [StudySessionController::class, 'complete'])->whereNumber('studySession')->name('study-sessions.complete');
+    Route::post('/study-sessions/{studySession}/miss', [StudySessionController::class, 'miss'])->whereNumber('studySession')->name('study-sessions.miss');
+    Route::post('/study-sessions/{studySession}/cancel', [StudySessionController::class, 'cancel'])->whereNumber('studySession')->name('study-sessions.cancel');
+    Route::post('/study-sessions/{studySession}/reschedule', [StudySessionController::class, 'reschedule'])->whereNumber('studySession')->name('study-sessions.reschedule');
 
     Route::get('/planning-preferences', [PlanningPreferenceController::class, 'show'])->name('planning-preferences.show');
     Route::put('/planning-preferences', [PlanningPreferenceController::class, 'update'])->name('planning-preferences.update');

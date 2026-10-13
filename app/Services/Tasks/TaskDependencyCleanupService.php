@@ -2,13 +2,13 @@
 
 namespace App\Services\Tasks;
 
-use App\Enums\ReminderAnchor;
 use App\Enums\ReminderStatus;
 use App\Enums\StudySessionStatus;
 use App\Models\Reminder;
 use App\Models\StudySession;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\Reminders\ReminderDependencyService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -16,6 +16,8 @@ use LogicException;
 
 class TaskDependencyCleanupService
 {
+    public function __construct(private ReminderDependencyService $reminderDependencies) {}
+
     /** Called after the deleter locks the owner, owned parent and scoped children. */
     public function cancel(User $user, Task $task, array $subtaskIds, bool $wholeTask = false): void
     {
@@ -46,16 +48,7 @@ class TaskDependencyCleanupService
                 }
             })->orderBy('id')->lockForUpdate()->get();
         foreach ($reminders as $reminder) {
-            $targets = array_filter($reminder->only(['task_id', 'subtask_id', 'study_session_id']), fn ($id) => $id !== null);
-            if ($reminder->user_id !== $user->id || count($targets) !== 1) {
-                $this->unsafeDependency();
-            }
-            $expectedAnchor = match (array_key_first($targets)) {
-                'task_id' => ReminderAnchor::TaskDeadline,
-                'subtask_id' => ReminderAnchor::SubtaskDeadline,
-                'study_session_id' => ReminderAnchor::SessionStart,
-            };
-            if ($reminder->anchor !== null && $reminder->anchor !== $expectedAnchor) {
+            if (! $this->reminderDependencies->compatible($reminder, $user)) {
                 $this->unsafeDependency();
             }
         }

@@ -12,4 +12,9 @@ class StudySessionPolicy
     {
         return $user->id === $studySession->user_id ? Response::allow() : Response::denyAsNotFound();
     }
+
+    public function update(User $user, StudySession $studySession): Response
+    {
+        return $this->view($user, $studySession);
+    }
 }

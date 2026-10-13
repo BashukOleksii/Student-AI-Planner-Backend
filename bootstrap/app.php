@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\StudyPlanConflictException;
+use App\Exceptions\StudySessionConflictException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -38,7 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
             if (! $request->is('api/planning/study-plans/*', 'api/study-sessions', 'api/study-sessions/*')) {
                 return null;
             }
-            if ($exception instanceof StudyPlanConflictException) {
+            if ($exception instanceof StudyPlanConflictException || $exception instanceof StudySessionConflictException) {
                 return response()->json(['message' => $exception->getMessage()], 409);
             }
             if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {

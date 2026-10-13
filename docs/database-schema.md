@@ -19,7 +19,7 @@ Important: this is the canonical repository adaptation of the approved `stage-02
 - `study_sessions`, with `StudySessionStatus`, completion/actual-effort constraints, nullable subtask and predecessor relationships, one direct successor per predecessor, and lifecycle history without soft deletion;
 - `reminders`, with `ReminderStatus`, nullable `ReminderAnchor`, signed offsets, explicit target relationships, and the four DB-safe checks below;
 - `ai_conversations` and `ai_messages`, with `AiMessageRole`, JSON-array tool-call metadata, and conversation/message cascades; messages automatically write `created_at` and have no `updated_at`;
-- the approved primary/foreign keys, indexes, uniqueness constraints, owner cascade deletes, optional `SET NULL` deletes, and thirty-six enforced MySQL CHECK constraints across fifteen domain tables; historical Lesson/import `RESTRICT` references remain unchanged. Unsupported self-reference and reminder target checks are assigned explicitly to future deterministic Services;
+- the approved primary/foreign keys, indexes, uniqueness constraints, owner cascade deletes, optional `SET NULL` deletes, and thirty-six enforced MySQL CHECK constraints across fifteen domain tables; historical Lesson/import `RESTRICT` references remain unchanged. Unsupported checks are assigned to deterministic Services: LessonService and Stage D enforce inspected self-reference graphs, while S3/Stage D validate affected reminder targets;
 - factories and focused MySQL-backed `PlanningPersistenceTest`, `AcademicContextPersistenceTest`, `ScheduleImportPersistenceTest`, `LessonPersistenceTest`, `TaskPersistenceTest`, `StudySessionPersistenceTest`, `ReminderPersistenceTest`, and `AiPersistenceTest`. Factory defaults are valid and ownership-consistent; the StudySession factory derives its owner from its Task. Import/AI JSON fixtures do not define future processing protocols. `PlanningMigrationTest` dynamically rolls back and reapplies domain migrations while preserving the four scaffold migrations and existing users, explicitly covering all Groups 1–9 without a fixed rollback count.
 
 **Implemented Stage 03 application behavior:** Authentication + User Profile uses Sanctum first-party SPA session/cookie authentication. Planning Preferences exposes side-effect-free singleton reads and complete nullable replacement/upsert through `PlanningPreferenceService`, which enforces session/workload bound ordering. Study Availability exposes user-scoped CRUD through `StudyAvailabilityService`, which enforces local interval ordering and deterministic same-user/day overlap rejection. The auto-discovered `StudyAvailabilityWindowPolicy` hides cross-user mutations with 404. See [the auth/profile contract](auth-profile.md) and [planning settings contract](planning-settings.md).
@@ -37,9 +37,9 @@ projected-conflict classification with transient row statuses, without staging
 or Lesson writes. No schema, enums or fixed fingerprint contract changed.
 See [schedule.md](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
 
-**Still unimplemented:** actual free-time calculation, automatic study planning, Task/Subtask planning workflows, reminder application/delivery logic, statistics, and AI orchestration/tools. Persistence of those entities does not implement their workflows.
+**Current application scope:** PF1/PF2/C9/C10, Stage A effort/work selection, Stage B automatic planning, Stage C reviewed confirmation/session reads and Stage D lifecycle/single-session rescheduling are implemented. Task/Subtask APIs and schedule-import confirmation are also implemented. General Reminder CRUD/delivery, statistics and AI orchestration/tools remain deferred.
 
-Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. T1/T2 enforce Task Subject ownership, parent deadline bounds and manual completion/reopening. S3 implements Task/Subtask deletion cleanup with eligible dependency ownership and target validation; general Reminder APIs, rescheduling and reminder recalculation remain unimplemented; product defaults remain undecided. Import C1/C2a/C2b now implement temporary XLSX upload, persisted preview/revalidation and confirmed atomic Lesson reconciliation. Destructive semester replacement is deferred. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. StudySession self-rescheduling and other domain lifecycle transitions remain future Service work.
+Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. T1/T2 enforce Task Subject ownership, parent deadline bounds and manual completion/reopening. S3 implements Task/Subtask deletion cleanup with eligible dependency ownership and target validation; Stage D implements session lifecycle/rescheduling and affected reminder preflight; general Reminder APIs/recalculation remain deferred; product defaults remain undecided. Import C1/C2a/C2b now implement temporary XLSX upload, persisted preview/revalidation and confirmed atomic Lesson reconciliation. Destructive semester replacement is deferred. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. Stage D enforces inspected StudySession chains and explicit lifecycle operations; general editing/reopening remains deferred.
 
 The companion [DBML source](database-schema.dbml) preserves the supplied `student-ai-planner.dbml` diagram. It uses numeric shorthand and omits SQL CHECK expressions; the MySQL types and constraints below remain authoritative. See [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [the earlier draft review](database-review-notes.md) for context. Known implementation issues are recorded in section 8 without changing approved tables, columns, keys, or delete actions.
 
@@ -618,7 +618,7 @@ The contract remains fixed. Import B2 implements its pure generator and exact ow
 
 ### 3.11 tasks
 
-Implemented persistence for user-owned academic work. T1 adds basic create/detail/PATCH with Service-owned Subject and parent deadline validation; see [tasks.md](tasks.md). T2 adds manual completion/reopening while preserving the existing completion CHECK. T3 adds read-only filtered/paginated listing. S3 implements soft deletion and synchronous dependency cleanup; restore, hard purge and planning remain deferred. The schema is unchanged.
+Implemented persistence for user-owned academic work. T1 adds basic create/detail/PATCH with Service-owned Subject and parent deadline validation; see [tasks.md](tasks.md). T2 adds manual completion/reopening while preserving the existing completion CHECK. T3 adds read-only filtered/paginated listing. S3 implements soft deletion and synchronous dependency cleanup; restore and hard purge remain deferred; Stage A–D planning/session workflows are implemented separately. The schema is unchanged.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -682,7 +682,7 @@ Eloquent:
 
 ### 3.12 subtasks
 
-Implemented persistence for ordered decomposition of a task. S1 adds nested basic APIs and independent completion/reopening, append-only position allocation and Service deadline validation; see [tasks.md](tasks.md). S2 adds complete active-set transactional position normalization and read-only derived progress. The schema is unchanged: no unique position constraint or stored percentage is added. S3 implements soft deletion and dependency cleanup; restore, hard purge and planning remain deferred.
+Implemented persistence for ordered decomposition of a task. S1 adds nested basic APIs and independent completion/reopening, append-only position allocation and Service deadline validation; see [tasks.md](tasks.md). S2 adds complete active-set transactional position normalization and read-only derived progress. The schema is unchanged: no unique position constraint or stored percentage is added. S3 implements soft deletion and dependency cleanup; restore and hard purge remain deferred; Stage A–D planning/session workflows are implemented separately.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -736,7 +736,7 @@ Eloquent:
 
 ### 3.13 study_sessions
 
-Implemented persistence for a concrete reserved study block. C10 implements read-only candidate evaluation using owned planned/completed scheduled workload and effective break sources. Stage B implements advisory deterministic planning. Stage C adds explicitly confirmed atomic planned-session creation and owned session list/detail using the existing schema; see [study plan persistence](study-plan-persistence.md). General session editing/lifecycle and rescheduling remain deferred. No soft deletes.
+Implemented persistence for a concrete reserved study block. C10 implements read-only candidate evaluation using owned planned/completed scheduled workload and effective break sources. Stage B implements advisory deterministic planning. Stage C adds explicitly confirmed atomic planned-session creation and owned session list/detail using the existing schema; see [study plan persistence](study-plan-persistence.md). Stage D implements explicit completion/miss/cancellation and linked single-session transfers with chain/reminder validation; see [session lifecycle](study-session-lifecycle.md). General editing/reopening remain deferred. No soft deletes or new migrations.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -794,7 +794,7 @@ Planned vs actual:
 
 - planned minutes = `ends_at - starts_at`;
 - actual minutes = `actual_minutes`;
-- if the first V1 UI supports only "mark complete", the Service may default `actual_minutes` to scheduled duration, but the schema keeps the concepts separate.
+- Stage D omission stores `actual_minutes = null`, preserving Stage A’s exact scheduled-second fallback; explicit HTTP null is rejected. The schema keeps actual effort and scheduled workload separate.
 
 Eloquent:
 
@@ -809,7 +809,7 @@ Eloquent:
 
 ### 3.14 reminders
 
-Implemented reminder persistence with optional typed domain targets; target validation, trigger recalculation, and delivery remain unimplemented.
+Implemented reminder persistence with optional typed domain targets. S3/Stage D validate affected scheduled dependency ownership and target/anchor compatibility before atomic cancellation. General CRUD, trigger recalculation and delivery remain deferred.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -953,12 +953,12 @@ Messages are treated as append-oriented records; `updated_at` is absent. `AiMess
 
 ## 5. Important cross-row/service rules not delegated to MySQL
 
-These are deterministic application responsibilities, separate from MySQL enforcement. Recurring availability overlap, current API ownership protection, Academic Context institution/deletion invariants, and manual Lesson/schedule rules are implemented; other domain rules remain future work:
+These are deterministic application responsibilities, separate from MySQL enforcement. Recurring availability overlap, current API ownership protection, Academic Context institution/deletion invariants, and manual Lesson/schedule rules are implemented. Stages A–D enforce planning and session transfer rules; general Reminder/statistics capabilities remain deferred:
 
 1. lesson overlap and schedule conflicts (implemented by LessonService for manual create/update/replacement/revert; import uses B3 projected checks inside C2b);
 2. study-session overlap and free-time validation;
-3. cross-user ownership checks (implemented for current profile/preferences/availability and Academic Context APIs; Lesson Subject/Teacher/AcademicPeriod compatibility is implemented; Task/Reminder association compatibility remains pending);
-4. subject/teacher/academic-period institution ownership compatibility (implemented by Academic Services); Lesson references are owner-validated by LessonService; Task operations remain pending; import validates owned references without requiring institution equality;
+3. cross-user ownership checks (implemented for current profile/preferences/availability and Academic Context APIs; Lesson Subject/Teacher/AcademicPeriod compatibility is implemented; Task ownership is enforced by TaskService; S3/Stage D enforce affected reminder dependencies);
+4. subject/teacher/academic-period institution ownership compatibility (implemented by Academic Services); Lesson references are owner-validated by LessonService; Task Subject operations are owner-validated; import validates owned references without requiring institution equality;
 5. replacement lesson and original lesson ownership (implemented by LessonService, including malformed legacy guards);
 6. subtask belongs to the study session's task;
 7. deadline feasibility;
@@ -1022,7 +1022,7 @@ All Stage 02 migration enforcement decisions are resolved. Approved FK actions a
 
 ### 8.1 Self-reference CHECK restrictions
 
-MySQL prohibits CHECK expressions referencing an `AUTO_INCREMENT` column. The Lesson design gate confirmed error 3818 on MySQL 8.4.10; Lessons and StudySessions deliberately omit self-comparison CHECKs and assign those prohibitions to deterministic application Services. LessonService now prohibits self-replacement; StudySession self-rescheduling remains future work. Persistence tests explicitly demonstrate physically permitted self-reference as invalid domain data. FKs enforce referenced existence, and unique references enforce one direct replacement/successor. No triggers or generated-column workarounds are used. [MySQL CHECK constraint restrictions](https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html).
+MySQL prohibits CHECK expressions referencing an `AUTO_INCREMENT` column. The Lesson design gate confirmed error 3818 on MySQL 8.4.10; Lessons and StudySessions deliberately omit self-comparison CHECKs and assign those prohibitions to deterministic application Services. LessonService now prohibits self-replacement; Stage D prohibits self-rescheduling and invalid inspected chains. Persistence tests explicitly demonstrate physically permitted self-reference as invalid domain data. FKs enforce referenced existence, and unique references enforce one direct replacement/successor. No triggers or generated-column workarounds are used. [MySQL CHECK constraint restrictions](https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html).
 
 ### 8.2 CHECK constraints and referential actions
 
@@ -1047,4 +1047,4 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
   introduced by the completed Stage 03 APIs.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup. Group 4 tests on MySQL 8.4.10 show that directly deleting a User who owns both a period and its import batch is rejected with error 1451 by `schedule_import_batches_academic_period_id_foreign`. Group 5 confirms that an isolated User/Subject/manual-Lesson graph can cascade, while a combined period/batch/Lesson history graph blocks direct User deletion with 1451. Hard-removing Lessons first still leaves the batch/period restriction; deleting batches next cascades their rows and then permits User deletion. Soft deletion does not remove restrictive references. Account hard purge is an ordered administrative operation, distinct from normal domain deletion; the approved FKs are unchanged.
 
-Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Task/Subtask workflows and deletion cleanup, PF1/PF2 algorithms and C10 read-only candidate evaluation are implemented. Further backend verticals must add other domain ownership compatibility, automatic planning, session creation, rescheduling and reminder lifecycle/delivery. Import C2b now implements confirmed atomic reconciliation; delivery, statistics and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.
+Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Task/Subtask workflows and deletion cleanup, PF1/PF2 algorithms and C10 read-only candidate evaluation are implemented. Stages A–C implement work selection, automatic planning and confirmed session creation; Stage D adds lifecycle and safe single-session rescheduling. Further verticals must add general Reminder mutation/delivery and other deferred capabilities. Import C2b now implements confirmed atomic reconciliation; delivery, statistics and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.

@@ -86,7 +86,7 @@ by 86400. An exclusive local-midnight endpoint adds no extra date. Skipped date
 labels remain part of the nominal envelope while contributing no real instants.
 
 No current-clock check occurs: historical candidates are valid diagnostics.
-Future write-side past-start restrictions and additional lookahead remain deferred.
+C10 itself remains historical-capable; Stages B–D apply their documented write-side clocks without changing diagnostic evaluation.
 
 Expand the first/last covered dates to their nominal ISO Monday/Sunday labels.
 Use the existing C2 `AvailabilityOccurrenceService` with all seven full-day
@@ -199,15 +199,16 @@ before committing. Accepted in-transaction batch candidates must also contribute
 to later validation. Diagnostic success cannot authorize a later stale write.
 
 Stage A now implements [work selection and remaining effort](planning-work-selection.md)
-separately, without changing C10. Remaining work: transactional plan acceptance,
-session persistence/lifecycle, rescheduling, reminder delivery, REST/AI
-adapters and LLM orchestration. Future product defaults and write-side creation
+separately, without changing C10. Stages C/D implement transactional acceptance, session persistence/lifecycle,
+single-session rescheduling and REST adapters. Reminder delivery, AI adapters
+and LLM orchestration remain deferred. Future product defaults and write-side creation
 rules remain separate decisions. C10 stops at evaluation.
 
 Stage B implements advisory splitting/allocation and rejects new past starts
 relative to Stage A's captured clock, with no additional lookahead beyond the
-requested 31-date maximum. C10 historical diagnostics remain unchanged. Session
-persistence/lifecycle and transactional plan acceptance remain deferred.
+requested 31-date maximum. C10 historical diagnostics remain unchanged. Stages C/D implement session
+persistence/lifecycle and transactional acceptance separately from the unchanged
+read-only Services.
 
 ## Verification
 

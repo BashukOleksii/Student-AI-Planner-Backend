@@ -303,9 +303,12 @@ with incompatible foreign work references fail closed before serialization.
 Selected history is validated through owned relationships with deleted work
 included. There is no global foreign lookup, hidden repair or GET status mutation.
 
-No general StudySession creation/editing, completion/reopening, missed detection,
-rescheduling, reminder workflow, report generation, frontend, AI adapter, job or
-calendar export is included. Existing Task deletion cleanup remains unchanged.
+Stage C itself does not implement general StudySession creation/editing, lifecycle,
+rescheduling, reminder workflow, reports, frontend, AI adapters, jobs or calendar
+export. [Stage D](study-session-lifecycle.md) now adds explicit completion/miss/cancel
+and single-session transfers under the same owner-first protocol, preserving these
+preview/confirmation/read contracts. Automatic missed detection and reopening
+remain deferred. The Stage C verification record below remains historical.
 
 ## Verification
 
