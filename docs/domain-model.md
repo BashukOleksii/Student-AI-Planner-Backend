@@ -25,6 +25,12 @@ compatibility, excludes ineligible work and orders authoritative Task/Subtask un
 C9/C10 scheduled workload is unchanged. No schema, endpoint, planner/writer or AI
 adapter is added. See [the Stage A contract](planning-work-selection.md).
 
+Stage B now implements transient Planning Results through `StudyPlanningService`.
+It allocates eligible Stage A work against PF1 and shared C9 context, projecting
+accepted proposals into PF2 break/workload checks. Results include exact remaining
+seconds and evidence-based greedy search diagnostics, without persisting sessions
+or adding a planning-run entity. See [the Stage B contract](automatic-study-planning.md).
+
 ## 1. Domain boundaries
 
 ### Identity & Profile

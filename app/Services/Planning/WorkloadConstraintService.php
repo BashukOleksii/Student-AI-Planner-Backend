@@ -23,7 +23,46 @@ class WorkloadConstraintService
      */
     public function evaluate(array $candidate, array $existingSessions, string $timezone, mixed $maxDailyMinutes = null, mixed $maxWeeklyMinutes = null): array
     {
-        $total = $this->intervals->durationSeconds($candidate);
+        $zone = $this->validateInputs($candidate, $existingSessions, $timezone, $maxDailyMinutes, $maxWeeklyMinutes);
+        if ($maxDailyMinutes === null && $maxWeeklyMinutes === null) {
+            return [];
+        }
+
+        [$days, $weeks] = $this->periodTotals($candidate, $existingSessions, $zone, true);
+
+        $violations = [];
+        if ($maxDailyMinutes !== null && max($days) > $maxDailyMinutes * 60) {
+            $violations[] = 'daily_study_limit_exceeded';
+        }
+        if ($maxWeeklyMinutes !== null && max($weeks) > $maxWeeklyMinutes * 60) {
+            $violations[] = 'weekly_study_limit_exceeded';
+        }
+
+        return $violations;
+    }
+
+    /**
+     * Residual budgets for a planning range, using the same C7 calendar portions and additive totals.
+     * Null means unconfigured; exhausted/overloaded periods have zero additional capacity.
+     *
+     * @return array{segments: list<array{start: int, end: int, day: string, week: string, seconds: int}>, days: array<string, ?int>, weeks: array<string, ?int>}
+     */
+    public function availableCapacity(array $range, array $existingSessions, string $timezone, mixed $maxDailyMinutes = null, mixed $maxWeeklyMinutes = null): array
+    {
+        $zone = $this->validateInputs($range, $existingSessions, $timezone, $maxDailyMinutes, $maxWeeklyMinutes);
+        [$days, $weeks] = $this->periodTotals($range,
+            $maxDailyMinutes === null && $maxWeeklyMinutes === null ? [] : $existingSessions, $zone, false);
+
+        return [
+            'segments' => iterator_to_array($this->portions($range, $zone), false),
+            'days' => array_map(fn (int $seconds): ?int => $maxDailyMinutes === null ? null : max(0, $maxDailyMinutes * 60 - $seconds), $days),
+            'weeks' => array_map(fn (int $seconds): ?int => $maxWeeklyMinutes === null ? null : max(0, $maxWeeklyMinutes * 60 - $seconds), $weeks),
+        ];
+    }
+
+    private function validateInputs(array $range, array $existingSessions, string $timezone, mixed $maxDailyMinutes, mixed $maxWeeklyMinutes): DateTimeZone
+    {
+        $total = $this->intervals->durationSeconds($range);
         if (! array_is_list($existingSessions)) {
             throw new InvalidArgumentException('Expected a list of existing workload sessions.');
         }
@@ -45,15 +84,16 @@ class WorkloadConstraintService
             && ! (str_starts_with($timezone, 'Etc/') && in_array($timezone, DateTimeZone::listIdentifiers(DateTimeZone::ALL_WITH_BC), true))) {
             throw new InvalidArgumentException('Expected an IANA timezone name.');
         }
-        $zone = new DateTimeZone($timezone);
-        if ($maxDailyMinutes === null && $maxWeeklyMinutes === null) {
-            return [];
-        }
 
+        return new DateTimeZone($timezone);
+    }
+
+    private function periodTotals(array $range, array $existingSessions, DateTimeZone $zone, bool $includeRange): array
+    {
         $days = $weeks = [];
-        foreach ($this->portions($candidate, $zone) as $portion) {
-            $days[$portion['day']] = $this->addSeconds($days[$portion['day']] ?? 0, $portion['seconds']);
-            $weeks[$portion['week']] = $this->addSeconds($weeks[$portion['week']] ?? 0, $portion['seconds']);
+        foreach ($this->portions($range, $zone) as $portion) {
+            $days[$portion['day']] = $this->addSeconds($days[$portion['day']] ?? 0, $includeRange ? $portion['seconds'] : 0);
+            $weeks[$portion['week']] = $this->addSeconds($weeks[$portion['week']] ?? 0, $includeRange ? $portion['seconds'] : 0);
         }
         foreach ($existingSessions as $session) {
             foreach ($this->portions($session, $zone) as $portion) {
@@ -67,18 +107,10 @@ class WorkloadConstraintService
             }
         }
 
-        $violations = [];
-        if ($maxDailyMinutes !== null && max($days) > $maxDailyMinutes * 60) {
-            $violations[] = 'daily_study_limit_exceeded';
-        }
-        if ($maxWeeklyMinutes !== null && max($weeks) > $maxWeeklyMinutes * 60) {
-            $violations[] = 'weekly_study_limit_exceeded';
-        }
-
-        return $violations;
+        return [$days, $weeks];
     }
 
-    /** @return Generator<int, array{day: string, week: string, seconds: int}> */
+    /** @return Generator<int, array{start: int, end: int, day: string, week: string, seconds: int}> */
     private function portions(array $interval, DateTimeZone $zone): Generator
     {
         $transitions = $zone->getTransitions($interval['start'], $interval['end']);
@@ -96,7 +128,7 @@ class WorkloadConstraintService
                 // A wrapped next-midnight timestamp lies beyond the representable timeline.
                 $remaining = $midnight > $wall ? $midnight - $wall : PHP_INT_MAX;
                 $seconds = min($end - $cursor, $remaining);
-                yield ['day' => $date->format('Y-m-d'), 'week' => $date->format('o-W'), 'seconds' => $seconds];
+                yield ['start' => $cursor, 'end' => $cursor + $seconds, 'day' => $date->format('Y-m-d'), 'week' => $date->format('o-W'), 'seconds' => $seconds];
                 $cursor += $seconds;
             }
         }

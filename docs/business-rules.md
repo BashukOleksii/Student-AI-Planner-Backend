@@ -7,6 +7,12 @@ Lesson association/replacement ownership, self-replacement/chain prohibition, Le
 
 These are intended requirements, not a claim that the backend implements all of them. References to "V1" mean the initial product release, not an implemented `/api/v1` route prefix. Deterministic rules must be shared by REST and AI-tool entry points through application Services. Preserve rule IDs when refining requirements so implementation and tests can trace them.
 
+Stage B now implements deterministic advisory allocation in memory, including
+duration bounds, projected conflicts/breaks, projected scheduled workload,
+captured-clock/horizon protection, effective deadlines and exact partial results.
+It preserves Stage A and C9 policies and adds no persistence or endpoint.
+See [automatic study planning](automatic-study-planning.md).
+
 ## 1. Global and ownership rules
 
 **BR-GEN-001 — Ownership isolation**  
@@ -245,7 +251,7 @@ Candidate work is ordered using a deterministic strategy. Baseline V1: earlier d
 No generated session may be placed after the work item's deadline. C9 diagnostics select the earliest present Task/Subtask deadline in raw UTC seconds; end equality passes and one second later violates the rule.
 
 **BR-PLAN-003 — No conflicts**  
-Generated sessions may not overlap effective lessons or other active study sessions. C9 combines PF1 full containment with explicit effective Lesson/planned-session break anchors; overlap and insufficient separation remain distinct C8 codes. No session writer or generator is implemented.
+Generated sessions may not overlap effective lessons or other active study sessions. C9 combines PF1 full containment with explicit effective Lesson/planned-session break anchors; overlap and insufficient separation remain distinct C8 codes. Stage B proposals also participate in subsequent free-time, break and scheduled-workload checks. No session writer is implemented.
 
 **BR-PLAN-004 — Split large work**  
 Work that does not fit one valid slot may be divided into multiple study sessions.
@@ -255,6 +261,10 @@ Planning uses remaining required effort, not total historical estimate already c
 
 **BR-PLAN-006 — Feasibility reporting**  
 If all required effort cannot fit before the deadline under current constraints, the planner returns a structured infeasibility result including unscheduled duration and relevant blocking constraints.
+
+Stage B reports exact algorithmically unallocated seconds with observed constraint
+codes and bounded-search exhaustion. Its deterministic greedy allocation is not a
+global optimizer; partial output does not prove mathematical impossibility.
 
 **BR-PLAN-007 — No fabricated capacity**  
 The AI response may explain planner output but may not claim that capacity exists when the deterministic planner reports none.

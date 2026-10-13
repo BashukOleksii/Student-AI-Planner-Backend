@@ -3,10 +3,15 @@
 Status: **PF1 complete (C1–C4 verified).** [PF2 C5–C8 checks](planning-constraints.md)
 and [C9/C10 read-only integration](planning-integration.md) are implemented.
 
+[Stage B automatic study planning](automatic-study-planning.md) now consumes the
+unchanged PF1 free-time result and uses PF2 to validate in-memory proposals,
+including projected occupied time, breaks and workload. PF1 endpoints and minimum
+slot semantics remain unchanged; no session persistence is introduced.
+
 C1/C2 provide pure computation. C3 adds read-only FreeTimeService integration
 with owned availability, Lessons and StudySessions. C4 exposes this calculation
 through an authenticated free-slots REST API. PF2 duration, break and workload checks are implemented separately with C10
-candidate integration. Automatic scheduling remains future work. No preference defaults or
+candidate integration. Stage B adds advisory allocation separately. No preference defaults or
 persistence are introduced.
 
 ## C1 interval engine

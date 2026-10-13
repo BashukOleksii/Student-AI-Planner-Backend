@@ -6,6 +6,13 @@ MySQL persistence with unchanged PF1 and pure C1–C8. The original local propos
 is preserved as historical context in [the approved policy](planning-integration-proposal.md).
 No new HTTP endpoint, AI Tool or write operation is added.
 
+Stage B now extracts C10 source assembly into `PlanningContextService`, preserving
+`evaluate()` and the approved policies below. C10 supplies its original candidate
+anchor envelope; Stage B supplies the requested local-date envelope. Stage B adds
+previously accepted in-memory proposals to free-time, break and workload inputs
+before C8 validation. Repeated C10 evaluation alone still sees persisted state.
+See [automatic study planning](automatic-study-planning.md).
+
 ## Public contract
 
 ```php
@@ -188,10 +195,15 @@ before committing. Accepted in-transaction batch candidates must also contribute
 to later validation. Diagnostic success cannot authorize a later stale write.
 
 Stage A now implements [work selection and remaining effort](planning-work-selection.md)
-separately, without changing C10. Remaining work: splitting, plan creation,
+separately, without changing C10. Remaining work: transactional plan acceptance,
 session persistence/lifecycle, rescheduling, reminder delivery, REST/AI
-adapters and LLM orchestration. Future product defaults, creation past-start rules
-and additional future lookahead remain separate decisions. C10 stops at evaluation.
+adapters and LLM orchestration. Future product defaults and write-side creation
+rules remain separate decisions. C10 stops at evaluation.
+
+Stage B implements advisory splitting/allocation and rejects new past starts
+relative to Stage A's captured clock, with no additional lookahead beyond the
+requested 31-date maximum. C10 historical diagnostics remain unchanged. Session
+persistence/lifecycle and transactional plan acceptance remain deferred.
 
 ## Verification
 

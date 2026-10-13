@@ -6,6 +6,14 @@ planning or StudySession persistence. C10 now implements owned database source
 selection separately in [the integration Service](planning-integration.md).
 [PF1](planning-foundation.md) remains the read-only allowed-free-time calculation.
 
+[Stage B](automatic-study-planning.md) now allocates advisory sessions using these
+constraints against persisted and in-memory projected sources. C7 additionally
+exposes `availableCapacity($range, $existingSessions, $timezone, $maxDailyMinutes,
+$maxWeeklyMinutes)`, sharing its existing calendar portions and additive totals.
+It returns UTC calendar segments and nullable residual daily/weekly budgets;
+exhausted periods have zero additional capacity. `evaluate()` and C8 violation
+semantics remain compatible. No constraint introduces a configured default.
+
 ## C5 configured session duration
 
 `SessionDurationConstraintService::evaluate($interval, $minimumMinutes = null,
@@ -205,7 +213,7 @@ An empty C5 result establishes duration suitability only; C8 additionally checks
 the supplied free time, anchors, workload and deadline. Free slots remain allowed
 study time, not guaranteed session capacity or a generated plan. [Stage A](planning-work-selection.md)
 now implements remaining effort and deterministic work ordering separately.
-Splitting, multi-session feasibility, automatic planning, rescheduling,
+Stage B implements splitting and projected multi-session validation. Rescheduling,
 session persistence and reminder workflows remain deferred. C10 implements diagnostic selection and enforcement of BR-FREE-004 and
 BR-LIM-001/BR-LIM-002 against owned database state; see [its contract](planning-integration.md).
 Future writers must revalidate transactionally. The PF1 API is unchanged.

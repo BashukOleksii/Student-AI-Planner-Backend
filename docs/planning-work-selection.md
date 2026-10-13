@@ -1,9 +1,15 @@
 # Stage A — Remaining Effort and Planning Work Selection
 
-Stage A implements read-only work accounting and selection for the future Stage B
+Stage A implements read-only work accounting and selection for the Stage B
 planner. It does not allocate time, split sessions, persist plans, add endpoints,
 change work lifecycle/progress, or orchestrate an LLM. Existing PF1/PF2 and
 [C9/C10](planning-integration.md) behavior remains unchanged.
+
+Stage B is now implemented in [automatic study planning](automatic-study-planning.md).
+It consumes this unchanged A1–A6 contract, including unallocated seconds,
+effective deadlines, deterministic ordering and the full-precision `as_of_utc`
+clock. Exclusions and warnings pass through unchanged; proposed sessions exist
+only in memory. Historical Stage A verification below remains its original record.
 
 ## Service contracts
 
@@ -219,13 +225,13 @@ be counted, so memory/processing and query row counts can still grow with curren
 work and its history. Explicit Task/child targeting reduces work context. Corruption
 outside the selected source context is not a global database audit.
 
-## Read-only boundary and future Stage B
+## Read-only boundary and Stage B consumer
 
 Selection executes SELECTs only: no transaction/locks, status changes, cleanup,
 preferences, sessions, reminders, results or hidden repair. Tests inspect SQL and
 all-table snapshots. The result is advisory, not an atomic commit authorization.
 
-Stage B can consume positive `effort.unallocated_work_seconds`, the effective
+Stage B consumes positive `effort.unallocated_work_seconds`, the effective
 UTC deadline and deterministic work order to allocate slots through existing
 PF1/C10 constraints. Stage A does not prove slot feasibility or independently
 revalidate existing reservations against availability, overlaps, breaks or workload
@@ -239,7 +245,7 @@ including historical planned rows. Stage A completed credit is actual-first, and
 stale plans do not reserve unallocated work. These are different measures; neither
 changes PF1 blocking or C10 workload/break behavior.
 
-Still deferred: allocation, splitting, session creation/lifecycle, transactional
+Still deferred: session creation/lifecycle, transactional
 plan acceptance, rescheduling, reminder delivery, REST/AI adapters and LLM calls.
 Historical attribution needs an explicit future user/data decision; Stage A never
 redistributes it. Whole rescheduling-graph validation and retrospective estimate/

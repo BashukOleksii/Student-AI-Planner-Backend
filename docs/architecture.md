@@ -23,6 +23,16 @@ compatibility, excludes ineligible work and orders authoritative Task/Subtask un
 C9/C10 scheduled workload is unchanged. No schema, endpoint, planner/writer or AI
 adapter is added. See [the Stage A contract](planning-work-selection.md).
 
+Stage B implements `StudyPlanningService::plan()` with an in-memory deterministic
+earliest-feasible allocator. A focused `PlanningContextService` extraction shares
+C10's approved owned source policies; C8 validates candidates against persisted
+sources plus every earlier proposal's occupied time, breaks and scheduled workload.
+The planner enforces the captured Stage A clock, inclusive local-date horizon,
+effective deadlines and configured constraints, returning exact partial allocation
+diagnostics. It adds no endpoint, schema, writer, cache or LLM dependency. Greedy
+results are advisory; Stage C must revalidate and commit transactionally.
+See [the Stage B contract and verification](automatic-study-planning.md).
+
 ## 1. Architectural goals
 
 The backend must support schedule management, academic tasks, free-time calculation, automatic study planning, rescheduling, reminders, progress analytics, Excel schedule import, authentication, and an AI agent that orchestrates deterministic application capabilities.
@@ -244,6 +254,12 @@ sequenceDiagram
 ```
 
 The agent chooses which operation is needed. Services decide whether a slot is valid, whether a deadline is violated, whether sessions overlap, and whether user limits are exceeded.
+
+The implemented Stage B application flow is Stage A selection → shared C9 context
+and PF1 free time → pure projected allocation with PF2/C8 acceptance → transient
+sessions and exact unallocated seconds. Its advisory generation performs no
+transaction or persistence; the mutating plan acceptance in section 11 remains
+future Stage C work. There is no AI/HTTP adapter for this planner yet.
 
 ## 8. AI agent boundary
 
