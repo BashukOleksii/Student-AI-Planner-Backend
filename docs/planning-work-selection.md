@@ -11,6 +11,12 @@ effective deadlines, deterministic ordering and the full-precision `as_of_utc`
 clock. Exclusions and warnings pass through unchanged; proposed sessions exist
 only in memory. Historical Stage A verification below remains its original record.
 
+Stage E2 reuses trusted exclusions to independently check exact work budgets
+after releasing the entire reviewed batch, then reloads Stage A after persisted
+retirement. Only successors reserve effort; cancelled unplaced work remains
+unfinished and available to Stage C. Completed credit and A1–A6 are unchanged.
+See [adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
+
 ## Service contracts
 
 ```php

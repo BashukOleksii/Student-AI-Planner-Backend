@@ -1,6 +1,6 @@
 # Conceptual Domain Model
 
-Status: conceptual model synchronized with approved persistence, Task/schedule APIs, planning Stages A–C and StudySession Stage D\
+Status: conceptual model synchronized with approved persistence, Task/schedule APIs, planning Stages A–C, StudySession Stage D and adaptive Stages E1/E2\
 Important: this document defines **domain concepts and ownership**. The approved physical MySQL design and implemented Eloquent relationships are documented in [database-schema.md](database-schema.md) and [the companion DBML](database-schema.dbml), not duplicated here. Migration Groups 1–9 are implemented; Stage 02 persistence is complete.
 
 Implemented models are `User`, `PlanningPreference`, `StudyAvailabilityWindow`, `EducationInstitution`, `AcademicPeriod`, `Subject`, `Teacher`, `ScheduleImportBatch`, `ScheduleImportRow`, `Lesson`, `Task`, `Subtask`, `StudySession`, `Reminder`, `AiConversation`, and `AiMessage`. PHP backed enums, scalar/date/datetime/JSON-array casts, factories, and MySQL-backed persistence tests support all groups. Lessons, tasks, and subtasks use soft deletion; sessions/reminders retain lifecycle states; AI messages have `created_at` without `updated_at`.
@@ -41,6 +41,13 @@ Stage D implements explicit StudySession lifecycle and immediate-successor
 transfers with terminal history, unchanged scheduled intervals and separate actual
 effort. Scheduled reminders on retired sources are cancelled atomically; reminder
 creation/delivery remain separate capabilities. See [session lifecycle](study-session-lifecycle.md).
+
+Stage E2 applies a transient adaptive review after explicit secure confirmation.
+Replaced originals become rescheduled with one immediate planned successor;
+explicitly accepted unplaced originals become cancelled with no successor. Valid,
+cannot-replan and terminal history is preserved. Stateless encrypted reviews add
+no domain entity or durable replay receipt. Scheduled source reminders retire
+atomically without changing unfinished work. See [adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
 
 ## 1. Domain boundaries
 

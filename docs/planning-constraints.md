@@ -14,6 +14,12 @@ It returns UTC calendar segments and nullable residual daily/weekly budgets;
 exhausted periods have zero additional capacity. `evaluate()` and C8 violation
 semantics remain compatible. No constraint introduces a configured default.
 
+Stage E2 reuses unchanged C8 for independent complete-batch validation, both
+before writes with the exact release hypothesis and after retirement. Each proposed
+replacement sees all other proposals once for conflicts, breaks and local daily/
+ISO-week workload. Completed scheduled workload retains C9 semantics. See
+[adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
+
 ## C5 configured session duration
 
 `SessionDurationConstraintService::evaluate($interval, $minimumMinutes = null,

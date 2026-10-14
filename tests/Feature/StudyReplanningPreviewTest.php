@@ -76,6 +76,8 @@ class StudyReplanningPreviewTest extends TestCase
             $this->assertStringStartsWith('select ', $query['query']);
             $this->assertStringNotContainsString('for update', $query['query']);
         }
+        $this->assertNotSame($data['preview_token'], $again['preview_token']);
+        unset($data['preview_token'], $again['preview_token']);
         $this->assertSame($data, $again);
         $this->assertSame($snapshot, $this->snapshot());
         $this->assertSame('2026-10-19T08:00:00.500000Z', $data['as_of_utc']);
@@ -87,7 +89,7 @@ class StudyReplanningPreviewTest extends TestCase
         $this->assertSame(['starts_at' => '2026-10-19T09:00:00Z', 'ends_at' => '2026-10-19T10:00:00Z', 'duration_seconds' => 3600], $row['replacement']);
         $this->assertSame(0, $row['untransferred_seconds']);
         $this->assertSame(3600, $data['work_results'][0]['unallocated_after_replacements']);
-        $this->assertArrayNotHasKey('preview_token', $data);
+        $this->assertSame('2026-10-19T08:15:00Z', $data['expires_at']);
         $this->assertArrayNotHasKey('effort', $row);
         $this->assertArrayNotHasKey('user_id', $row);
         $this->assertSame(StudySessionStatus::Planned, $source->fresh()->status);
@@ -426,7 +428,9 @@ class StudyReplanningPreviewTest extends TestCase
             $model::addGlobalScope('reverse_replanning_test', fn ($query) => $query->orderByDesc($query->getModel()->qualifyColumn('id')));
         }
         try {
-            $this->assertSame($expected, $this->preview());
+            $actual = $this->preview();
+            unset($expected['preview_token'], $actual['preview_token']);
+            $this->assertSame($expected, $actual);
         } finally {
             Task::clearBootedModels();
         }

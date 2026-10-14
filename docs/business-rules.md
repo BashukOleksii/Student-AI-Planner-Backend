@@ -17,6 +17,15 @@ Stage C now implements confirmed planned-session creation and read-only session
 retrieval through [study plan persistence](study-plan-persistence.md). Preview
 remains read-only; confirmation cannot silently substitute a changed proposal.
 
+Stage E2 now enforces BR-GEN-001/002/006, BR-PLAN-002/003/005/008,
+BR-SES-001/002/003, BR-RES-001–006 and BR-REM-001/002/005/007 for confirmed adaptive
+batches. Full material reviews are owner-bound and short-lived; stale confirmations
+conflict. Partial replacements require explicit partial acceptance; unplaced source
+cancellation requires that flag and separate cancellation acceptance. Valid and
+cannot-replan sources remain unchanged. Exact release-set effort/constraints,
+one-successor history and scheduled-reminder cleanup commit or roll back together.
+See [the E2 contract](adaptive-replanning.md#stage-e2-confirmation-contract).
+
 ## 1. Global and ownership rules
 
 **BR-GEN-001 — Ownership isolation**  
@@ -302,7 +311,8 @@ valid sources remain protected. Identity-based self-exclusion removes the candid
 from blocking, breaks, workload and reservation credit. One source has at most one
 shorter-or-equal proposal, capped by current exact-unit effort; partial/unplaced
 results and the full hypothetical release set are explicit. E2 confirmation and
-application remain deferred. See [adaptive replanning](adaptive-replanning.md).
+application are implemented separately with explicit acceptance and atomic
+persistence. See [adaptive replanning](adaptive-replanning.md).
 
 Stage D's exact transition and transfer contracts are documented in
 [study-session-lifecycle.md](study-session-lifecycle.md). Completion accepts a

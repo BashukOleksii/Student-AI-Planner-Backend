@@ -32,6 +32,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/planning/free-slots', [FreeSlotController::class, 'index'])->name('planning.free-slots.index');
     Route::post('/planning/study-plans/preview', [StudyPlanController::class, 'preview'])->name('planning.study-plans.preview');
     Route::post('/planning/replanning/preview', [StudyReplanningController::class, 'preview'])->name('planning.replanning.preview');
+    Route::post('/planning/replanning/confirm', [StudyReplanningController::class, 'confirm'])->name('planning.replanning.confirm');
     Route::post('/planning/study-plans/confirm', [StudyPlanController::class, 'confirm'])->name('planning.study-plans.confirm');
     Route::get('/study-sessions', [StudySessionController::class, 'index'])->name('study-sessions.index');
     Route::get('/study-sessions/{studySession}', [StudySessionController::class, 'show'])->whereNumber('studySession')->name('study-sessions.show');

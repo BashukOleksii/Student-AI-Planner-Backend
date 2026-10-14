@@ -1,9 +1,10 @@
-# Stage E1 — Adaptive Replanning Analysis and Preview
+# Stages E1/E2 — Adaptive Replanning Preview and Atomic Confirmation
 
 Stage E1 detects constraint-invalid future reservations and proposes deterministic
 one-to-one replacements. All operations are read-only and advisory. It does not
 perform Stage E2 confirmation/application, change statuses, create successors,
-cancel reminders, infer missed sessions, start jobs or invoke an LLM.
+cancel reminders, infer missed sessions, start jobs or invoke an LLM. Stage E2 now
+implements reviewed application in separate confirmation/persistence Services.
 
 ## REST and application contracts
 
@@ -37,7 +38,9 @@ StudyReplanningPreviewService::preview(User $user, string $startDate,
 The application result uses integer UTC endpoints; `StudyReplanningResource`
 exposes whole-second UTC strings and only selected public session fields.
 `StudyReplanningController` contains request/response orchestration only. No
-confirmation token, preview record, session mutation or new schema is introduced.
+preview record or new schema is introduced. The HTTP adapter now adds an encrypted
+`preview_token` and UTC `expires_at`; the application preview operation remains
+read-only and encryption-free.
 
 ## Detection and classification
 
@@ -177,9 +180,9 @@ there is no optimization or mathematical impossibility claim.
 IDs remain in `released_session_ids`, while their actual database rows remain
 planned. New intervals are feasible under the whole reported hypothesis, not an
 instruction to insert only the successful proposals while retaining unplaced
-reservations. E2 must explicitly define/review the treatment of unplaced sources
-or regenerate with those sources retained before application. E1 performs neither
-retirement nor cancellation. This assumption is exposed, not silently dropped.
+reservations. E2 requires explicit partial acceptance and separate unplaced-cancellation
+acceptance, then cancels unplaced sources in the same atomic batch. E1 performs
+neither retirement nor cancellation. This assumption is exposed, not silently dropped.
 
 ## Exact public result
 
@@ -187,6 +190,7 @@ retirement nor cancellation. This assumption is exposed, not silently dropped.
 
 | Field | Meaning |
 | --- | --- |
+| `preview_token`, `expires_at` | HTTP-only protected E2 review and exclusive UTC expiration. |
 | `as_of_utc` | Captured UTC `YYYY-MM-DDTHH:MM:SS.uuuuuuZ`. |
 | `start_date`, `end_date`, `timezone` | Original request labels and reloaded IANA timezone. |
 | `session_results` | Deterministically ordered inspected planned-session results. |
@@ -270,12 +274,339 @@ Separate reads are advisory, not an atomic snapshot or authorization to write.
 The clock is consistent, but concurrent source changes or elapsed time can stale
 the result. Stage D manually validates one explicitly requested interval and
 persists immediately under an owner lock; E1 detects and greedily suggests a batch
-without locks or writes. E2 must own a fresh owner-first transaction, regenerate,
-compare the reviewed material outcome, revalidate all constraints and efforts,
-resolve explicit partial/unplaced confirmation, and apply history/reminder policy.
-No E2 endpoint, confirmation token or persistence behavior is implemented here.
+without locks or writes. E2 owns a fresh owner-first transaction, regenerates and compares the reviewed
+material outcome, independently revalidates constraints/effort and applies the
+explicit acceptance, history and reminder policy documented below.
 
-## Verification
+## Stage E2 confirmation contract
+
+`POST /api/planning/replanning/confirm` (`planning.replanning.confirm`) requires
+Sanctum authentication and returns **200**, because it updates an existing batch
+and can create successors. The request accepts exactly:
+
+```json
+{
+  "preview_token": "opaque-encrypted-token",
+  "accept_partial": false,
+  "accept_unplaced_cancellation": false
+}
+```
+
+The token is required, non-empty, protected base64 transport. Both optional flags
+default to false and require genuine JSON booleans. Null, 0/1, string booleans,
+floats, arrays, whitespace tokens and unknown fields are rejected. Validation
+reads only the POST body; query values cannot supply or override it. Work IDs,
+source IDs, replacement arrays, statuses and owner IDs cannot be supplied to
+confirmation. `ConfirmStudyReplanningRequest` extends the unchanged Stage C
+strict body conventions. The Controller delegates to a Service and returns a
+`StudyReplanningConfirmationResource` in Laravel's `data` envelope.
+
+The HTTP preview uses `StudyReplanningPersistenceService::preview()` to add a
+review token to the unchanged E1 application result. The underlying
+`StudyReplanningPreviewService::preview()` remains a pure read-only application
+operation, available independently for regeneration. Token issuance stores
+nothing. This application boundary is distinct from Laravel's authentication
+session housekeeping; Sanctum and session storage are unchanged.
+
+### Protected review
+
+`StudyReplanningConfirmationService` uses Laravel's authenticated Encrypter with
+JSON plaintext (`encrypt(..., false)` / `decrypt(..., false)`), without PHP object
+unserialization, custom cryptography or token tables. Its payload contains exactly:
+
+```text
+purpose: adaptive-replanning-confirmation
+version: 1
+owner_id: persisted trusted User ID
+parameters: {start_date, end_date, task_id, subtask_id}
+review: complete internal Stage E1 result
+issued_at: UTC Unix integer seconds
+expires_at: issued_at + 900 seconds
+```
+
+The full internal review is encrypted; only the existing public E1 Resource plus
+token/expiry is returned over HTTP. Owner and internal source graph/effort details
+are not exposed in plaintext token metadata. Verify purpose, integer version,
+owner, exact parameter keys/scalar types, real increasing bounded dates, child
+scope, issuance and expiration. Future issuance and malformed/tampered tokens
+fail uniformly. Expiration is exclusive (`now >= expires_at` rejects). Issuance
+floors to whole seconds, so usable lifetime can be under 15 minutes by less than
+one second. Lifetime is rechecked after owner contention, before writes, and
+immediately before commit. Stage C's original purpose/version/format and endpoint
+remain unchanged; tokens from the two protocols are rejected in both directions.
+
+Regenerate E1 after acquiring the owner lock and compare the **complete internal
+result**, excluding only root `as_of_utc`. Token issuance/expiry/ciphertext do not
+enter that result. Dates/work parameters come from the token, timezone from the
+locked owner. Recursive associative-key normalization reuses Stage C's pure
+comparison; scalar types and every list's order remain material. Comparison
+includes every inspected source ID, original interval, classification, source
+reason, replacement presence/interval/duration, work attribution, priority,
+eligibility and effort facts, partial/unplaced diagnostics, released IDs/order,
+work results, exclusions, warnings and complete summary. A change returns 409;
+the current alternative is never silently applied. Compatible changes producing
+identical material outcomes may confirm, subject to independent current validation.
+
+### Acceptance and transitions
+
+| Reviewed source | Required flags | Persisted original | Successor |
+| --- | --- | --- | --- |
+| requires_replanning, full replacement | Neither | rescheduled | Exactly one planned row |
+| requires_replanning, shorter replacement | accept_partial | rescheduled | Exactly one planned row |
+| requires_replanning, no replacement | Both flags | cancelled | None |
+| valid | Neither; always preserved | unchanged | None |
+| cannot_replan | Neither; always preserved | unchanged | None |
+
+Missing acceptance returns 422 on `accept_partial` first, then
+`accept_unplaced_cancellation`. Zero actionable sources always return 422 on
+`preview_token` with `This preview contains no actionable replanning changes.`,
+including valid-only, cannot-replan-only and empty results. A full batch does not
+require partial acceptance merely because unrelated unfinished work exists.
+
+Unplaced cancellation is deliberate: it realizes the exact reviewed release
+hypothesis, including all unplaced reservations. Keeping an unplaced source planned
+while inserting other proposals would apply a different capacity scenario. The
+cancelled original retains its interval/work/history and null completion/actual
+fields. Its work remains unfinished and can be allocated through a fresh Stage C
+preview/confirmation. No Task/Subtask is completed or reopened automatically.
+
+### Fresh transaction and full-batch algorithm
+
+`StudyReplanningPersistenceService::confirm()` rejects ambient transactions and
+owns one fresh outermost MySQL transaction with one attempt. Pure token/input
+checks can precede it; its **first database read** is the current locking read
+of the trusted User row (`SELECT id, timezone ... FOR UPDATE`). No ordinary
+consistent snapshot is established before that lock. After a wait, all source
+reads see the previous holder's committed state under REPEATABLE READ. Cached
+authentication/route models and relationships supply no mutable planning facts.
+
+1. Lock current User and recheck token lifetime/owner.
+2. Derive affected work/source IDs from the protected review; lock owned Tasks
+   (including deleted history) by ascending ID, corresponding Subtasks by ascending
+   ID, then affected connected StudySession chains by ascending ID.
+3. Authorize each source with `StudySessionPolicy`; require planned state,
+   identical original interval and trusted exact Task/Subtask attribution. Validate
+   each connected component with Stage D's pure chain rules: ownership, acyclicity,
+   predecessor state and no existing direct successor. Validate positive UTC bounds
+   and strictly future sources after contention.
+4. Lock/preflight scheduled source-target Reminders through
+   `ReminderDependencyService` after all session locks. Source iteration and each
+   reminder query are deterministic by ID. Validate owner, exactly one target and
+   compatible anchor/offset before any cancellation.
+5. Regenerate E1 using protected dates/filters, compare all material results,
+   enforce explicit acceptance and exact ordered release-set integrity.
+6. Independently reload Stage A excluding **all** released IDs and identified
+   PF1/C9 context. `PlanningScenarioService::without()` removes those identities
+   from blocking, break and scheduled workload inputs. Validate the entire exact
+   replacement batch before writes.
+7. Recheck future starts/lifetime; retire all affected sources in reviewed order
+   to rescheduled or explicitly accepted cancelled. Preserve intervals, work
+   relationships and ancestors, with null completion/actual fields.
+8. Independently reload Stage A/C9 after retirement and repeat the full-batch gate
+   against persisted rules. No inserts have occurred, so old reservations cannot
+   block replacements and cannot count twice toward workload.
+9. Insert exactly one trusted planned successor for every non-null proposal,
+   setting its immediate `rescheduled_from_session_id`, exact original work IDs,
+   reviewed whole-second UTC interval and null completion/actual fields.
+10. Cancel only the preflighted scheduled reminders, preserving target IDs,
+    message, trigger, anchor and offset. Sent/cancelled and unrelated Task/Subtask/
+    general reminders remain unchanged; no reminder is cloned or delivered.
+11. Recheck every source and successor start against a new full-precision UTC
+    clock, and token lifetime immediately before commit. Any failure rolls back
+    predecessors, successors and reminder cancellation together.
+
+The shared Stage D context exposes only its chain-locking helper; E2 never calls
+`StudySessionMutationContextService::run()` or `StudyPlanPersistenceService::confirm()`
+inside its transaction. Stage D retains its own outermost boundary and rules.
+The existing unique direct-successor MySQL key remains a final defense. Terminal
+sessions, ancestors and unaffected planned reservations are never rewritten.
+
+The independent pure gate requires unique source IDs, exact ordered release IDs
+matching all requires-replanning rows, at most one correctly attributed replacement,
+positive representable DATETIME bounds, duration <= original, and strict future
+starts. Sum replacement durations per exact work unit against current Stage A
+unallocated effort after the full release. Require current eligible owned work and
+effective earliest Task/Subtask deadlines. C8 independently checks availability,
+effective Lessons, retained sessions, configured duration/breaks and local daily/
+ISO-week limits. Each replacement sees **all other proposals exactly once** in
+break and workload inputs, excluding itself. DST and local ISO week/year behavior
+are inherited from C2/C7; no fixed-duration day/week or new search algorithm is
+introduced. Completed scheduled workload remains distinct from actual-first effort.
+
+### Confirmation response
+
+```json
+{
+  "data": {
+    "applied": true,
+    "original_sessions": [{"id": 42, "status": "rescheduled"},
+                          {"id": 43, "status": "cancelled"}],
+    "replacement_sessions": [{"id": 58, "task_id": 12, "subtask_id": null,
+      "starts_at": "2026-10-20T13:00:00Z", "ends_at": "2026-10-20T14:00:00Z",
+      "duration_seconds": 3600, "status": "planned", "completed_at": null,
+      "actual_minutes": null}],
+    "summary": {"rescheduled_sessions": 1, "cancelled_unplaced_sessions": 1,
+      "created_replacements": 1, "untransferred_seconds": 3600}
+  }
+}
+```
+
+Original/replacement lists preserve reviewed affected/proposal order. Replacements
+reuse `StudySessionResource`. No owner, audit, internal token or graph fields are
+returned. Untransferred seconds measure original transfer shortfall, **not** total
+unfinished effort; no response claims unfinished work is completed.
+
+### Errors, replay and boundaries
+
+| Status | Meaning |
+| --- | --- |
+| 401 | Unauthenticated, before validation |
+| 404 | Inaccessible explicit preview work or missing owned authorization target |
+| 422 | Malformed body/token, expiry/wrong owner/purpose, missing acceptance, no action |
+| 409 | Changed material result, conflicting source status/time, replay or independent current constraint failure |
+| 500 | Generic SQL, unsafe source/reminder integrity or internal/integration failure |
+
+Explicit scope disappearing after issuance conflicts at confirmation. Generic
+error rendering withholds SQL, exception traces, foreign metadata and private IDs,
+including in debug mode. Unsafe graphs never become ordinary no-capacity output.
+
+A successful token replay returns **409**, with no duplicate successors or second
+reminder cleanup. There are no durable replay receipts; they are deferred. A
+transport failure after commit requires inspecting saved sessions; retry conflicts
+rather than returning an unverified success. MySQL AUTO_INCREMENT gaps on rollback
+are normal. Application mutation guarantees cover cooperating owner-first writers,
+including Stage C/D, Task/Subtask, Lesson/import and settings; timezone UPDATE locks
+the same User row. Arbitrary direct SQL and administrative hard purges are outside
+that serialization boundary. Later authorized changes may invalidate a committed
+plan. Final future checks apply at the check instant; time can advance after commit.
+No arbitrary future-start buffer or automatic missed inference is added.
+
+V1 retains E1's greedy, local one-to-one suggestions. Large reviews/tokens, history
+reads and quadratic full-batch checks can consume memory/time and hold the owner
+lock longer; no hidden cap or throughput promise is introduced. Frontend, LLM,
+cron/jobs, global optimization, multiple direct successors, reminder creation/
+cloning/delivery, statistics and general session reopening remain outside E2.
+No schema, migration, dependencies or authentication architecture changed.
+
+### Stage E2 verification
+
+Starting and ending HEAD: `4ffcd740883ac3a953a596d9eb903f71d5c65b45`.
+Initial tree already contained four tracked modifications (Controller, shared
+mutation context, routes and E1 Feature tests) plus five untracked E2 files
+(Request, Resource, confirmation/persistence Services and Unit tests). Those
+changes were inspected, preserved and completed. Final tree: 17 modified tracked
+files and eight untracked files, 25 total, nothing staged, committed or pushed.
+No unrelated changes, schema migrations, model/enums, dependencies or authentication
+configuration were changed.
+
+All database tests ran serially on real MySQL `student_planner_testing` with the
+existing configured/live database guards. Unit tests use pure arrays and no
+Laravel/database bootstrap. E2 Feature tests use DatabaseTruncation and committed
+fixture cleanup, allowing actual outermost transactions. No SQLite substitution,
+skipped concurrency proof or weakened baseline test was used.
+
+| Final verification command | Exit | Tests | Assertions |
+| --- | ---: | ---: | ---: |
+| `vendor/bin/phpunit --filter='StudyReplanning'` | 0 | 303 | 2,006 |
+| Required regression filter below | 0 | 2,665 | 20,464 |
+| `vendor/bin/phpunit` | 0 | 3,453 | 28,147 |
+| `vendor/bin/pint --dirty` | 0 | — | — |
+| `vendor/bin/pint --test` | 0 | — | — |
+| `git diff --check` | 0 | — | — |
+
+The complete suite includes unchanged Stage A–E1 coverage and all E2 tests.
+Regression was repeated after restoring the shared context's pre-lock ownership/
+attribution checks. The focused command includes **14 separate-process MySQL
+concurrency tests**, all passing under REPEATABLE READ with actual owner-row waits
+verified through `performance_schema.data_lock_waits`, `data_locks` and `threads`.
+Workers independently check testing environment, driver and live database, receive
+connection/key configuration through their process environment, and never print
+secrets. The test account requires access to those instrumentation tables.
+
+Contention coverage includes two E2 confirmations of one multi-source review,
+Stage C confirmation in both directions, Stage D cancellation/completion/manual
+transfer, Task/Subtask deletion, Lesson mutation and preference/availability
+updates. Waiting E2 workers observe actual cooperating Services' committed changes
+before current analysis and conflict. A waiting worker also observes rollback of
+an already-written predecessor and successfully applies the original review.
+A real owner-lock wait with a deterministic clock advanced after acquisition
+verifies source-start and exclusive-expiration rechecks. Sequential API calls are
+not the concurrency evidence.
+
+Required regression command:
+
+```sh
+vendor/bin/phpunit --filter='TimeIntervalServiceTest|AvailabilityOccurrenceServiceTest|FreeTimeServiceTest|FreeSlotsApiTest|SessionDurationConstraintServiceTest|BreakConstraintServiceTest|WorkloadConstraintServiceTest|PlanningConstraintServiceTest|PlanningCandidateEvaluationServiceTest|RemainingEffortServiceTest|PlanningWorkSelectionServiceTest|StudyPlanningServiceTest|StudySessionAllocationServiceTest|WorkloadCapacityTest|StudyPlan|StudySession|TaskLifecycleTest|SubtaskLifecycleTest|TaskSecurityTest|SubtaskSecurityTest|TaskDeletionTest|SubtaskDeletionTest|LessonLifecycleTest|LessonSecurityTest|ScheduleImport|ReminderPersistenceTest|AuthProfileTest|PlanningPreferenceApiTest|StudyAvailabilityApiTest|StudyReplanning'
+```
+
+Unit coverage includes protected issuance/expiry/owner/purpose/version/tampering,
+scalar types and parameter structures, complete material comparisons, associative
+normalization/list order, explicit acceptance/no action, release-set/one-successor
+integrity, exact multi-unit and shared-unit budgets, full-precision future boundaries,
+invalid/overflowing intervals/DATETIME bounds and input immutability.
+
+Feature coverage includes strict body/query/auth isolation, full/multi-source/
+multi-unit batches, preservation of valid/cannot-replan/history, partial/unplaced/
+mixed acceptance, status/work/estimate/deadline/calendar/settings/reservation/
+completed-effort staleness, Stage C/D integration, DST/local ISO weeks, protected
+tokens/replay and corrupt source/chain/reminder rollback. Matching intentionally
+invalid reviews prove the independent gate rejects availability, deadlines,
+breaks, daily/weekly workload, excess unit/aggregate effort and proposal overlap.
+All-table snapshots verify rollback after predecessor writes, first/second
+successor insertion, cancelled model saves, reminder updates, elapsed starts and
+mid-operation expiry. Reminder target/anchor/message/time metadata and sent,
+cancelled, unrelated/general history are preserved.
+
+Development results: the initial token/E1 run passed 116 tests / 774 assertions
+(exit 0). An unapproved sandboxed new-Feature invocation could not connect to
+MySQL (exit 2, 95 setup errors); the authorized run accessed only the guarded test
+database. The first authorized Feature run failed (exit 1, 95 tests / 746 assertions,
+37 failures), exposing the draft component-filter operation discarding model IDs.
+After restoring ID keys, the next run had two fixture failures (exit 1, 95 / 846):
+a completed interval in the prior ISO week and a Lesson unintentionally blocking
+mixed partial capacity. Corrected fixtures then passed the expanded E2 run (exit 0,
+159 / 1,109); added independent-gate/precision/budget coverage passed the final
+focused command above. No failed test was deleted or weakened. Final full regression
+and formatting pass with the final shared-lock implementation.
+
+| Changed or added file | Responsibility |
+| --- | --- |
+| `app/Services/Planning/StudyReplanningConfirmationService.php` (new) | Protected review, canonical/acceptance/release integrity and independent pure batch gate. |
+| `app/Services/Planning/StudyReplanningPersistenceService.php` (new) | HTTP preview adapter and fresh owner-first atomic confirmation. |
+| `app/Services/Planning/StudySessionMutationContextService.php` | Shared chain locking while preserving Stage D pre-lock integrity. |
+| `app/Http/Requests/ConfirmStudyReplanningRequest.php` (new) | Strict body/token/two-flag validation. |
+| `app/Http/Resources/StudyReplanningConfirmationResource.php` (new) | Public applied-source/replacement/summary result. |
+| `app/Http/Controllers/Api/StudyReplanningController.php` | Thin preview/confirm orchestration. |
+| `routes/api.php` | Authenticated confirm POST, HTTP 200. |
+| `tests/Unit/StudyReplanningConfirmationServiceTest.php` (new) | Pure token/material/release/acceptance/budget/precision coverage. |
+| `tests/Feature/StudyReplanningConfirmationTest.php` (new) | MySQL API, atomicity, constraints, history, isolation and integration. |
+| `tests/Feature/StudyReplanningConcurrencyTest.php` (new) | Independent-process contention, commit/rollback visibility and multi-source batch. |
+| `tests/Support/study_replanning_confirmation_worker.php` (new) | Guarded independent MySQL confirmation worker. |
+| `tests/Feature/StudyReplanningPreviewTest.php` | Token/expiry response assertions and unchanged application SELECT-only snapshots. |
+| `docs/adaptive-replanning.md` | Complete E2 contract, implementation, verification and limits; historical E1 record preserved. |
+| `docs/architecture.md`, `docs/business-rules.md`, `docs/domain-model.md` | Current E2 architecture, approved rule enforcement and history concepts. |
+| `docs/database-schema.md`, `docs/database-review-notes.md` | Existing-schema application enforcement; no migration. |
+| `docs/planning-foundation.md`, `docs/planning-constraints.md`, `docs/planning-integration.md` | Exact source projection and unchanged PF1/C8/C9 rules. |
+| `docs/planning-work-selection.md`, `docs/automatic-study-planning.md` | Unchanged Stage A budgets/B allocator and released unfinished work. |
+| `docs/study-plan-persistence.md`, `docs/study-session-lifecycle.md` | Protocol isolation, owner serialization and Stage C/D compatibility. |
+
+Final architecture review confirms thin Requests/Controller/Resource boundaries,
+no duplicated planner/constraint rules, no nested mutation transactions, exact
+reviewed release semantics, preserved one-direct-successor history and atomic
+Reminder cleanup. A changed/untracked-file whitespace/local-document-link audit
+passes with zero errors. Approved rule identifiers and historical verification
+records remain intact.
+
+**Stage E2 acceptance: complete.** All requested application/security/persistence,
+independent-process concurrency, Stage A–E1 regression, full-suite and formatting
+gates pass. Known V1 limits are cooperating-writer serialization, greedy proposals,
+large-token/batch cost, time advancement after the final check, and deferred durable
+replay receipts; none silently changes the approved contracts. The Stage E1
+checkpoint below remains a historical record, including its then-open whole-request
+authentication-housekeeping scope discussion. E2 explicitly separates that
+housekeeping from the application read-only preview guarantee.
+
+## Stage E1 verification (historical checkpoint)
 
 Starting local/remote main HEAD: `ad0232c609cb65c340846f3bbc678178fa721091`.
 Ending HEAD: unchanged. Initial working tree: clean. Final tree: 14 modified

@@ -17,6 +17,11 @@ See [automatic study planning](automatic-study-planning.md).
 revalidation inside owner-locked confirmation. C10 diagnostic behavior is unchanged;
 new persistence resides in a separate application Service.
 
+Stage E2 consumes identified context for its independent release projection and
+normal context after transactional retirement. Planned/completed scheduled
+workload and effective break sources retain all C9 policies. Full-batch acceptance
+is separate from advisory C10 diagnostics; see [adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
+
 ## Public contract
 
 Stage E1 optionally retains source identities through

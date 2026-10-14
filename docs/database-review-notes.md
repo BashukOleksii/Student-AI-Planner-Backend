@@ -4,6 +4,11 @@ Status: historical draft review; persistence decisions resolved by the approved 
 
 The canonical design is [database-schema.md](database-schema.md), with [database-schema.dbml](database-schema.dbml) as its diagram source. The earlier draft below is neither the approved design nor the current application schema. New MySQL implementation issues are recorded in the canonical schema's implementation gate and must be resolved before affected migrations.
 
+Stage E2 extends current application enforcement to confirmed adaptive batches
+without changing the approved schema. The existing unique direct-successor key
+and lifecycle fields remain authoritative. General Reminder CRUD/delivery and
+administrative purge remain deferred; see [adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
+
 ## Source and current repository baseline
 
 The supplied Stage 01 review refers to an earlier SQL/ER draft, but no source SQL draft or ER image is present in this repository. Draft-specific observations below are carried forward from that review and remain unverified against the original artifacts. They describe possible design issues, not defects in the current migrations.

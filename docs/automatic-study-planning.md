@@ -11,6 +11,11 @@ unchanged and read-only. Stage C regenerates under the owner lock, compares the
 reviewed result and validates the full batch before any persistence. The Stage B
 design and historical verification record below retain their checkpoint meaning.
 
+Stage E2 now confirms E1's one-to-one allocator results through a separate
+owner-first atomic persistence Service. Stage B generation/splitting remains
+unchanged; unfinished work released by accepted unplaced cancellation can use
+fresh Stage C planning. See [adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
+
 ## Public application contract
 
 Stage E1 reuses the pure allocator with an optional fourth `singlePlacement`

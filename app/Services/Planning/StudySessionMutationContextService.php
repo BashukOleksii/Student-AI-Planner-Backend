@@ -36,28 +36,7 @@ class StudySessionMutationContextService
             }
             // Discover both directions without filtering owners: a foreign edge must fail closed.
             // Visited IDs guarantee termination even on a corrupt cycle. Lock the component by ID.
-            $records = [];
-            $pending = [$source->id];
-            while ($pending !== []) {
-                $batch = StudySession::whereIn('id', $pending)->orWhereIn('rescheduled_from_session_id', $pending)->get();
-                $next = [];
-                foreach ($batch as $row) {
-                    if (! isset($records[$row->id])) {
-                        $records[$row->id] = $row;
-                        $next[] = $row->id;
-                        if ($row->rescheduled_from_session_id !== null && ! isset($records[$row->rescheduled_from_session_id])) {
-                            $next[] = $row->rescheduled_from_session_id;
-                        }
-                    }
-                }
-                $pending = array_values(array_unique($next));
-            }
-            foreach ($records as $record) {
-                if ($record->user_id !== $owner->id || $record->task_id !== $source->task_id || $record->subtask_id !== $source->subtask_id) {
-                    throw new UnexpectedValueException('Invalid study session source relationships.');
-                }
-            }
-            $locked = StudySession::whereIn('id', array_keys($records))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $locked = $this->lockChainRecords($owner, [$source->id], $source);
             $source = $locked[$source->id];
             $interval = ['start' => $this->context->utcSeconds($source->getRawOriginal('starts_at')),
                 'end' => $this->context->utcSeconds($source->getRawOriginal('ends_at'))];
@@ -65,6 +44,38 @@ class StudySessionMutationContextService
 
             return $action($owner, $source, $task, $child, $interval, $now, $locked);
         });
+    }
+
+    /** Owner and work locks must already be held. Discover both directions, lock once by ID. */
+    public function lockChainRecords(User $owner, array $sourceIds, ?StudySession $attribution = null): Collection
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('History locking requires a mutation transaction.');
+        }
+        $records = [];
+        $pending = $sourceIds;
+        while ($pending !== []) {
+            $batch = StudySession::whereIn('id', $pending)->orWhereIn('rescheduled_from_session_id', $pending)->get();
+            $next = [];
+            foreach ($batch as $row) {
+                // Preserve Stage D's pre-lock integrity boundary; never lock a foreign graph.
+                // E2 supports multiple units and validates each owned component after locking.
+                if ($row->user_id !== $owner->id || ($attribution !== null
+                    && ($row->task_id !== $attribution->task_id || $row->subtask_id !== $attribution->subtask_id))) {
+                    throw new UnexpectedValueException('Invalid study session source relationships.');
+                }
+                if (! isset($records[$row->id])) {
+                    $records[$row->id] = true;
+                    $next[] = $row->id;
+                    if ($row->rescheduled_from_session_id !== null && ! isset($records[$row->rescheduled_from_session_id])) {
+                        $next[] = $row->rescheduled_from_session_id;
+                    }
+                }
+            }
+            $pending = array_values(array_unique($next));
+        }
+
+        return StudySession::whereIn('id', array_keys($records))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
     }
 
     public function validateChain(Collection $records, int $sourceId): void

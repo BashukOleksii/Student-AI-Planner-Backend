@@ -5,6 +5,12 @@ and owned StudySession retrieval. Stage A accounting/order, Stage B greedy
 allocation and C9/PF1/PF2 source/constraint policies remain authoritative. There
 is no new schema, planning-run table, optimization algorithm, cache or LLM call.
 
+Stage E2 adds a separate adaptive confirmation protocol under the same owner-first
+serialization boundary. Stage C's purpose/version/format and endpoint behavior
+remain unchanged; E2/C tokens are rejected in both directions. Accepted unplaced
+cancellations release unfinished work for fresh Stage C planning. Durable replay
+receipts remain deferred. See [adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
+
 ## Endpoints and input
 
 All four endpoints require `auth:sanctum`, using the existing first-party SPA

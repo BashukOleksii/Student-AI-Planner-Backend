@@ -1,6 +1,6 @@
 # Backend Architecture
 
-Status: Laravel/MySQL architecture with completed persistence, schedule/import, Task/Subtask APIs, planning Stages A–C and StudySession Stage D\
+Status: Laravel/MySQL architecture with completed persistence, schedule/import, Task/Subtask APIs, planning Stages A–C, StudySession Stage D and adaptive Stages E1/E2\
 Scope: Laravel backend only  
 Persistence target: MySQL through Eloquent ORM  
 Frontend: independent Vue application communicating through REST API
@@ -50,6 +50,14 @@ constraints validate replacements after transactional source retirement. History
 partial effort and immediate successor identity are preserved without changing
 Task/Subtask lifecycle or adding schema. See [session lifecycle](study-session-lifecycle.md).
 
+Stage E2 adds a separate protected-review/persistence adapter around unchanged
+read-only E1 analysis. It owns a fresh owner-first transaction, regenerates and
+compares the complete material review, independently validates both projected and
+retired-state batches, then atomically retires sources, inserts one successor each
+and cancels obsolete scheduled reminders. Unplaced cancellation requires two
+explicit flags. No schema or authentication changes are introduced; see
+[adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
+
 ## 1. Architectural goals
 
 Stage E1 adds authenticated adaptive replanning preview through
@@ -58,7 +66,7 @@ PF1/C9 snapshots support consistent self-exclusion and hypothetical release;
 Stage A accepts trusted exclusions/a shared clock, and the Stage B allocator has
 an optional single-placement mode. Valid reservations remain protected. Every
 replacement is checked against the complete projected batch, without writes or
-locks. Confirmation/application remain Stage E2. See [adaptive replanning](adaptive-replanning.md).
+locks. Stage E2 confirmation/application is implemented separately. See [adaptive replanning](adaptive-replanning.md).
 
 The backend must support schedule management, academic tasks, free-time calculation, automatic study planning, rescheduling, reminders, progress analytics, Excel schedule import, authentication, and an AI agent that orchestrates deterministic application capabilities.
 

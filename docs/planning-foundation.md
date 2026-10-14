@@ -14,6 +14,12 @@ through an authenticated free-slots REST API. PF2 duration, break and workload c
 candidate integration. Stage B adds advisory allocation separately. No preference defaults or
 persistence are introduced.
 
+Stage E2 uses identified PF1 sources for independent batch projection under an
+owner lock, excluding exactly the reviewed released session IDs, including
+explicitly accepted unplaced cancellations. It repeats validation after source
+retirement. PF1 itself remains read-only and its public API is unchanged; see
+[adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
+
 ## C1 interval engine
 
 TimeIntervalService validates, merges, subtracts, clips and filters half-open

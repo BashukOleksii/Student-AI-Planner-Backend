@@ -5,6 +5,12 @@ upcoming reservation. Stage A–C and PF1/PF2/C9/C10 remain authoritative and
 unchanged. No schema, status, background job, effort total or planning-history
 table is added. A session's history is retained as ordinary lifecycle rows.
 
+Stage E2 confirms adaptive one-to-one transfers and explicitly accepted unplaced
+cancellations atomically, reusing Stage D's pure lifecycle/chain rules and scheduled
+Reminder dependency Service. E2 uses only the exposed chain-locking helper inside
+its own fresh outermost transaction; it never nests `run()`. Manual Stage D
+contracts and future/terminal policies remain unchanged. See [adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
+
 ## Public endpoints
 
 Stage E1 now provides separate read-only adaptive analysis and suggested intervals.

@@ -37,11 +37,17 @@ projected-conflict classification with transient row statuses, without staging
 or Lesson writes. No schema, enums or fixed fingerprint contract changed.
 See [schedule.md](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
 
-**Current application scope:** PF1/PF2/C9/C10, Stage A effort/work selection, Stage B automatic planning, Stage C reviewed confirmation/session reads and Stage D lifecycle/single-session rescheduling are implemented. Task/Subtask APIs and schedule-import confirmation are also implemented. General Reminder CRUD/delivery, statistics and AI orchestration/tools remain deferred.
+**Current application scope:** PF1/PF2/C9/C10, Stage A effort/work selection, Stage B automatic planning, Stage C reviewed confirmation/session reads, Stage D lifecycle/single-session rescheduling and Stage E1/E2 adaptive preview/atomic confirmation are implemented. Task/Subtask APIs and schedule-import confirmation are also implemented. General Reminder CRUD/delivery, statistics and AI orchestration/tools remain deferred.
 
 Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. T1/T2 enforce Task Subject ownership, parent deadline bounds and manual completion/reopening. S3 implements Task/Subtask deletion cleanup with eligible dependency ownership and target validation; Stage D implements session lifecycle/rescheduling and affected reminder preflight; general Reminder APIs/recalculation remain deferred; product defaults remain undecided. Import C1/C2a/C2b now implement temporary XLSX upload, persisted preview/revalidation and confirmed atomic Lesson reconciliation. Destructive semester replacement is deferred. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. Stage D enforces inspected StudySession chains and explicit lifecycle operations; general editing/reopening remains deferred.
 
 The companion [DBML source](database-schema.dbml) preserves the supplied `student-ai-planner.dbml` diagram. It uses numeric shorthand and omits SQL CHECK expressions; the MySQL types and constraints below remain authoritative. See [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [the earlier draft review](database-review-notes.md) for context. Known implementation issues are recorded in section 8 without changing approved tables, columns, keys, or delete actions.
+
+Stage E2 uses the existing StudySession status/history columns, unique direct
+successor key and Reminder lifecycle fields without migrations. Its owner-first
+atomic batch validates exact work/chain ownership, preserves original intervals,
+creates one planned successor per replacement, cancels explicitly accepted
+unplaced sources and cancels their scheduled reminders. See [adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
 
 ## 1. Scope and conventions
 
