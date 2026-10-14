@@ -127,13 +127,13 @@ class ReminderRulesTest extends TestCase
         if (! $valid) {
             $this->expectException(ReminderConflictException::class);
         }
-        (new ReminderRules)->editable($status, $absolute);
+        (new ReminderRules)->editable($status);
         $this->assertTrue($valid);
     }
 
     public static function transitions(): array
     {
-        return [[ReminderStatus::Scheduled, true, true], [ReminderStatus::Scheduled, false, false],
+        return [[ReminderStatus::Scheduled, true, true], [ReminderStatus::Scheduled, false, true],
             [ReminderStatus::Sent, true, false], [ReminderStatus::Cancelled, true, false]];
     }
 }

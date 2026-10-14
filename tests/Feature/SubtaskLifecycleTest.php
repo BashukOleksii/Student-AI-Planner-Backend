@@ -111,7 +111,7 @@ class SubtaskLifecycleTest extends TestCase
     }
 
     #[DataProvider('parentStates')]
-    public function test_parent_other_children_sessions_reminders_and_deadlines_are_unchanged(bool $completedParent): void
+    public function test_parent_siblings_sessions_and_deadlines_are_preserved_while_reminders_cancel_once(bool $completedParent): void
     {
         $task = Task::factory()->create(['status' => $completedParent ? TaskStatus::Completed : TaskStatus::Pending,
             'completed_at' => $completedParent ? '2026-10-10 12:00:00' : null, 'deadline_at' => '2026-10-11 12:00:00']);
@@ -119,7 +119,8 @@ class SubtaskLifecycleTest extends TestCase
         $other = Subtask::factory()->for($task)->create(['position' => 2, 'status' => TaskStatus::Completed, 'completed_at' => '2026-10-09 12:00:00']);
         $session = StudySession::factory()->for($task)->create(['subtask_id' => $child->id]);
         $reminder = Reminder::factory()->for($task->user)->create(['subtask_id' => $child->id]);
-        $records = [$task, $other, $session, $reminder];
+        $records = [$task, $other, $session];
+        $reminderBefore = $reminder->refresh()->getAttributes();
         $snapshots = array_map(fn ($record) => $record->refresh()->getAttributes(), $records);
         $this->actingAs($task->user, 'web');
         foreach (['complete', 'reopen', 'complete'] as $operation) {
@@ -127,6 +128,13 @@ class SubtaskLifecycleTest extends TestCase
             foreach ($records as $i => $record) {
                 $this->assertSame($snapshots[$i], $record->refresh()->getAttributes());
             }
+            $after = $reminder->refresh()->getAttributes();
+            $this->assertSame('cancelled', $after['status']);
+            $this->assertSame(Arr::except($reminderBefore, ['status', 'updated_at']), Arr::except($after, ['status', 'updated_at']));
+            if ($operation === 'complete' && ! isset($cancelledSnapshot)) {
+                $cancelledSnapshot = $after;
+            }
+            $this->assertSame($cancelledSnapshot, $after);
             $this->assertSame('2026-10-10 12:00:00', $child->refresh()->getRawOriginal('deadline_at'));
         }
         $this->assertDatabaseCount('subtasks', 2);

@@ -37,7 +37,7 @@ projected-conflict classification with transient row statuses, without staging
 or Lesson writes. No schema, enums or fixed fingerprint contract changed.
 See [schedule.md](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
 
-**Current application scope:** PF1/PF2/C9/C10, Stage A effort/work selection, Stage B automatic planning, Stage C reviewed confirmation/session reads, Stage D lifecycle/single-session rescheduling and Stage E1/E2 adaptive preview/atomic confirmation are implemented. Task/Subtask APIs and schedule-import confirmation are also implemented. F1 absolute Reminder management is implemented; relative reconciliation/delivery, statistics and AI orchestration/tools remain deferred.
+**Current application scope:** PF1/PF2/C9/C10, Stage A effort/work selection, Stage B automatic planning, Stage C reviewed confirmation/session reads, Stage D lifecycle/single-session rescheduling and Stage E1/E2 adaptive preview/atomic confirmation are implemented. Task/Subtask APIs and schedule-import confirmation are also implemented. F1/F2 absolute and relative Reminder management is implemented; delivery, statistics and AI orchestration/tools remain deferred.
 
 Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. T1/T2 enforce Task Subject ownership, parent deadline bounds and manual completion/reopening. S3 implements Task/Subtask deletion cleanup with eligible dependency ownership and target validation; Stage D implements session lifecycle/rescheduling and affected reminder preflight; F1 absolute Reminder APIs are implemented; F2 reconciliation remains deferred; product defaults remain undecided. Import C1/C2a/C2b now implement temporary XLSX upload, persisted preview/revalidation and confirmed atomic Lesson reconciliation. Destructive semester replacement is deferred. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. Stage D enforces inspected StudySession chains and explicit lifecycle operations; general editing/reopening remains deferred.
 
@@ -53,9 +53,12 @@ Stage F1 adds absolute Reminder creation, paginated list/detail, scheduled editi
 and explicit cancellation through `ReminderService`, Form Requests, an ownership
 Policy and a Resource. Strict UTC/type validation, eligible creation targets,
 structural scheduled-source checks and fresh owner-first transactions preserve
-history and existing S3/Stage D/E2 cleanup. The shared single-target dependency
-helper and physical schema are unchanged. F2 relative/target reconciliation and
-F3 notification delivery remain deferred; see [reminders.md](reminders.md).
+history and existing S3/Stage D/E2 cleanup. The strict single-target dependency
+helper and physical schema are retained. F2 now adds relative creation/offset editing
+and atomic Task/Subtask deadline/completion reconciliation through a focused
+synchronization Service and shared target/UTC rules. Session identities retain their
+Stage D/E2 retirement policy; F3 delivery and hard purge remain deferred.
+See [reminders.md](reminders.md).
 
 ## 1. Scope and conventions
 
@@ -823,7 +826,7 @@ Eloquent:
 
 ### 3.14 reminders
 
-Implemented reminder persistence with optional typed domain targets. S3/Stage D validate affected scheduled dependency ownership and target/anchor compatibility before atomic cancellation. F1 implements absolute creation/list/detail/edit/cancel with current owner/target validation; relative trigger recalculation and delivery remain deferred.
+Implemented reminder persistence with optional typed domain targets. S3/Stage D validate affected scheduled dependency ownership and target/anchor compatibility before atomic cancellation. F1 implements absolute creation/list/detail/edit/cancel with current owner/target validation; F2 implements deadline trigger recalculation and completion reconciliation; delivery remains deferred.
 
 | Column | MySQL type | Null |
 |---|---|---:|
@@ -859,7 +862,7 @@ DB-enforced CHECKs (none reference SET NULL target columns):
 - `reminders_anchor_offset_pair`: `(anchor IS NULL AND offset_minutes IS NULL) OR (anchor IS NOT NULL AND offset_minutes IS NOT NULL)`;
 - `reminders_sent_consistency`: `(status = 'sent' AND sent_at IS NOT NULL) OR (status IN ('scheduled', 'cancelled') AND sent_at IS NULL)`.
 
-Reminder Service invariants (F1 enforces target count/ownership/compatibility; recalculation and purge remain deferred):
+Reminder Service invariants (F1/F2 enforce target count/ownership/compatibility and deadline/completion reconciliation; purge remains deferred):
 
 - at most one of `task_id`, `subtask_id`, `study_session_id` is non-NULL;
 - `task_deadline`, `subtask_deadline`, and `session_start` require their matching target;
@@ -871,7 +874,7 @@ MySQL rejects CHECKs involving these `ON DELETE SET NULL` FK columns (3823), so 
 
 Offset semantics:
 
-`trigger_at = anchor_time + offset_minutes`
+`trigger_at = anchor_timestamp_utc + offset_minutes * 60 seconds`
 
 Example: 60 minutes before a task deadline => `offset_minutes = -60`.
 
@@ -1040,7 +1043,7 @@ MySQL prohibits CHECK expressions referencing an `AUTO_INCREMENT` column. The Le
 
 ### 8.2 CHECK constraints and referential actions
 
-The Lesson design gate independently confirmed error 3823 for a CHECK involving a FK column with `ON DELETE SET NULL`. Lesson and StudySession self FKs remain unchanged. Reminder CHECKs do not reference target FKs: MySQL enforces status, nullable anchor vocabulary, anchor/offset pairing, and sent-state consistency. Target count, anchor/target compatibility, ownership, recalculation, and purge reconciliation belong to a future Reminder Service. The lesson import-period CHECK is supported with its `RESTRICT` FK and remains enforced as `lessons_import_requires_period`. [MySQL CHECK constraint restrictions](https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html).
+The Lesson design gate independently confirmed error 3823 for a CHECK involving a FK column with `ON DELETE SET NULL`. Lesson and StudySession self FKs remain unchanged. Reminder CHECKs do not reference target FKs: MySQL enforces status, nullable anchor vocabulary, anchor/offset pairing, and sent-state consistency. F1/F2 Services enforce target count, anchor/target compatibility, ownership and deadline/completion reconciliation; hard-purge reconciliation remains future work. The lesson import-period CHECK is supported with its `RESTRICT` FK and remains enforced as `lessons_import_requires_period`. [MySQL CHECK constraint restrictions](https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html).
 
 Nulling a relative reminder's target leaves its persisted anchor/offset unchanged. Tests confirm this behavior; future hard-purge code must reconcile the relative metadata and reminder lifecycle before deleting the target. Database persistence is not a substitute for that application cleanup.
 
@@ -1061,4 +1064,4 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
   introduced by the completed Stage 03 APIs.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup. Group 4 tests on MySQL 8.4.10 show that directly deleting a User who owns both a period and its import batch is rejected with error 1451 by `schedule_import_batches_academic_period_id_foreign`. Group 5 confirms that an isolated User/Subject/manual-Lesson graph can cascade, while a combined period/batch/Lesson history graph blocks direct User deletion with 1451. Hard-removing Lessons first still leaves the batch/period restriction; deleting batches next cascades their rows and then permits User deletion. Soft deletion does not remove restrictive references. Account hard purge is an ordered administrative operation, distinct from normal domain deletion; the approved FKs are unchanged.
 
-Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Task/Subtask workflows and deletion cleanup, PF1/PF2 algorithms and C10 read-only candidate evaluation are implemented. Stages A–C implement work selection, automatic planning and confirmed session creation; Stage D adds lifecycle and safe single-session rescheduling. F1 implements absolute Reminder mutation; further verticals must add F2 reconciliation, F3 delivery and other deferred capabilities. Import C2b now implements confirmed atomic reconciliation; delivery, statistics and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.
+Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Task/Subtask workflows and deletion cleanup, PF1/PF2 algorithms and C10 read-only candidate evaluation are implemented. Stages A–C implement work selection, automatic planning and confirmed session creation; Stage D adds lifecycle and safe single-session rescheduling. F1/F2 implement absolute/relative Reminder mutation and target reconciliation; further verticals must add F3 delivery and other deferred capabilities. Import C2b now implements confirmed atomic reconciliation; delivery, statistics and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.

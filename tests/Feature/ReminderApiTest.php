@@ -230,8 +230,9 @@ class ReminderApiTest extends TestCase
     public function test_cancellation_preserves_relative_metadata_and_historical_immutability(): void
     {
         [$owner, $task] = $this->fixture();
-        $reminder = Reminder::factory()->for($owner)->create(['task_id' => $task->id, 'anchor' => ReminderAnchor::TaskDeadline, 'offset_minutes' => -30, 'message' => 'Old']);
-        $this->patchJson('/api/reminders/'.$reminder->id, ['message' => 'New'])->assertConflict();
+        $reminder = Reminder::factory()->for($owner)->create(['task_id' => $task->id, 'anchor' => ReminderAnchor::TaskDeadline, 'offset_minutes' => -30, 'message' => 'Old', 'trigger_at' => '2026-10-20 08:00:00']);
+        $this->patchJson('/api/reminders/'.$reminder->id, ['message' => 'New'])->assertOk()->assertJsonPath('data.message', 'New');
+        $this->patchJson('/api/reminders/'.$reminder->id, ['trigger_at' => '2026-10-21T08:00:00Z'])->assertUnprocessable();
         $before = $reminder->fresh()->getAttributes();
         $this->postJson('/api/reminders/'.$reminder->id.'/cancel', ['status' => null])->assertUnprocessable();
         $this->postJson('/api/reminders/'.$reminder->id.'/cancel')->assertOk()->assertJsonPath('data.status', 'cancelled');
@@ -283,14 +284,14 @@ class ReminderApiTest extends TestCase
         return array_map(fn ($kind) => [$kind], ['foreign_task', 'foreign_child', 'foreign_session', 'multiple', 'anchor', 'general_anchor', 'bad_session_child', 'bad_session_task', 'general_empty']);
     }
 
-    public function test_completed_targets_are_structurally_valid_until_f2_reconciliation(): void
+    public function test_completion_cancels_targeted_absolute_reminders_and_preserves_history(): void
     {
         [, $task] = $this->fixture();
         $id = $this->postJson('/api/reminders', ['task_id' => $task->id, 'trigger_at' => $this->body()['trigger_at']])->assertCreated()->json('data.id');
         $this->postJson('/api/tasks/'.$task->id.'/complete')->assertOk();
-        $this->getJson('/api/reminders/'.$id)->assertOk()->assertJsonPath('data.status', 'scheduled');
-        $this->patchJson('/api/reminders/'.$id, ['message' => 'Changed'])->assertOk();
-        $this->postJson('/api/reminders/'.$id.'/cancel')->assertOk();
+        $this->getJson('/api/reminders/'.$id)->assertOk()->assertJsonPath('data.status', 'cancelled');
+        $this->patchJson('/api/reminders/'.$id, ['message' => 'Changed'])->assertConflict();
+        $this->postJson('/api/reminders/'.$id.'/cancel')->assertConflict();
     }
 
     #[DataProvider('writeFailures')]

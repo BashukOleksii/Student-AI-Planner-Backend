@@ -14,7 +14,7 @@ class StoreReminderRequest extends ReminderActionRequest
 
     public function rules(): array
     {
-        return array_fill_keys(['message', 'trigger_at', ...($this->creating() ? ReminderRules::TARGETS : [])], ['sometimes']);
+        return array_fill_keys(['message', 'trigger_at', 'offset_minutes', ...($this->creating() ? ['anchor', ...ReminderRules::TARGETS] : [])], ['sometimes']);
     }
 
     public function after(): array

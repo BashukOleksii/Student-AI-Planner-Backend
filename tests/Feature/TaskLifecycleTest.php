@@ -181,7 +181,7 @@ class TaskLifecycleTest extends TestCase
         }
     }
 
-    public function test_lifecycle_leaves_subtasks_sessions_reminders_and_unrelated_tasks_unchanged(): void
+    public function test_lifecycle_preserves_work_sessions_and_unrelated_tasks_while_cancelling_reminders(): void
     {
         $task = Task::factory()->create(['deadline_at' => '2026-10-10 12:00:00']);
         $pending = Subtask::factory()->for($task)->create(['position' => 1, 'estimated_minutes' => 30, 'deadline_at' => '2026-10-09 12:00:00']);
@@ -190,7 +190,8 @@ class TaskLifecycleTest extends TestCase
         $session = StudySession::factory()->for($task)->create(['subtask_id' => $pending->id]);
         $reminder = Reminder::factory()->for($task->user)->for($task)->create();
         $unrelated = Task::factory()->for($task->user)->create();
-        $records = [$pending, $completed, $session, $reminder, $unrelated];
+        $records = [$pending, $completed, $session, $unrelated];
+        $reminderBefore = $reminder->refresh()->getAttributes();
         $snapshots = array_map(fn ($record) => $record->refresh()->getAttributes(), $records);
         $this->actingAs($task->user, 'web');
         foreach (['complete', 'reopen'] as $operation) {
@@ -198,6 +199,13 @@ class TaskLifecycleTest extends TestCase
             foreach ($records as $index => $record) {
                 $this->assertSame($snapshots[$index], $record->refresh()->getAttributes());
             }
+            $after = $reminder->refresh()->getAttributes();
+            $this->assertSame('cancelled', $after['status']);
+            $this->assertSame(Arr::except($reminderBefore, ['status', 'updated_at']), Arr::except($after, ['status', 'updated_at']));
+            if ($operation === 'complete') {
+                $cancelledSnapshot = $after;
+            }
+            $this->assertSame($cancelledSnapshot, $after);
             $this->assertSame('2026-10-10 12:00:00', $task->refresh()->getRawOriginal('deadline_at'));
         }
         $this->assertDatabaseCount('tasks', 2);

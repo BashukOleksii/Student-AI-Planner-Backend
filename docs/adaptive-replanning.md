@@ -6,12 +6,13 @@ perform Stage E2 confirmation/application, change statuses, create successors,
 cancel reminders, infer missed sessions, start jobs or invoke an LLM. Stage E2 now
 implements reviewed application in separate confirmation/persistence Services.
 
-F1 now creates and manages absolute reminders through the authenticated
-[Reminder API](reminders.md). It uses compatible fresh owner-first locking and
-preserves this workflow's existing atomic dependency cancellation and historical
-references. The shared single-target cleanup helper is unchanged; general reminders
-have a separate F1 validation path. Task/Subtask completion/deadline reconciliation
-and relative recalculation remain F2 work; notification delivery remains F3 work.
+F1/F2 manage absolute and relative reminders through the authenticated
+[Reminder API](reminders.md). Relative offsets resolve from exact persisted UTC
+anchors. F2 atomically reconciles Task/Subtask deadline and completion changes;
+completion cancels invalidated reminders without changing StudySessions or other
+work. The strict single-target dependency helper and existing S3/Stage D/E2 cleanup
+policies remain intact. Session retirement never transfers/clones reminders to a
+successor. Notification delivery remains F3 work; hard purge is not exposed.
 
 ## REST and application contracts
 

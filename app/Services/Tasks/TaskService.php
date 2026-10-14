@@ -4,8 +4,10 @@ namespace App\Services\Tasks;
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Exceptions\ReminderIntegrityException;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\Reminders\ReminderSynchronizationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
@@ -16,7 +18,7 @@ class TaskService
 {
     private const EDITABLE_FIELDS = ['title', 'description', 'subject_id', 'priority', 'estimated_minutes', 'deadline_at'];
 
-    public function __construct(private TaskDependencyCleanupService $cleanup) {}
+    public function __construct(private TaskDependencyCleanupService $cleanup, private ReminderSynchronizationService $reminders) {}
 
     public function delete(User $user, Task $task): void
     {
@@ -116,7 +118,12 @@ class TaskService
                 : CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $deadline, 'UTC');
             $candidate = array_replace($candidate, $this->editableValues($values));
             $this->validateCandidate($user, $candidate, $task);
-            $task->update($candidate);
+            if (! $task->update($candidate)) {
+                throw new ReminderIntegrityException;
+            }
+            if ($deadline !== $task->getRawOriginal('deadline_at')) {
+                $this->reminders->deadlineChanged($user, $task);
+            }
 
             return $task->refresh();
         });
@@ -128,10 +135,13 @@ class TaskService
             $this->lockOwner($user);
             $task = $user->tasks()->lockForUpdate()->findOrFail($task->getKey());
             if ($task->status === TaskStatus::Pending) {
-                $task->update([
+                if (! $task->update([
                     'status' => TaskStatus::Completed,
                     'completed_at' => CarbonImmutable::now('UTC')->startOfSecond(),
-                ]);
+                ])) {
+                    throw new ReminderIntegrityException;
+                }
+                $this->reminders->completed($user, $task);
             }
 
             return $task->refresh();

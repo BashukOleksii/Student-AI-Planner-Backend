@@ -2,7 +2,6 @@
 
 namespace App\Services\Reminders;
 
-use App\Enums\ReminderAnchor;
 use App\Enums\ReminderStatus;
 use App\Models\Reminder;
 use App\Models\StudySession;
@@ -21,11 +20,7 @@ class ReminderDependencyService
         if ($reminder->user_id !== $owner->id || count($targets) !== 1) {
             return false;
         }
-        $expected = match (array_key_first($targets)) {
-            'task_id' => ReminderAnchor::TaskDeadline,
-            'subtask_id' => ReminderAnchor::SubtaskDeadline,
-            'study_session_id' => ReminderAnchor::SessionStart,
-        };
+        $expected = (new ReminderRules)->anchorFor(array_key_first($targets));
 
         return ($reminder->anchor === null && $reminder->offset_minutes === null)
             || ($reminder->anchor === $expected && is_int($reminder->offset_minutes));

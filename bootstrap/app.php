@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\ReminderConflictException;
+use App\Exceptions\ReminderIntegrityException;
 use App\Exceptions\StudyPlanConflictException;
 use App\Exceptions\StudySessionConflictException;
 use Illuminate\Auth\AuthenticationException;
@@ -39,6 +40,9 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $exception, Request $request) {
+            if ($exception instanceof ReminderIntegrityException && $request->is('api/tasks/*')) {
+                return response()->json(['message' => 'The reminder dependencies could not be processed.'], 500);
+            }
             if ($request->is('api/reminders', 'api/reminders/*')) {
                 if ($exception instanceof ReminderConflictException) {
                     return response()->json(['message' => $exception->getMessage()], 409);

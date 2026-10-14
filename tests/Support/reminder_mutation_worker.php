@@ -52,6 +52,22 @@ try {
             $service->cancel($owner, (string) $input['reminder_id']);
             $outcome = ['status' => 'cancelled'];
             break;
+        case 'task_deadline':
+            $app->make(TaskService::class)->update($owner, Task::findOrFail($input['task_id']), $input['data']);
+            $outcome = ['status' => 'changed'];
+            break;
+        case 'child_deadline':
+            $app->make(SubtaskService::class)->update($owner, Task::findOrFail($input['task_id']), Subtask::findOrFail($input['subtask_id']), $input['data']);
+            $outcome = ['status' => 'changed'];
+            break;
+        case 'task_complete':
+            $app->make(TaskService::class)->complete($owner, Task::findOrFail($input['task_id']));
+            $outcome = ['status' => 'completed'];
+            break;
+        case 'child_complete':
+            $app->make(SubtaskService::class)->complete($owner, Task::findOrFail($input['task_id']), Subtask::findOrFail($input['subtask_id']));
+            $outcome = ['status' => 'completed'];
+            break;
         case 'task_delete':
             $app->make(TaskService::class)->delete($owner, Task::findOrFail($input['task_id']));
             $outcome = ['status' => 'deleted'];

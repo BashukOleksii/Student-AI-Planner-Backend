@@ -10,12 +10,13 @@ Reminder CRUD/delivery and AI tools remain deferred. [Stage C](study-plan-persis
 now provides explicit reviewed planning confirmation separately; Task/Subtask
 lifecycle and progress behavior do not change.
 
-F1 now creates and manages absolute reminders through the authenticated
-[Reminder API](reminders.md). It uses compatible fresh owner-first locking and
-preserves this workflow's existing atomic dependency cancellation and historical
-references. The shared single-target cleanup helper is unchanged; general reminders
-have a separate F1 validation path. Task/Subtask completion/deadline reconciliation
-and relative recalculation remain F2 work; notification delivery remains F3 work.
+F1/F2 manage absolute and relative reminders through the authenticated
+[Reminder API](reminders.md). Relative offsets resolve from exact persisted UTC
+anchors. F2 atomically reconciles Task/Subtask deadline and completion changes;
+completion cancels invalidated reminders without changing StudySessions or other
+work. The strict single-target dependency helper and existing S3/Stage D/E2 cleanup
+policies remain intact. Session retirement never transfers/clones reminders to a
+successor. Notification delivery remains F3 work; hard purge is not exposed.
 
 ## Endpoints
 
@@ -132,10 +133,12 @@ and stored completion instant are independent of server/User/client timezones.
 Task and Subtask completion are independent. Pending Subtasks do not block
 manual parent completion; completing/reopening a parent does not alter any
 Subtask, and completed Subtasks do not automatically complete their parent.
-These endpoints change only Task lifecycle fields (plus normal `updated_at` on
-an actual transition). Subject, title, description, priority, estimates and
-deadlines remain unchanged; no StudySession or Reminder workflow runs and no
-progress is calculated. A malformed legacy foreign Subject remains masked in
+These endpoints preserve independent Task/Subtask lifecycle fields and progress
+rules. Subject, title, description, priority, estimates and deadlines remain
+unchanged. F2 additionally cancels affected scheduled reminders on actual
+completion, inside the same transaction; no StudySession is completed/cancelled
+and no progress value is persisted. Reopening does not resurrect reminders.
+A malformed legacy foreign Subject remains masked in
 the response without silent repair; ordinary PATCH still requires explicit repair.
 
 ## Service and persistence guarantees
@@ -151,7 +154,9 @@ When the candidate parent deadline is non-null, no non-deleted Subtask with a
 deadline may exceed it. The Service checks relevant Subtasks under locks;
 completed but non-deleted records participate, while deleted/null-deadline
 records do not. Equal deadlines and clearing the parent deadline are allowed.
-No Subtasks are mutated by Task updates. S1 SubtaskService enforces the reciprocal
+No Subtasks are mutated by Task updates. F2 synchronizes only direct Task-relative
+reminders when the persisted deadline changes; clearing or expiring the trigger
+cancels them with history retained. S1 SubtaskService enforces the reciprocal
 deadline bound under the same owner and parent serialization locks.
 
 Existing MySQL checks preserve pending/completed completion consistency,
@@ -226,7 +231,8 @@ null. Validation failure rolls back without changing parent/child state.
 Subtask mutations use one transaction and owner → parent → child lock order (the
 allocation query locks the current maximum child when present). This is compatible
 with TaskService's parent deadline changes. PATCH preserves parent, position and
-lifecycle metadata; StudySessions and Reminders are untouched.
+lifecycle metadata; StudySessions remain untouched. F2 synchronizes direct
+Subtask-relative reminders only when the persisted child deadline changes.
 
 ### Completion and reopening (S1b)
 
@@ -240,8 +246,10 @@ Completion after reopening records a new instant; no completion history is store
 
 Task/Subtask status remains independent in both directions, including when all
 Subtasks are completed. Lifecycle operations change no unrelated fields, do not
-repair legacy deadline relations, and do not alter parents, siblings, StudySessions
-or Reminders. No progress calculation or planning/reminder workflow runs.
+repair legacy deadline relations, and do not alter parents, siblings or
+StudySessions. F2 completion cancels the child's affected scheduled reminders inside
+the same transaction; reopening leaves that history cancelled. No progress value
+or planning reservation is changed.
 
 ### Public Subtask representation
 

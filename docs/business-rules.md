@@ -349,7 +349,7 @@ Every reminder belongs to one user.
 A reminder uses optional `task_id`, `subtask_id`, and `study_session_id` foreign keys, with at most one target set. The target must resolve to the same user. All three may be null for a general absolute reminder; there is no polymorphic-FK target design.
 
 **BR-REM-003 — Trigger validity**  
-F1 newly created and edited absolute reminders must have a trigger strictly after full-precision current UTC time. The API requires canonical whole-second UTC timestamps in years 1000–9999; there is no "notify now" exception.
+F1/F2 newly created and explicitly edited absolute/relative reminders must have a trigger strictly after full-precision current UTC time. The API requires canonical whole-second UTC timestamps in years 1000–9999; there is no "notify now" exception.
 
 **BR-REM-004 — Idempotent delivery**  
 Retries must not intentionally produce duplicate user notifications for the same delivery event.
@@ -364,24 +364,34 @@ reminders remain intact. General anchor editing/recalculation remains separate
 from this scoped lifecycle cleanup.
 
 **BR-REM-006 — Relative and absolute triggers**\
-Supported relative anchors are `task_deadline`, `subtask_deadline`, and `session_start`, each requiring its matching target. Persist the anchor, signed `offset_minutes`, and resolved `trigger_at = anchor_time + offset_minutes`; negative offsets mean before the anchor. Anchor and offset are both present or both null. For absolute reminders they are null and `trigger_at` is authoritative.
+Supported relative anchors are `task_deadline`, `subtask_deadline`, and `session_start`, each requiring its matching target. Persist the anchor, signed `offset_minutes`, and resolved `trigger_at = anchor_timestamp_utc + offset_minutes * 60 seconds`; negative offsets mean before the anchor. Anchor and offset are both present or both null. For absolute reminders they are null and `trigger_at` is authoritative.
 
 **BR-REM-007 — Reminder lifecycle**\
 Reminder statuses are `scheduled`, `sent`, and `cancelled`. Sent reminders require `sent_at`; non-sent reminders have no sent timestamp. V1 does not introduce reminder-delivery-history tables.
 
-F1 enforces BR-REM-001/002/003/006/007 through authenticated absolute-reminder
-management. General reminders require a meaningful message; targets are genuine
-positive integers and creation requires eligible active owned work or a future
-planned session. Scheduled rows alone can be edited; explicit cancellation retains
-history, and repeated cancellation or historical edits conflict. Controlled fields
-are rejected even when null. Writes use fresh owner-first transactions and current
-persisted source validation. GET never infers delivery or repairs sources.
+F1/F2 enforce BR-REM-001/002/003/005/006/007 through authenticated absolute and
+relative Reminder management. General reminders require a meaningful message;
+relative reminders require exactly one compatible owned target and a genuine signed
+SMALLINT offset. The server resolves the exact persisted Task deadline, Subtask's
+own deadline or linked session start using integer UTC arithmetic, without a parent
+fallback or successor substitution. Explicit triggers/offset edits must remain
+future; incompatible modes and target/anchor/ownership/delivery edits are rejected.
 
-BR-REM-005 reconciliation beyond existing S3/Stage D/E2 cleanup is deferred to F2:
-Task/Subtask completion and deadline changes do not automatically cancel/recalculate
-all reminders in F1. Relative creation/recalculation is not exposed. BR-REM-004 and
-actual notification delivery are deferred to F3, after F2 target reconciliation.
-See [the complete F1 contract and verification](reminders.md).
+Task/Subtask deadline changes atomically recalculate scheduled direct relative
+reminders, preserving absolute and historical rows. Missing, elapsed or
+unrepresentable resolutions cancel with the last committed trigger retained.
+Actual Task/Subtask completion cancels affected scheduled reminders in both modes,
+including invalidated descendant/session targets, without changing sessions or
+other work. Reopening never resurrects history. Shared structural integrity checks
+fail closed before a reminder batch write and roll back the enclosing mutation.
+Fresh owner-first application transactions and current locked sources serialize
+public writes. GET never recalculates, cancels or repairs records. S3/Stage D/E2
+cleanup remains authoritative, retaining original session identities and metadata.
+No existing operation edits a session start in place or exposes hard purge.
+
+BR-REM-004 and actual notification delivery remain F3 work. Administrative hard
+purge must reconcile scheduled dependents before SET NULL; no speculative purge
+endpoint/hook is introduced. See [the F1/F2 contract and actual verification](reminders.md).
 
 ## 11. Progress and report rules
 

@@ -3,9 +3,11 @@
 namespace App\Services\Tasks;
 
 use App\Enums\TaskStatus;
+use App\Exceptions\ReminderIntegrityException;
 use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\Reminders\ReminderSynchronizationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
@@ -16,7 +18,7 @@ class SubtaskService
 {
     private const EDITABLE_FIELDS = ['title', 'description', 'estimated_minutes', 'deadline_at'];
 
-    public function __construct(private TaskDependencyCleanupService $cleanup) {}
+    public function __construct(private TaskDependencyCleanupService $cleanup, private ReminderSynchronizationService $reminders) {}
 
     public function delete(User $user, Task $task, Subtask $subtask): void
     {
@@ -73,7 +75,12 @@ class SubtaskService
                 : CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $deadline, 'UTC');
             $candidate = array_replace($candidate, $this->editableValues($values));
             $this->validateDeadline($task, $candidate);
-            $subtask->update($candidate);
+            if (! $subtask->update($candidate)) {
+                throw new ReminderIntegrityException;
+            }
+            if ($deadline !== $subtask->getRawOriginal('deadline_at')) {
+                $this->reminders->deadlineChanged($user, $task, $subtask);
+            }
 
             return $subtask->refresh();
         });
@@ -85,10 +92,13 @@ class SubtaskService
             $task = $this->lockParent($user, $task);
             $subtask = $task->subtasks()->lockForUpdate()->findOrFail($subtask->getKey());
             if ($subtask->status === TaskStatus::Pending) {
-                $subtask->update([
+                if (! $subtask->update([
                     'status' => TaskStatus::Completed,
                     'completed_at' => CarbonImmutable::now('UTC')->startOfSecond(),
-                ]);
+                ])) {
+                    throw new ReminderIntegrityException;
+                }
+                $this->reminders->completed($user, $task, $subtask);
             }
 
             return $subtask->refresh();
