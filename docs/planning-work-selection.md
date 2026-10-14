@@ -24,6 +24,8 @@ PlanningWorkSelectionService::select(
     User $user,
     mixed $taskId = null,
     mixed $subtaskId = null,
+    array $excludedPlannedSessionIds = [],
+    ?DateTimeImmutable $asOfUtc = null,
 ): array;
 ```
 
@@ -34,6 +36,14 @@ matching existing planning Services. Estimates/actual minutes are null or genuin
 positive integers whose multiplication by 60 fits a PHP integer. MySQL fields
 already bound persisted minutes to 1–65535; the pure arithmetic contract additionally
 supports other representable positive integers without imposing product defaults.
+
+Stage E1 adds the two optional trusted scenario arguments above. Exclusions are
+unique genuine positive IDs of owned planned sessions in the selected work scope;
+references and original UTC intervals are validated before removing their
+hypothetical reservation/warnings. Completed credit and all A1–A6 rules remain
+unchanged. A supplied immutable clock is converted to UTC and used consistently;
+omitting both arguments preserves the original behavior. No public endpoint accepts
+exclusion IDs or a clock. See [adaptive replanning](adaptive-replanning.md).
 
 Completed inputs are a list of exactly
 `['scheduled_seconds' => int, 'actual_minutes' => ?int]` records. Reservation

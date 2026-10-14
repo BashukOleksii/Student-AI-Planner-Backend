@@ -27,20 +27,31 @@ class FreeTimeService
      */
     public function calculate(User $user, string $startDate, string $endDate, mixed $minimumSeconds = null): array
     {
+        if ($minimumSeconds !== null) {
+            $this->intervals->filterByMinimumSeconds([], $minimumSeconds);
+        }
+        $sources = $this->sources($user, $startDate, $endDate);
+        $blockers = array_map(fn ($record) => ['start' => $record['start'], 'end' => $record['end']],
+            [...$sources['blocking_lessons'], ...$sources['blocking_sessions']]);
+        $free = $this->intervals->subtract($sources['allowed_intervals'], $blockers);
+
+        return $minimumSeconds === null ? $free : $this->intervals->filterByMinimumSeconds($free, $minimumSeconds);
+    }
+
+    /** The same PF1 source policy, retaining identities for trusted read-only projections. */
+    public function sources(User $user, string $startDate, string $endDate): array
+    {
         $start = $this->calendarDate($startDate);
         $end = $this->calendarDate($endDate);
         if ($end < $start || $start->diff($end)->days >= 31) {
             throw new InvalidArgumentException('Expected an increasing inclusive range of at most 31 calendar dates.');
-        }
-        if ($minimumSeconds !== null) {
-            $this->intervals->filterByMinimumSeconds([], $minimumSeconds);
         }
 
         $windows = $user->studyAvailabilityWindows()->get(['day_of_week', 'starts_at', 'ends_at'])
             ->map(fn ($window): array => $window->only(['day_of_week', 'starts_at', 'ends_at']))->all();
         $allowed = $this->availability->expand($windows, $startDate, $endDate, $user->timezone);
         if ($allowed === []) {
-            return [];
+            return ['allowed_intervals' => [], 'blocking_lessons' => [], 'blocking_sessions' => []];
         }
 
         // C2's normalized union provides a safe envelope without resolving ambiguous local boundaries.
@@ -48,23 +59,21 @@ class FreeTimeService
         $rangeEnd = gmdate('Y-m-d H:i:s', $allowed[count($allowed) - 1]['end']);
         $lessons = $user->lessons()->where('status', LessonStatus::Active)
             ->where('starts_at', '<', $rangeEnd)->where('ends_at', '>', $rangeStart)
-            ->get(['starts_at', 'ends_at']);
+            ->get(['id', 'starts_at', 'ends_at']);
         $sessions = $user->studySessions()->where('status', StudySessionStatus::Planned)
             ->where('starts_at', '<', $rangeEnd)->where('ends_at', '>', $rangeStart)
-            ->get(['starts_at', 'ends_at']);
-        $blockers = [];
-        foreach ($lessons->concat($sessions) as $event) {
-            // DATETIME is UTC wall-clock storage; model presentation casts can use a different timezone.
-            $blockers[] = [
-                'start' => $this->utcSeconds($event->getRawOriginal('starts_at')),
-                'end' => $this->utcSeconds($event->getRawOriginal('ends_at')),
-            ];
-        }
+            ->get(['id', 'starts_at', 'ends_at']);
+        $records = function ($events): array {
+            return $events->map(function ($event): array {
+                // DATETIME is UTC wall-clock storage; model presentation casts can use a different timezone.
+                return ['id' => $event->id,
+                    'start' => $this->utcSeconds($event->getRawOriginal('starts_at')),
+                    'end' => $this->utcSeconds($event->getRawOriginal('ends_at')),
+                ];
+            })->all();
+        };
 
-        // Subtraction only removes instants from C2's date/window membership set; no extra clipping is needed.
-        $free = $this->intervals->subtract($allowed, $blockers);
-
-        return $minimumSeconds === null ? $free : $this->intervals->filterByMinimumSeconds($free, $minimumSeconds);
+        return ['allowed_intervals' => $allowed, 'blocking_lessons' => $records($lessons), 'blocking_sessions' => $records($sessions)];
     }
 
     private function calendarDate(string $value): DateTimeImmutable

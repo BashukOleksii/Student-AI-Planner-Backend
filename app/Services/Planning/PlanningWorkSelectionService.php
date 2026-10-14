@@ -27,7 +27,7 @@ class PlanningWorkSelectionService
      * @throws ModelNotFoundException For missing, foreign, deleted or incorrectly nested explicit targets.
      * @throws UnexpectedValueException For incompatible selected session references, without private details.
      */
-    public function select(User $user, mixed $taskId = null, mixed $subtaskId = null): array
+    public function select(User $user, mixed $taskId = null, mixed $subtaskId = null, array $excludedPlannedSessionIds = [], ?DateTimeImmutable $asOfUtc = null): array
     {
         foreach ([$taskId, $subtaskId] as $id) {
             if ($id !== null && (! is_int($id) || $id < 1)) {
@@ -37,7 +37,8 @@ class PlanningWorkSelectionService
         if ($subtaskId !== null && $taskId === null) {
             throw new InvalidArgumentException('A subtask requires its parent task identifier.');
         }
-        $now = CarbonImmutable::now('UTC');
+        PlanningScenarioService::validateIds($excludedPlannedSessionIds);
+        $now = ($asOfUtc ?? CarbonImmutable::now('UTC'))->setTimezone(new DateTimeZone('UTC'));
         $user = $user->newQuery()->whereKey($user->getKey())->firstOrFail(['id']);
         $tasks = $user->tasks()->when($taskId !== null, fn ($query) => $query->whereKey($taskId))
             ->with(['subtasks' => fn ($query) => $query->withTrashed()->select([
@@ -51,6 +52,10 @@ class PlanningWorkSelectionService
         }
         $result = ['as_of_utc' => $now->format('Y-m-d\TH:i:s.u\Z'), 'work_items' => [], 'excluded_items' => [], 'warnings' => []];
         if ($tasks->isEmpty()) {
+            if ($excludedPlannedSessionIds !== []) {
+                throw new InvalidArgumentException('Excluded reservations must belong to the selected owned work.');
+            }
+
             return $result;
         }
         $children = $tasks->flatMap(fn ($task) => $task->subtasks)->keyBy('id');
@@ -59,6 +64,13 @@ class PlanningWorkSelectionService
             ->where(fn ($query) => $query->whereIn('task_id', $tasks->modelKeys())->orWhereIn('subtask_id', $children->keys()->all()))
             ->get(['id', 'user_id', 'task_id', 'subtask_id', 'status', 'starts_at', 'ends_at', 'actual_minutes']);
         $this->validateReferences($user, $sessions, $tasks, $children);
+        $byId = $sessions->keyBy('id');
+        $excluded = array_fill_keys($excludedPlannedSessionIds, true);
+        foreach ($excludedPlannedSessionIds as $id) {
+            if (! isset($byId[$id]) || $byId[$id]->status !== StudySessionStatus::Planned) {
+                throw new InvalidArgumentException('Excluded reservations must be owned planned sessions in the selected work.');
+            }
+        }
 
         $units = $completed = $reserved = [];
         foreach ($tasks as $task) {
@@ -88,6 +100,9 @@ class PlanningWorkSelectionService
             $start = $this->utcDate($session->getRawOriginal('starts_at'));
             $end = $this->utcDate($session->getRawOriginal('ends_at'));
             $duration = $this->intervals->durationSeconds(['start' => $start->getTimestamp(), 'end' => $end->getTimestamp()]);
+            if (isset($excluded[$session->id])) {
+                continue;
+            }
             $source = ['scheduled_seconds' => $duration, 'actual_minutes' => $session->actual_minutes];
             $isCompleted = $session->status === StudySessionStatus::Completed;
             $credit = $isCompleted ? $this->effort->calculate(null, [$source], [])['completed_credit_seconds'] : $duration;

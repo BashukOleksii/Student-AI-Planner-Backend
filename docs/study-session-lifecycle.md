@@ -7,6 +7,11 @@ table is added. A session's history is retained as ordinary lifecycle rows.
 
 ## Public endpoints
 
+Stage E1 now provides separate read-only adaptive analysis and suggested intervals.
+It creates no successor, cancels no reminder and changes no lifecycle state. The
+manual Stage D contracts and history invariants below remain unchanged; see
+[adaptive replanning](adaptive-replanning.md).
+
 All endpoints use `auth:sanctum`, owner-scoped lookup and `StudySessionPolicy`.
 Ownership is resolved before body validation and independently reloaded under
 the transaction lock. GET list/detail and Stage C contracts remain unchanged.

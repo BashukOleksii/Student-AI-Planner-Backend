@@ -52,6 +52,14 @@ Task/Subtask lifecycle or adding schema. See [session lifecycle](study-session-l
 
 ## 1. Architectural goals
 
+Stage E1 adds authenticated adaptive replanning preview through
+`StudyReplanningPreviewService` and a focused pure analyzer. Identity-preserving
+PF1/C9 snapshots support consistent self-exclusion and hypothetical release;
+Stage A accepts trusted exclusions/a shared clock, and the Stage B allocator has
+an optional single-placement mode. Valid reservations remain protected. Every
+replacement is checked against the complete projected batch, without writes or
+locks. Confirmation/application remain Stage E2. See [adaptive replanning](adaptive-replanning.md).
+
 The backend must support schedule management, academic tasks, free-time calculation, automatic study planning, rescheduling, reminders, progress analytics, Excel schedule import, authentication, and an AI agent that orchestrates deterministic application capabilities.
 
 The architecture must remain understandable enough to explain during project defense, testable without an LLM, and deployable independently from the frontend.

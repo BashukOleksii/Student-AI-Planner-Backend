@@ -20,7 +20,7 @@ class StudySessionAllocationService
      * @param  int  $notBeforeUtc  First whole second at or after Stage A's full-precision clock.
      * @return array{sessions: list<array>, work_results: list<array>, summary: array}
      */
-    public function allocate(array $workItems, array $context, mixed $notBeforeUtc): array
+    public function allocate(array $workItems, array $context, mixed $notBeforeUtc, bool $singlePlacement = false): array
     {
         if (! is_int($notBeforeUtc) || ! array_is_list($workItems)) {
             throw new InvalidArgumentException('Expected ordered work items and an integer planning cutoff.');
@@ -87,7 +87,7 @@ class StudySessionAllocationService
                 $duration = $this->intervals->durationSeconds($candidate);
                 $tail = $remaining - $duration;
                 // Reduce only when a valid second minimum-sized session can actually be placed.
-                if ($tail > 0 && $tail < $minimum && $remaining >= 2 * $minimum && $remaining - $minimum >= $minimum) {
+                if (! $singlePlacement && $tail > 0 && $tail < $minimum && $remaining >= 2 * $minimum && $remaining - $minimum >= $minimum) {
                     $balanced = ['start' => $candidate['start'], 'end' => $candidate['start'] + $remaining - $minimum];
                     $preview = $this->project($state, $balanced);
                     if ($this->placement($minimum, $deadline, $preview, $context, $minimum, $maximum) !== null) {
@@ -105,8 +105,12 @@ class StudySessionAllocationService
                 $state = $this->project($state, $candidate);
                 $remaining -= $duration;
                 $allocatedTotal = $this->add($allocatedTotal, $duration);
+                if ($singlePlacement) {
+                    break;
+                }
             }
-            $reasons = $remaining === 0 ? [] : $this->reasons($remaining, $deadline, $state, $context, $minimum, $maximum);
+            $reasons = $remaining === 0 ? [] : ($singlePlacement && $remaining !== $requested
+                ? ['single_replacement_duration_limited'] : $this->reasons($remaining, $deadline, $state, $context, $minimum, $maximum));
             $results[] = ['task_id' => $work['task_id'], 'subtask_id' => $work['subtask_id'], 'requested_seconds' => $requested,
                 'allocated_seconds' => $requested - $remaining, 'unscheduled_seconds' => $remaining, 'reason_codes' => $reasons];
         }

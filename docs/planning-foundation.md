@@ -96,7 +96,7 @@ active replacement does. StudySessions block only when planned, even for a
 historical requested date. Completed, missed, rescheduled and cancelled sessions
 are excluded. No current-clock or parent-work lifecycle filter is inferred.
 
-Blocker queries retrieve only start/end fields. Raw database DATETIME values are
+Blocker queries retrieve identity and start/end fields. Raw database DATETIME values are
 parsed explicitly in UTC; model presentation casts and the server's default
 timezone never determine their instants. Query bounds are also formatted in UTC.
 C1 subtraction normalizes overlapping, adjacent and duplicate-equivalent blockers
@@ -117,6 +117,12 @@ not an atomic planning/commit snapshot; future plan creation must revalidate
 current state transactionally. Output is allowed study free time, not unrestricted
 calendar free time or guaranteed schedulable capacity. C4 exposes this read-only
 workflow; PF2 checks and C10 candidate integration are separate implemented capabilities.
+
+Stage E1 extracts `FreeTimeService::sources()` from the same source assembly,
+retaining allowed membership and identified Lesson/planned-session blockers for
+pure hypothetical exclusions. `calculate()` delegates to this shared extraction;
+calendar/status/ownership selection and public results are unchanged. See
+[adaptive replanning](adaptive-replanning.md).
 
 ## C4 free-slots REST API
 

@@ -13,6 +13,13 @@ design and historical verification record below retain their checkpoint meaning.
 
 ## Public application contract
 
+Stage E1 reuses the pure allocator with an optional fourth `singlePlacement`
+boolean (default false). True permits one largest feasible placement per work
+request and disables balancing for a second session. Default Stage B splitting,
+ordering, diagnostics and read-only behavior remain compatible. E1 separately
+maintains shared work budgets and complete-batch validation; see
+[adaptive replanning](adaptive-replanning.md).
+
 ```php
 StudyPlanningService::plan(
     User $user,

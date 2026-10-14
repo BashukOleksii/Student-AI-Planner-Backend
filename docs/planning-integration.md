@@ -19,6 +19,11 @@ new persistence resides in a separate application Service.
 
 ## Public contract
 
+Stage E1 optionally retains source identities through
+`PlanningContextService::load(..., $includeSources = true)` for shared pure
+self-exclusion and hypothetical release. C9 status/ownership/calendar policies
+and normal C10 diagnostics remain unchanged. See [adaptive replanning](adaptive-replanning.md).
+
 ```php
 public function evaluate(
     User $user,

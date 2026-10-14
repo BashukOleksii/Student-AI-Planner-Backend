@@ -296,6 +296,14 @@ Scheduled start/end define planned duration. `completed_at` is present exactly w
 
 ## 9. Rescheduling rules
 
+Stage E1 adds read-only adaptive detection/proposals under these same rule IDs.
+Only eligible strictly future planned reservations can be proposed for relocation;
+valid sources remain protected. Identity-based self-exclusion removes the candidate
+from blocking, breaks, workload and reservation credit. One source has at most one
+shorter-or-equal proposal, capped by current exact-unit effort; partial/unplaced
+results and the full hypothetical release set are explicit. E2 confirmation and
+application remain deferred. See [adaptive replanning](adaptive-replanning.md).
+
 Stage D's exact transition and transfer contracts are documented in
 [study-session-lifecycle.md](study-session-lifecycle.md). Completion accepts a
 positive 1–65535 actual-minute integer or omission, storing null on omission.

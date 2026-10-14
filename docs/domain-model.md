@@ -44,6 +44,11 @@ creation/delivery remain separate capabilities. See [session lifecycle](study-se
 
 ## 1. Domain boundaries
 
+Stage E1 exposes a transient adaptive replanning preview: affected future planned
+reservations map to at most one proposed replacement each, with separate original
+shortfall and unfinished-work effort. Protected valid and terminal history remains
+unchanged. No successor or preview record is persisted. See [adaptive replanning](adaptive-replanning.md).
+
 ### Identity & Profile
 
 **User**  

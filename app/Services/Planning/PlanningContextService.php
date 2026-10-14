@@ -26,7 +26,7 @@ class PlanningContextService
     ) {}
 
     /** Dates are inclusive local labels; an optional anchor envelope preserves C10's exact selection. */
-    public function load(User $user, string $startDate, string $endDate, ?array $anchorEnvelope = null): array
+    public function load(User $user, string $startDate, string $endDate, ?array $anchorEnvelope = null, bool $includeSources = false): array
     {
         $this->validateDates($startDate, $endDate);
         $range = $this->dateRange($startDate, $endDate, $user->timezone);
@@ -53,19 +53,35 @@ class PlanningContextService
         }
         $workload = $user->studySessions()->whereIn('status', [StudySessionStatus::Planned, StudySessionStatus::Completed])
             ->where('starts_at', '<', $weekEnd)->where('ends_at', '>', $weekStart)
-            ->get(['id', 'task_id', 'subtask_id', 'starts_at', 'ends_at']);
+            ->get(['id', 'task_id', 'subtask_id', 'starts_at', 'ends_at', 'status']);
         $sessions = $envelope === null ? new Collection : $user->studySessions()->where('status', StudySessionStatus::Planned)
             ->where('starts_at', '<', $anchorEnd)->where('ends_at', '>', $anchorStart)
             ->get(['id', 'task_id', 'subtask_id', 'starts_at', 'ends_at']);
         $this->validateSessionReferences($user, $workload->concat($sessions)->unique('id'));
         $lessons = $envelope === null ? new Collection : $user->lessons()->where('status', LessonStatus::Active)
             ->where('starts_at', '<', $anchorEnd)->where('ends_at', '>', $anchorStart)
-            ->get(['starts_at', 'ends_at']);
-        $free = $this->freeTime->calculate($user, $startDate, $endDate, null);
+            ->get(['id', 'starts_at', 'ends_at']);
+        $sources = $includeSources ? $this->freeTime->sources($user, $startDate, $endDate) : null;
+        $free = $includeSources ? $this->intervals->subtract($sources['allowed_intervals'],
+            array_map(fn ($record) => ['start' => $record['start'], 'end' => $record['end']],
+                [...$sources['blocking_lessons'], ...$sources['blocking_sessions']]))
+            : $this->freeTime->calculate($user, $startDate, $endDate, null);
 
-        return ['range' => $range, 'timezone' => $user->timezone, 'preferences' => $preferences,
+        $context = ['range' => $range, 'timezone' => $user->timezone, 'preferences' => $preferences,
             'free_intervals' => $free, 'break_anchors' => $this->eventIntervals($lessons->concat($sessions)),
             'workload_sessions' => $this->eventIntervals($workload)];
+
+        return $includeSources ? [...$context, ...$sources,
+            'lesson_anchors' => $this->eventRecords($lessons), 'session_anchors' => $this->eventRecords($sessions),
+            'workload_records' => $this->eventRecords($workload, true)] : $context;
+    }
+
+    private function eventRecords(Collection $events, bool $status = false): array
+    {
+        $intervals = $this->eventIntervals($events);
+
+        return $events->values()->map(fn ($event, $index) => ['id' => $event->id, ...$intervals[$index],
+            ...($status ? ['status' => $event->status->value] : [])])->all();
     }
 
     public function validateDates(string $startDate, string $endDate): void

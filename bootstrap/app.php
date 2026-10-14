@@ -25,22 +25,25 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/lessons', 'api/lessons/*'),
             fn (Request $request) => $request->isMethod('GET') && $request->is('api/tasks'),
             fn (Request $request) => $request->isMethod('GET') && $request->is('api/planning/free-slots'),
-            fn (Request $request) => $request->is('api/planning/study-plans/*', 'api/study-sessions', 'api/study-sessions/*'),
+            fn (Request $request) => $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/study-sessions', 'api/study-sessions/*'),
         ]);
         // Subject color and Task deadlines distinguish null from an invalid empty string.
         $middleware->convertEmptyStringsToNull(except: [
             fn (Request $request) => $request->is('api/subjects', 'api/subjects/*'),
             fn (Request $request) => $request->is('api/tasks', 'api/tasks/*'),
-            fn (Request $request) => $request->is('api/planning/study-plans/*', 'api/study-sessions', 'api/study-sessions/*'),
+            fn (Request $request) => $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/study-sessions', 'api/study-sessions/*'),
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $exception, Request $request) {
-            if (! $request->is('api/planning/study-plans/*', 'api/study-sessions', 'api/study-sessions/*')) {
+            if (! $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/study-sessions', 'api/study-sessions/*')) {
                 return null;
             }
             if ($exception instanceof StudyPlanConflictException || $exception instanceof StudySessionConflictException) {
                 return response()->json(['message' => $exception->getMessage()], 409);
+            }
+            if ($request->is('api/planning/replanning/*') && $exception instanceof UnexpectedValueException) {
+                return response()->json(['message' => 'The replanning preview could not be processed.', 'classification' => 'invalid_source'], 500);
             }
             if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
                 return null;
