@@ -10,6 +10,13 @@ Reminder CRUD/delivery and AI tools remain deferred. [Stage C](study-plan-persis
 now provides explicit reviewed planning confirmation separately; Task/Subtask
 lifecycle and progress behavior do not change.
 
+F1 now creates and manages absolute reminders through the authenticated
+[Reminder API](reminders.md). It uses compatible fresh owner-first locking and
+preserves this workflow's existing atomic dependency cancellation and historical
+references. The shared single-target cleanup helper is unchanged; general reminders
+have a separate F1 validation path. Task/Subtask completion/deadline reconciliation
+and relative recalculation remain F2 work; notification delivery remains F3 work.
+
 ## Endpoints
 
 All routes require `auth:sanctum`. DELETE returns no content; other routes use

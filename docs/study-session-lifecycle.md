@@ -11,6 +11,13 @@ Reminder dependency Service. E2 uses only the exposed chain-locking helper insid
 its own fresh outermost transaction; it never nests `run()`. Manual Stage D
 contracts and future/terminal policies remain unchanged. See [adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
 
+F1 now creates and manages absolute reminders through the authenticated
+[Reminder API](reminders.md). It uses compatible fresh owner-first locking and
+preserves this workflow's existing atomic dependency cancellation and historical
+references. The shared single-target cleanup helper is unchanged; general reminders
+have a separate F1 validation path. Task/Subtask completion/deadline reconciliation
+and relative recalculation remain F2 work; notification delivery remains F3 work.
+
 ## Public endpoints
 
 Stage E1 now provides separate read-only adaptive analysis and suggested intervals.

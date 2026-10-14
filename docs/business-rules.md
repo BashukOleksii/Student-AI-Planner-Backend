@@ -349,7 +349,7 @@ Every reminder belongs to one user.
 A reminder uses optional `task_id`, `subtask_id`, and `study_session_id` foreign keys, with at most one target set. The target must resolve to the same user. All three may be null for a general absolute reminder; there is no polymorphic-FK target design.
 
 **BR-REM-003 — Trigger validity**  
-A newly created scheduled reminder should have a future trigger unless the use case explicitly means "notify now".
+F1 newly created and edited absolute reminders must have a trigger strictly after full-precision current UTC time. The API requires canonical whole-second UTC timestamps in years 1000–9999; there is no "notify now" exception.
 
 **BR-REM-004 — Idempotent delivery**  
 Retries must not intentionally produce duplicate user notifications for the same delivery event.
@@ -368,6 +368,20 @@ Supported relative anchors are `task_deadline`, `subtask_deadline`, and `session
 
 **BR-REM-007 — Reminder lifecycle**\
 Reminder statuses are `scheduled`, `sent`, and `cancelled`. Sent reminders require `sent_at`; non-sent reminders have no sent timestamp. V1 does not introduce reminder-delivery-history tables.
+
+F1 enforces BR-REM-001/002/003/006/007 through authenticated absolute-reminder
+management. General reminders require a meaningful message; targets are genuine
+positive integers and creation requires eligible active owned work or a future
+planned session. Scheduled rows alone can be edited; explicit cancellation retains
+history, and repeated cancellation or historical edits conflict. Controlled fields
+are rejected even when null. Writes use fresh owner-first transactions and current
+persisted source validation. GET never infers delivery or repairs sources.
+
+BR-REM-005 reconciliation beyond existing S3/Stage D/E2 cleanup is deferred to F2:
+Task/Subtask completion and deadline changes do not automatically cancel/recalculate
+all reminders in F1. Relative creation/recalculation is not exposed. BR-REM-004 and
+actual notification delivery are deferred to F3, after F2 target reconciliation.
+See [the complete F1 contract and verification](reminders.md).
 
 ## 11. Progress and report rules
 

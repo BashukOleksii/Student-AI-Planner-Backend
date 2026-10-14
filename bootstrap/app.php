@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\ReminderConflictException;
 use App\Exceptions\StudyPlanConflictException;
 use App\Exceptions\StudySessionConflictException;
 use Illuminate\Auth\AuthenticationException;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
         // Validate exact UTC wire formats instead of silently trimming timestamps.
         $middleware->trimStrings(except: [
+            fn (Request $request) => $request->is('api/reminders', 'api/reminders/*'),
             'deadline_at',
             fn (Request $request) => $request->is('api/lessons', 'api/lessons/*'),
             fn (Request $request) => $request->isMethod('GET') && $request->is('api/tasks'),
@@ -29,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         // Subject color and Task deadlines distinguish null from an invalid empty string.
         $middleware->convertEmptyStringsToNull(except: [
+            fn (Request $request) => $request->is('api/reminders', 'api/reminders/*'),
             fn (Request $request) => $request->is('api/subjects', 'api/subjects/*'),
             fn (Request $request) => $request->is('api/tasks', 'api/tasks/*'),
             fn (Request $request) => $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/study-sessions', 'api/study-sessions/*'),
@@ -36,6 +39,19 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $exception, Request $request) {
+            if ($request->is('api/reminders', 'api/reminders/*')) {
+                if ($exception instanceof ReminderConflictException) {
+                    return response()->json(['message' => $exception->getMessage()], 409);
+                }
+                if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
+                    return null;
+                }
+                if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                }
+
+                return response()->json(['message' => 'The reminder could not be processed.'], 500);
+            }
             if (! $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/study-sessions', 'api/study-sessions/*')) {
                 return null;
             }
