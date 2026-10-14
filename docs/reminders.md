@@ -1,10 +1,13 @@
-# Stages F1/F2 — Absolute and Relative Reminder Management
+# Stages F1/F2/F3a — Reminders and In-App Notifications
 
-F1/F2 implement authenticated reminder storage, management and deterministic target
-synchronization. **No notification is delivered.** There is no scheduler, queue,
-email/push service, delivery claim/retry worker, frontend or AI adapter. The existing
-models, enums, signed SMALLINT offset, foreign keys and MySQL CHECKs are unchanged;
-no migration is added. See [the schema](database-schema.md#314-reminders) and
+F1/F2 implement authenticated reminder management and deterministic target
+synchronization. F3a adds atomic delivery to a persistent in-app inbox, a bounded
+Artisan dispatcher, minute scheduling and authenticated inbox reads. Delivery means
+a committed inbox record, not a student opening it or an external device receiving
+it. There is no email, push, SMS, broadcasting, frontend or AI adapter. Queues and
+their existing infrastructure are unchanged. One additive notifications migration
+is added; Reminder models, enums, signed SMALLINT offsets, FKs and CHECKs remain
+unchanged. See [the schema](database-schema.md#317-notifications-f3a) and
 [stable BR-REM rules](business-rules.md#10-reminder-rules).
 
 ## API contract
@@ -250,7 +253,8 @@ Compatible edits serialize; cancellation cannot be overwritten by a stale edit.
 Failed preflight, target/reminder save veto, SQL failure, event failure or final
 explicit-trigger checks roll back the complete enclosing mutation. Automatic expiry
 cancels safely inside that transaction. No partially synchronized batch commits.
-There are no network calls or notifications inside transactions.
+There are no network calls inside transactions. Only F3a local inbox persistence
+runs inside its delivery transaction; target synchronization sends nothing.
 
 Known limits are cooperating owner-first writers rather than arbitrary SQL/model
 writes; advisory unlocked GET; bounded per-record list relationship queries; and
@@ -259,7 +263,7 @@ Services require separate reconciliation and must never be trusted by delivery.
 Repeated completion is idempotent; F2 hooks run on the actual transition and deadline
 change, not as a general background sweep of legacy data.
 
-## Hard purge and F3 boundary
+## Hard purge safety
 
 FK `SET NULL` can orphan relative metadata if a target is permanently removed.
 A future concrete purge workflow must acquire the owner/work/session/reminder locks,
@@ -270,13 +274,296 @@ historical attribution/audit policy must be defined before exposing such a workf
 There is no public purge now and F2 adds no hook without a concrete caller. Raw
 force deletion is not a supported application workflow.
 
-F3 remains a separate stage: define atomic delivery claiming, current target/anchor
-revalidation, channels, sent transitions, idempotence, retries and concurrency.
-`BR-REM-004` is an intended delivery requirement, not an F1/F2 feature. Storage and
-synchronization do not promise actual notification delivery or separate delivery
-history tables. Existing S3/Stage D/E2 historical identity rules remain authoritative.
+F3a enforces `BR-REM-004` for committed local inbox records. External channels and
+their retry/receipt requirements remain separate future work. Existing S3/Stage D/E2
+historical identity rules remain authoritative.
 
-## Stage F2 verification and changed-file review
+## F3a inbox persistence and payload
+
+`2026_10_14_000001_create_notifications_table.php` creates Laravel's native database
+notification structure: UUID primary key, notification type, indexed polymorphic
+`notifiable_type`/`notifiable_id`, JSON `data`, nullable `read_at` and timestamps.
+A nullable BIGINT `reminder_id` has a UNIQUE constraint and FK to Reminders with
+`ON DELETE SET NULL`. An additional recipient/read/creation index supports inbox
+queries. Multiple null references allow unrelated future notification types.
+
+The existing User `Notifiable` relation and framework `DatabaseNotification` model
+persist receipts directly in the same MySQL transaction as the Reminder update.
+No second outbox/receipt table, custom notification model or external channel is
+needed. The safe stored type is `reminder`; the immutable JSON snapshot has exactly:
+`reminder_id`, `message`, `task_id`, `subtask_id`, `study_session_id`, `trigger_at`.
+It contains the original exact target identity, canonical UTC trigger and meaningful
+display message. Null/blank targeted messages receive deterministic text:
+"You have a task reminder.", "You have a subtask reminder." or
+"You have a study session reminder." General reminders still require meaningful
+messages. There are no target titles, model dumps, credentials or LLM text.
+
+Target changes never rewrite delivered content. `SET NULL` retains delivered inbox
+history if an administrative operation eventually removes a Reminder; the original
+numeric ID stays in JSON. This does not authorize a public purge. Polymorphic
+recipients have no User FK, following Laravel conventions; a future account purge
+must explicitly remove its inbox records as part of the account retention policy.
+No application hard-purge workflow is introduced.
+
+## Due selection, delivery and failure policy
+
+`ReminderDeliveryService::dispatchDue()` captures full-precision UTC time and selects
+only `scheduled` rows with persisted `trigger_at <= now`, ordered by
+`trigger_at ASC, id ASC`. It loads only bounded ID/owner candidates: default 100,
+maximum 1,000. Each candidate is revalidated in its own fresh outermost transaction
+through `process()`; ambient transactions are rejected. Candidate discovery is
+advisory and cannot authorize delivery.
+
+Each transaction locks the current User before any consistent-read snapshot,
+reloads/locks Task, Subtask and exact StudySession attribution when applicable,
+then locks the Reminder. Lock order remains
+`User -> Task -> Subtask -> StudySession -> Reminder`. Shared
+`ReminderTargetService::forReminder()`, `ReminderDependencyService` and
+`ReminderRules` enforce structural ownership, target count and anchor compatibility;
+the strict single-target helper is not loosened for general reminders. General
+absolute reminders use their separate meaningful-message path.
+
+After the locks, a fresh full-precision UTC clock rechecks scheduled/due state.
+Missing, foreign or already-terminal candidates are skipped. Structurally valid
+targets that are deleted, completed or terminal are cancelled, preserving the last
+scheduled trigger, targets, anchor, offset and message with null `sent_at`. Delivery
+requires active pending work and a `planned` linked session, but does not require
+its start to remain future: zero/positive offsets and overdue planned sessions may
+deliver without inferring completion or missed status. Creation/edit eligibility
+still requires a future planned session as in F1/F2.
+
+For eligible relative targets, the exact current persisted anchor plus signed
+offset must equal the stored trigger. Stale triggers, missing anchors, overflow,
+foreign attribution, invalid structure and malformed general messages fail closed
+and roll back. They are not silently repaired. F2 deadline synchronization policy
+is unchanged. The dispatcher never substitutes a successor session, changes work
+progress, completes sessions or changes planning reservations.
+
+A scheduled row with any existing linked notification is an integrity failure;
+the dispatcher never repairs its lifecycle. Under the owner serialization boundary,
+the receipt existence query is deliberately nonlocking to avoid empty unique-index
+gap locks between independent owners. The database UNIQUE constraint complements
+the owner/Reminder locks. Native inbox insertion and `scheduled -> sent` with
+`sent_at` occur atomically. `sent_at` and inbox `created_at` use the captured
+post-lock delivery clock, stored at whole-second column precision. A save veto,
+SQL error or exception after either write rolls back both; a later attempt can
+deliver once. Already-sent/cancelled rows are never rewritten or backfilled.
+
+Each failed candidate is isolated and reported as `failed`; processing continues
+with the remaining selected candidates. No private IDs, messages or SQL are printed.
+An unsuccessful candidate remains scheduled for a later invocation after repair;
+there is no separate retry queue. Persistent corrupt candidates can occupy bounded
+batch slots and need operator resolution. A command-wide selection failure also
+fails the invocation. Local committed-record exactly-once protection does not
+extend to future external side effects or arbitrary SQL writers bypassing Services.
+
+## Artisan command and scheduler operation
+
+```sh
+php artisan migrate
+php artisan reminders:dispatch-due --limit=100
+php artisan schedule:work
+```
+
+The dispatcher emits one JSON count object, for example:
+
+```json
+{"selected":100,"sent":96,"cancelled":2,"skipped":1,"failed":1}
+```
+
+Exit codes: 0 for a completed batch without failures, 1 for failed candidates, and
+2 for an invalid limit. Limits are exact positive decimal strings in 1–1,000.
+`routes/console.php` registers `reminders:dispatch-due --limit=100` every minute.
+No global scheduler overlap lock is required for correctness; per-owner database
+serialization allows competing dispatchers and independent recipients.
+
+Schedule registration does not start an operating-system scheduler. Locally run
+`schedule:work` in a separate process. Production requires a continuously operating
+Laravel scheduler, typically an OS cron entry using the deployed project path:
+
+```cron
+* * * * * cd /path/to/backend && php artisan schedule:run
+```
+
+Configure operational logging and observe nonzero dispatcher results. More than
+100 due reminders are handled by later invocations, or an explicit larger bounded
+limit. F3a provides no external channel queue, provider retries or deployment setup.
+
+## Notification inbox REST API
+
+Both routes require `auth:sanctum`, owner-scoped native notification lookup and the
+explicitly registered `DatabaseNotificationPolicy`.
+
+| Method | Endpoint | Success |
+| --- | --- | --- |
+| GET | `/api/notifications` | 200, paginated Resources |
+| POST | `/api/notifications/{notification}/read` | 200, owned Resource |
+
+GET orders `created_at DESC, id DESC`, includes read and unread records by default,
+and has no writes. Query filters are `unread_only=true|false`, `per_page=1..100`
+(default 20), and `page=1..2147483647` (default 1); unknown or malformed filters
+return 422. Pagination links retain validated filters. Example resource:
+
+```json
+{
+  "data": {
+    "id": "fcb245ee-bbe0-48f7-9212-8cd672c7672e",
+    "type": "reminder",
+    "reminder_id": 35,
+    "message": "Deadline in one hour",
+    "task_id": 12,
+    "subtask_id": null,
+    "study_session_id": null,
+    "trigger_at": "2026-10-21T11:00:00Z",
+    "created_at": "2026-10-21T11:00:08Z",
+    "read_at": null
+  }
+}
+```
+
+`created_at` is the in-app delivery timestamp. Stored history is validated without
+reading mutable targets. Owner/morph details, internal notification classes and
+arbitrary payload data are never exposed. Unrelated future types remain compatible
+with persistence and serialize as safe `type=notification`, a generic message and
+null reminder/target/trigger fields until a separate public contract is defined.
+
+Read POST accepts an empty body only; fields including explicit null `read_at`
+are forbidden. An absent body, `{}` or conventional empty `[]` is accepted;
+malformed/scalar/nonempty-array JSON returns 422. Query parameters cannot override
+the server timestamp. A fresh User lock followed by the owned notification lock
+sets current UTC `read_at` only when null. Repeated and concurrent requests return
+the existing timestamp without another write. Payload and Reminder state remain
+unchanged. No inbox delete endpoint exists.
+
+Unauthenticated requests return 401; missing/foreign IDs return identical generic
+404 responses. Invalid inputs return 422. Unexpected persisted corruption/write
+failure returns generic 500 `{"message":"The notification could not be processed."}`,
+without private metadata or SQL details, even with application debug enabled.
+
+## Lifecycle compatibility and remaining delivery scope
+
+F1 absolute requests, F2 relative requests, PATCH/cancel contracts and Reminder GET
+behavior remain unchanged. Delivery contends at the same owner boundary as
+deadline reconciliation, completion, deletion, Stage D and E2 retirement. A waiting
+dispatcher sees committed edits/cancellations or rollback. If delivery commits
+first, subsequent retirement preserves sent Reminder and inbox history; explicit
+Reminder PATCH/cancel conflicts with 409. No successor receives a cloned reminder
+or notification. Marking read has no Task/Subtask/session/progress effect.
+
+Reminder lifecycle, committed inbox delivery and nullable inbox read state are
+separate concepts. A sent but unread notification remains visible. F3a guarantees
+at most one committed linked inbox record and atomic source transition; it makes
+no claim that a student opened it. Email/push/SMS providers, WebSockets, external
+retry/claim queues, analytics, automatic generation and AI/frontend remain deferred.
+
+## Stage F3a verification and changed-file review
+
+Starting/ending HEAD: `b81b8d4d717ab7714a8b04ce94e3c7c7d90eadfe`. Initial tree
+clean; final tree contains 17 modified tracked files and 14 new files, all unstaged.
+No commit or push. No dependency, queue, database configuration, Reminder schema,
+target mutation Service, planning algorithm or existing cleanup Service changes.
+
+| Changed/added file | Responsibility |
+| --- | --- |
+| `database/migrations/2026_10_14_000001_create_notifications_table.php` (new) | Native JSON inbox, UUID/morph indexes, nullable unique source FK with SET NULL. |
+| `app/Services/Reminders/ReminderDeliveryRules.php` (new) | Pure full-precision due checks and immutable safe payload validation. |
+| `app/Services/Reminders/ReminderDeliveryService.php` (new) | Bounded deterministic selection, source revalidation, atomic delivery and failure isolation. |
+| `app/Services/Reminders/ReminderTargetService.php` | Shared scheduled structural validation; delivery permits still-planned overdue sessions while creation/edit defaults remain unchanged. |
+| `app/Services/Reminders/ReminderService.php` | Delegate existing structural validation to shared target Service. |
+| `app/Console/Commands/DispatchDueReminders.php` (new) | Bounded command, count-only output and failure exit codes. |
+| `routes/console.php` | Register minute dispatch; preserve inspire and queue infrastructure. |
+| `app/Services/Notifications/NotificationInboxService.php` (new) | Owned deterministic pagination and transactional idempotent read mutation. |
+| `app/Http/Controllers/Api/NotificationController.php` (new) | Thin list/read orchestration. |
+| `app/Http/Requests/NotificationIndexRequest.php` (new) | Exact bounded query validation. |
+| `app/Http/Requests/ReadNotificationRequest.php` (new) | Ownership before empty-body validation. |
+| `app/Http/Resources/NotificationResource.php` (new) | Safe immutable history and canonical UTC serialization. |
+| `app/Policies/DatabaseNotificationPolicy.php` (new) | Exact recipient type/owner and generic not-found denial. |
+| `app/Providers/AppServiceProvider.php` | Explicit native notification model Policy mapping. |
+| `routes/api.php` | Two authenticated inbox routes. |
+| `bootstrap/app.php` | Exact notification inputs and generic private-data-safe errors. |
+| `tests/Unit/ReminderDeliveryRulesTest.php` (new) | Pure due/calendar precision, payload typing/whitelisting and immutability. |
+| `tests/Feature/ReminderDeliveryTest.php` (new) | Real MySQL delivery/schema/command/source integrity, UTC boundaries and exact rollback snapshots. |
+| `tests/Feature/NotificationInboxApiTest.php` (new) | Authentication, owner isolation, pagination/read state, history and safe failures. |
+| `tests/Feature/ReminderDeliveryConcurrencyTest.php` (new) | Real independent-process dispatch/lifecycle/read contention and rollback visibility. |
+| `tests/Support/reminder_mutation_worker.php` | Guarded native delivery/read/E2 actions in independent processes. |
+| `tests/Feature/PlanningMigrationTest.php` | Strengthen additive rollback/reapply assertion with notifications table. |
+| `docs/reminders.md` | F3a contract, deployment operation, limitations and actual verification; unchanged historical F1/F2 records. |
+| `docs/architecture.md` | Native notification persistence, shared Services and scheduling architecture. |
+| `docs/domain-model.md` | Scheduling/delivery/read lifecycle separation and delivered snapshots. |
+| `docs/business-rules.md` | Implement local inbox idempotence under unchanged BR-REM identifiers. |
+| `docs/database-schema.md` | Additive inbox schema, FK/ownership and retention policy. |
+| `docs/database-review-notes.md` | Current F3a enforcement and unchanged Stage 02 history. |
+| `docs/tasks.md` | Preserve existing cleanup, progress and sent history. |
+| `docs/study-session-lifecycle.md` | Exact source identity and delivery/retirement contention. |
+| `docs/adaptive-replanning.md` | Existing E2 cleanup remains authoritative; no successor receipt cloning. |
+
+All database suites run serially against guarded real MySQL
+`student_planner_testing`; pure Unit tests have no database. Fixtures are committed
+and Services exercise fresh outermost transactions. No SQLite, skipped concurrency
+substitution or weakened/deleted existing tests. Migration rollback/reapply includes
+the new inbox and preserves scaffold tables/users. Historical verification below
+remains unchanged.
+
+The **29 independent-process F3a concurrency cases** assert REPEATABLE READ and
+actual User-row contention via `performance_schema.data_lock_waits`, `data_locks`
+and `threads`, using separate guarded PHP processes/connections. They verify two
+dispatchers, both execution orders for cancel/absolute edit/relative edit/deadline/
+Task and Subtask completion/deletion/session cancel/reschedule/E2 retirement,
+post-insert and post-sent rollback/retry, failed deadline-sync rollback visibility,
+clock capture after owner wait, independent-owner delivery while another receipt
+is uncommitted, and competing read requests preserving the first timestamp.
+Query-log coverage separately asserts actual work-before-Reminder lock order.
+Sequential HTTP tests are not used as the concurrency proof.
+
+Feature tests additionally cover each absolute/relative target and general mode,
+zero/positive session offsets, overdue planned sessions, not-due and terminal
+history, eligibility cancellation, corrupt/foreign/stale/overflow anchors,
+command limit/order/failure/schedule behavior, nullable uniqueness and JSON schema,
+physical source SET NULL, native save vetoes/SQL errors/post-write exceptions,
+retry after exact all-table rollback, owner-only pagination/read API, immutable
+payload, generic future notification types and Kyiv DST/ISO-year UTC boundaries.
+
+| Final verification command | Exit | Tests | Assertions |
+| --- | ---: | ---: | ---: |
+| `vendor/bin/phpunit --filter='ReminderDelivery|NotificationInbox|PlanningMigrationTest'` | 0 | 115 | 1,188 |
+| Affected regression filter below | 0 | 3,071 | 24,640 |
+| `vendor/bin/phpunit --filter='RemainingEffortServiceTest'` | 0 | 68 | 120 |
+| `vendor/bin/phpunit` | 0 | 3,926 | 32,398 |
+| `vendor/bin/pint --dirty` | 0 | — | — |
+| `vendor/bin/pint --test` | 0 | — | — |
+| `git diff --check` | 0 | — | — |
+
+Focused, affected regression, supplemental effort and full durations: 27.386,
+172.405, 0.049 and 185.153 seconds. All tests passed; none skipped. The full suite
+includes unchanged F1/F2, Task/Subtask/security/deletion, Stage D and E2 confirmation/
+concurrency tests and all 114 new F3a tests. The new pure Unit run passed 28 tests /
+81 assertions, exit 0. The initial focused run passed 83 / 768, and the expanded
+concurrency run passed 112 / 1,164, both exit 0; three additional real MySQL UTC
+calendar cases produced the final 115 / 1,188 focused result.
+
+Exact affected regression command:
+
+```sh
+vendor/bin/phpunit --filter='TimeIntervalServiceTest|AvailabilityOccurrenceServiceTest|FreeTimeServiceTest|FreeSlotsApiTest|SessionDurationConstraintServiceTest|BreakConstraintServiceTest|WorkloadConstraintServiceTest|PlanningConstraintServiceTest|PlanningCandidateEvaluationServiceTest|RemainingEffortServiceServiceTest|PlanningWorkSelectionServiceTest|StudyPlanningServiceTest|StudySessionAllocationServiceTest|WorkloadCapacityTest|StudyPlan|StudySession|TaskLifecycleTest|SubtaskLifecycleTest|TaskSecurityTest|SubtaskSecurityTest|TaskDeletionTest|SubtaskDeletionTest|LessonLifecycleTest|LessonSecurityTest|ScheduleImport|Reminder|NotificationInbox|PlanningMigrationTest|AuthProfileTest|PlanningPreferenceApiTest|StudyAvailabilityApiTest|StudyReplanning'
+```
+
+The affected command contained a misspelled `RemainingEffortServiceServiceTest`
+selector; the separately recorded `RemainingEffortServiceTest` run closes that
+omission. The full run also includes those tests. No failure was hidden or test
+weakened. Final architecture/changed-file review confirms 31 scoped files, no
+new whitespace errors or missing local documentation links, no lock inversion,
+duplicated ownership/anchor arithmetic, network delivery or unrelated infrastructure.
+Approved BR-REM identifiers and historical F1/F2 verification records are retained.
+
+**F3a acceptance: complete.** All nineteen criteria pass for local in-app delivery,
+atomic source/inbox persistence, owner authorization, actual MySQL contention,
+regressions, full-suite and formatting checks. Operational deployment still requires
+applying the migration and running Laravel's scheduler. Persistent corrupt
+candidates need operator resolution and may consume bounded batch capacity.
+Exactly-once protection concerns committed local records; external channels,
+arbitrary direct SQL writers and administrative purge remain outside this stage.
+
+## Stage F2 verification and changed-file review (historical)
 
 Starting and ending HEAD: `1e7bb28249e5769387a928c4fb35e9ddd8bf56e5`.
 Initial tree: clean. Final tree: 21 modified tracked files and six new files,

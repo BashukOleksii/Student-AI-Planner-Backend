@@ -13,11 +13,10 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use LogicException;
-use UnexpectedValueException;
 
 class ReminderService
 {
-    public function __construct(private ReminderRules $rules, private ReminderDependencyService $dependencies, private ReminderTargetService $targets) {}
+    public function __construct(private ReminderRules $rules, private ReminderTargetService $targets) {}
 
     public function listing(User $owner, array $filters): LengthAwarePaginator
     {
@@ -141,16 +140,8 @@ class ReminderService
         if ($reminder->status !== ReminderStatus::Scheduled) {
             return null; // Historical targets are preserved without repair or eligibility checks.
         }
-        $targets = $this->rules->targets($reminder->getAttributes());
-        if ($targets === []) {
-            if ($reminder->anchor !== null || $reminder->offset_minutes !== null || ! $this->rules->meaningful($reminder->message)) {
-                throw new UnexpectedValueException('Invalid reminder relationships.');
-            }
-        } elseif (! $this->dependencies->compatible($reminder, $owner)) {
-            throw new UnexpectedValueException('Invalid reminder relationships.');
-        }
 
-        return $this->targets->resolve($owner, $targets, $lock, false);
+        return $this->targets->forReminder($owner, $reminder, $lock);
     }
 
     private function relativeTrigger(array $context, mixed $offset): string

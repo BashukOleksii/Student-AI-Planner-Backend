@@ -5,7 +5,7 @@ Important: this document defines **domain concepts and ownership**. The approved
 
 Implemented models are `User`, `PlanningPreference`, `StudyAvailabilityWindow`, `EducationInstitution`, `AcademicPeriod`, `Subject`, `Teacher`, `ScheduleImportBatch`, `ScheduleImportRow`, `Lesson`, `Task`, `Subtask`, `StudySession`, `Reminder`, `AiConversation`, and `AiMessage`. PHP backed enums, scalar/date/datetime/JSON-array casts, factories, and MySQL-backed persistence tests support all groups. Lessons, tasks, and subtasks use soft deletion; sessions/reminders retain lifecycle states; AI messages have `created_at` without `updated_at`.
 
-Authentication + User Profile now implements the first-party Sanctum session/cookie API; see [the contract](auth-profile.md). Planning Preferences and Study Availability Windows also have authenticated APIs and focused Services/ownership protection; see [planning settings](planning-settings.md). Academic Context CRUD and its ownership Policies, institution validation, and guarded lifecycle Services are implemented; see [the Academic Context contract](academic-context.md). Lesson CRUD/lifecycle and user-timezone today/date/ISO-week views are implemented; see [schedule.md](schedule.md). PF1 free-time calculation and its read-only API are implemented; see [planning-foundation.md](planning-foundation.md). Stages A–C implement deterministic automatic planning and confirmed session persistence; Stage D implements session lifecycle and single-session rescheduling. F1/F2 absolute and relative Reminder management is implemented; delivery, statistics and AI orchestration/tools remain deferred. Import A implements database-independent weekly-template parsing; see [the parser contract](schedule.md#import-a-workbook-parser-foundation). Import B1 adds transient calendar/parity/timezone materialization. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B3 adds transient identity/projected-conflict classification. Import C1 adds owned upload/persisted preview; C2a revalidates and C2b commits it atomically after confirmation. LessonService prohibits self-replacement and replacement chains. S3/Stage D validate affected scheduled-reminder dependencies; Stage D also validates inspected rescheduling chains. F2 relative/target reconciliation is implemented; administrative purge remains deferred; unsupported DB CHECKs are not used. References below to an earlier SQL/ER draft are historical Stage 01 review context; its source is not present in the repository. See [database review notes](database-review-notes.md).
+Authentication + User Profile now implements the first-party Sanctum session/cookie API; see [the contract](auth-profile.md). Planning Preferences and Study Availability Windows also have authenticated APIs and focused Services/ownership protection; see [planning settings](planning-settings.md). Academic Context CRUD and its ownership Policies, institution validation, and guarded lifecycle Services are implemented; see [the Academic Context contract](academic-context.md). Lesson CRUD/lifecycle and user-timezone today/date/ISO-week views are implemented; see [schedule.md](schedule.md). PF1 free-time calculation and its read-only API are implemented; see [planning-foundation.md](planning-foundation.md). Stages A–C implement deterministic automatic planning and confirmed session persistence; Stage D implements session lifecycle and single-session rescheduling. F1/F2 absolute and relative Reminder management and F3a in-app delivery are implemented; external delivery, statistics and AI orchestration/tools remain deferred. Import A implements database-independent weekly-template parsing; see [the parser contract](schedule.md#import-a-workbook-parser-foundation). Import B1 adds transient calendar/parity/timezone materialization. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B3 adds transient identity/projected-conflict classification. Import C1 adds owned upload/persisted preview; C2a revalidates and C2b commits it atomically after confirmation. LessonService prohibits self-replacement and replacement chains. S3/Stage D validate affected scheduled-reminder dependencies; Stage D also validates inspected rescheduling chains. F2 relative/target reconciliation is implemented; administrative purge remains deferred; unsupported DB CHECKs are not used. References below to an earlier SQL/ER draft are historical Stage 01 review context; its source is not present in the repository. See [database review notes](database-review-notes.md).
 
 C9 approves V1 planning integration policies; C10 implements the read-only
 `PlanningCandidateEvaluationService` through trusted owned Eloquent relationships,
@@ -57,7 +57,7 @@ history and existing S3/Stage D/E2 cleanup. The strict single-target dependency
 helper and physical schema are retained. F2 now adds relative creation/offset editing
 and atomic Task/Subtask deadline/completion reconciliation through a focused
 synchronization Service and shared target/UTC rules. Session identities retain their
-Stage D/E2 retirement policy; F3 delivery and hard purge remain deferred.
+Stage D/E2 retirement policy. F3a adds atomic in-app inbox delivery and independent read state; external delivery and hard purge remain deferred.
 See [reminders.md](reminders.md).
 
 ## 1. Domain boundaries
@@ -294,6 +294,13 @@ Persisted states are `active`, `cancelled`, and `replaced`. Only active, non-sof
 
 Persisted states are `scheduled`, `sent`, and `cancelled`. Sent reminders retain delivery timing; relative reminders must be recalculated when the associated deadline/session changes.
 
+F3a atomically turns an eligible due scheduled Reminder into one native database
+notification owned through User's Notifiable relation. Its unique nullable source
+reference and immutable JSON snapshot preserve original message/target/trigger
+meaning. Reminder scheduling, committed in-app delivery and nullable notification
+`read_at` are independent lifecycle concepts. Reading never completes work or
+changes the Reminder. Existing sent records are not automatically backfilled.
+
 ### Deletion and history
 
 Lessons, tasks, and subtasks use soft deletion. S3 TaskService/SubtaskService use shared transactional cleanup to cancel affected planned sessions with UTC starts at or after now and affected scheduled reminders, then soft-delete the work. Past planned and other session states, sent/cancelled reminders and historical references are preserved. Unsafe live dependencies reject deletion atomically. Model soft deletion alone does not implement that orchestration. Study sessions retain history through lifecycle states; see [tasks.md](tasks.md#s3-safe-deletion-and-dependency-cleanup).
@@ -314,10 +321,12 @@ Derived examples:
 - feasibility warnings;
 - most statistics and report aggregates.
 
-Planning runs, generated report history, and reminder-delivery history are also excluded from V1. A later concrete performance, retention, or audit requirement is needed to introduce additional persistence.
+Planning runs and generated report history remain excluded from V1. F3a's native
+notification inbox persists actual delivered messages, rather than derived data;
+no separate reminder-delivery-history or outbox table is introduced.
 
 ## 7. Resolved design and remaining work
 
 The former Stage 02 ownership, academic-period, target-reference, replacement, enum, and deletion/history questions are resolved by [the approved physical schema](database-schema.md). Its implementation gate records the resolved DB-versus-Service enforcement decisions without reopening those domain decisions.
 
-C9/C10 use nullable configured constraints without defaults or conflict overrides. Any later product defaults or override behavior require a separate decision. The V1 fingerprint normalization/serialization contract is fixed; Import B2 implements its generator and C1 persists preview snapshots; C2b implements confirmed atomic commit. Groups 1–9 complete persistence only; Authentication/Profile, Planning Settings, Academic Context, and manual Lesson/lifecycle/schedule-view application behavior is implemented. Task/Subtask and schedule/import APIs, planning Stages A–C and StudySession Stage D are implemented. F1/F2 absolute and relative Reminder management is implemented; delivery, reports and AI orchestration remain deferred.
+C9/C10 use nullable configured constraints without defaults or conflict overrides. Any later product defaults or override behavior require a separate decision. The V1 fingerprint normalization/serialization contract is fixed; Import B2 implements its generator and C1 persists preview snapshots; C2b implements confirmed atomic commit. Groups 1–9 complete persistence only; Authentication/Profile, Planning Settings, Academic Context, and manual Lesson/lifecycle/schedule-view application behavior is implemented. Task/Subtask and schedule/import APIs, planning Stages A–C and StudySession Stage D are implemented. F1/F2 absolute and relative Reminder management and F3a in-app delivery are implemented; external delivery, reports and AI orchestration remain deferred.

@@ -6,7 +6,7 @@ The canonical design is [database-schema.md](database-schema.md), with [database
 
 Stage E2 extends current application enforcement to confirmed adaptive batches
 without changing the approved schema. The existing unique direct-successor key
-and lifecycle fields remain authoritative. F1/F2 absolute/relative Reminder management and target reconciliation are implemented; F3 delivery and
+and lifecycle fields remain authoritative. F1/F2 absolute/relative Reminder management and target reconciliation are implemented; F3a in-app delivery is implemented; external delivery and
 administrative purge remain deferred; see [adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
 
 Stage F1 adds absolute Reminder creation, paginated list/detail, scheduled editing
@@ -17,14 +17,19 @@ history and existing S3/Stage D/E2 cleanup. The strict single-target dependency
 helper and physical schema are retained. F2 now adds relative creation/offset editing
 and atomic Task/Subtask deadline/completion reconciliation through a focused
 synchronization Service and shared target/UTC rules. Session identities retain their
-Stage D/E2 retirement policy; F3 delivery and hard purge remain deferred.
+Stage D/E2 retirement policy. F3a adds one native notifications migration with
+UUID identity, polymorphic recipient, JSON snapshot and nullable unique Reminder
+FK using SET NULL. It preserves delivered inbox history without a second outbox;
+account purge must separately address recipient records. Native Notifiable/model
+persistence and a single owner-first transaction enforce local idempotence.
+External delivery and hard purge remain deferred.
 See [reminders.md](reminders.md).
 
 ## Source and current repository baseline
 
 The supplied Stage 01 review refers to an earlier SQL/ER draft, but no source SQL draft or ER image is present in this repository. Draft-specific observations below are carried forward from that review and remain unverified against the original artifacts. They describe possible design issues, not defects in the current migrations.
 
-The inspected repository retains the four Laravel/Sanctum scaffold migrations and adds Groups 1–9 through sixteen additive domain migrations. Academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages are implemented with Eloquent relationships, PHP backed enums, factories, supported MySQL constraints, and persistence/rollback tests. Stage 02 persistence is complete. The current repository also implements authentication/profile, settings, academic/schedule/import and Task/Subtask APIs, planning Stages A–C and StudySession Stage D. F1/F2 absolute and relative Reminder management is implemented; delivery, statistics and AI orchestration remain deferred. Application Services enforce cross-row ownership, exact session work attribution, Lesson replacement and Stage D inspected rescheduling graphs, plus affected scheduled-reminder dependencies. F2 relative/target reconciliation is implemented; administrative purge remains deferred. The [canonical schema](database-schema.md) records the resolved AUTO_INCREMENT/SET NULL enforcement decisions and fixed fingerprint contract; Import B2 implements fingerprint generation. Database configuration is unchanged.
+The inspected repository retains the four Laravel/Sanctum scaffold migrations and adds Groups 1–9 through sixteen additive domain migrations. Academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages are implemented with Eloquent relationships, PHP backed enums, factories, supported MySQL constraints, and persistence/rollback tests. Stage 02 persistence is complete. The current repository also implements authentication/profile, settings, academic/schedule/import and Task/Subtask APIs, planning Stages A–C and StudySession Stage D. F1/F2 management and F3a in-app Reminder delivery are implemented; external delivery, statistics and AI orchestration remain deferred. Application Services enforce cross-row ownership, exact session work attribution, Lesson replacement and Stage D inspected rescheduling graphs, plus affected scheduled-reminder dependencies. F2 relative/target reconciliation is implemented; administrative purge remains deferred. The [canonical schema](database-schema.md) records the resolved AUTO_INCREMENT/SET NULL enforcement decisions and fixed fingerprint contract; Import B2 implements fingerprint generation. Database configuration is unchanged.
 
 The earlier SQL/ER draft remains rejected and is retained here as historical context. The approved Stage 02 specification and DBML determine the persistence design; Groups 1–9 implement that approved design through additive migrations, preserving the existing scaffold migrations. The historical analysis below is retained; the current schema records the resolved Lesson/StudySession/Reminder enforcement and exact fingerprint serialization decisions.
 
@@ -149,4 +154,4 @@ Additional approved decisions:
 - free slots, overdue flags, progress percentages, workload totals, conflicts, and general metric snapshots are not persisted;
 - planning-run, report-history, and reminder-delivery-history tables are excluded from V1.
 
-Stage 02 persistence is complete. MySQL enforcement decisions are resolved: unsupported checks are assigned to deterministic Services, while supported scalar/timestamp CHECKs are enforced. LessonService and Stage D validate inspected replacement/rescheduling history; S3/Stage D validate affected reminder dependencies. Authentication/profile, planning-settings, and Academic Context APIs/Services are implemented. No planning defaults or conflict overrides are invented. Task deletion and scoped reminder cleanup, Stage A–D planning/session workflows and import confirmation are implemented. Fingerprint normalization/serialization and Import B2 generation are implemented. F1/F2 absolute/relative Reminder workflows and reconciliation are implemented; F3 delivery remains deferred. Ordered administrative account hard purge remains necessary for restrictive history graphs. Framework tables are preserved.
+Stage 02 persistence is complete. MySQL enforcement decisions are resolved: unsupported checks are assigned to deterministic Services, while supported scalar/timestamp CHECKs are enforced. LessonService and Stage D validate inspected replacement/rescheduling history; S3/Stage D validate affected reminder dependencies. Authentication/profile, planning-settings, and Academic Context APIs/Services are implemented. No planning defaults or conflict overrides are invented. Task deletion and scoped reminder cleanup, Stage A–D planning/session workflows and import confirmation are implemented. Fingerprint normalization/serialization and Import B2 generation are implemented. F1/F2 absolute/relative Reminder workflows and reconciliation are implemented; F3a in-app delivery is implemented; external delivery remains deferred. Ordered administrative account hard purge remains necessary for restrictive history graphs. Framework tables are preserved.

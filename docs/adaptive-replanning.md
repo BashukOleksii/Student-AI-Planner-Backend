@@ -12,7 +12,11 @@ anchors. F2 atomically reconciles Task/Subtask deadline and completion changes;
 completion cancels invalidated reminders without changing StudySessions or other
 work. The strict single-target dependency helper and existing S3/Stage D/E2 cleanup
 policies remain intact. Session retirement never transfers/clones reminders to a
-successor. Notification delivery remains F3 work; hard purge is not exposed.
+successor. F3a delivers due reminders to the in-app inbox under the same owner-first boundary.
+Retirement committed first prevents delivery; delivery committed first preserves
+sent Reminder and immutable inbox history. No successor notification is cloned.
+Read state never alters work or sessions. External delivery and hard purge remain
+unimplemented.
 
 ## REST and application contracts
 

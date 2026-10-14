@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EducationInstitutionController;
 use App\Http\Controllers\Api\FreeSlotController;
 use App\Http\Controllers\Api\LessonController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PlanningPreferenceController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReminderController;
@@ -27,6 +28,9 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
 });
 
 Route::middleware('auth:sanctum')->group(function (): void {
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'read'])->whereUuid('notification')->name('notifications.read');
+
     Route::get('/reminders', [ReminderController::class, 'index'])->name('reminders.index');
     Route::post('/reminders', [ReminderController::class, 'store'])->name('reminders.store');
     Route::get('/reminders/{reminder}', [ReminderController::class, 'show'])->whereNumber('reminder')->name('reminders.show');

@@ -1,7 +1,7 @@
 # Business Rules
 
 Status: approved persistence baseline with current API enforcement recorded\
-Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. T1/T2 Task create/detail/PATCH and manual completion/reopening, plus T3 owned filtered/paginated listing, are implemented; S1 adds nested Subtask basic APIs and independent completion/reopening; S2 adds transactional reordering and read-only count-based Task progress. See [tasks.md](tasks.md). S3 implements safe Task/Subtask soft deletion and scoped synchronous dependency cancellation. PF1 free-time calculation and its read-only API are implemented; see [planning-foundation.md](planning-foundation.md). Stages A–C implement deterministic work selection, automatic planning and reviewed transactional persistence; Stage D adds session lifecycle and single-session rescheduling. Reminder delivery, statistics and AI orchestration/tools remain future work. Import C2b implements confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B1 adds transient calendar/parity/timezone materialization. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
+Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. T1/T2 Task create/detail/PATCH and manual completion/reopening, plus T3 owned filtered/paginated listing, are implemented; S1 adds nested Subtask basic APIs and independent completion/reopening; S2 adds transactional reordering and read-only count-based Task progress. See [tasks.md](tasks.md). S3 implements safe Task/Subtask soft deletion and scoped synchronous dependency cancellation. PF1 free-time calculation and its read-only API are implemented; see [planning-foundation.md](planning-foundation.md). Stages A–C implement deterministic work selection, automatic planning and reviewed transactional persistence; Stage D adds session lifecycle and single-session rescheduling. F3a in-app Reminder delivery is implemented; external delivery, statistics and AI orchestration/tools remain future work. Import C2b implements confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B1 adds transient calendar/parity/timezone materialization. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
 
 Lesson association/replacement ownership, self-replacement/chain prohibition, Lesson lifecycle transitions and active overlap validation are implemented. Task Subject ownership, parent deadline bounds and manual completion/reopening are implemented in TaskService. S3 validates ownership, session task/subtask consistency and Reminder target compatibility for affected live deletion dependencies. Stage C implements session reads and reviewed creation; Stage D implements lifecycle, rescheduling chains and scoped scheduled-reminder cleanup. General Reminder APIs/recalculation/purge reconciliation remain future Service requirements. MySQL enforces supported scalar/timestamp CHECKs, FK existence/actions, and approved uniqueness; it does not enforce cross-row ownership or checks prohibited by AUTO_INCREMENT/SET NULL restrictions.
 
@@ -354,6 +354,12 @@ F1/F2 newly created and explicitly edited absolute/relative reminders must have 
 **BR-REM-004 — Idempotent delivery**  
 Retries must not intentionally produce duplicate user notifications for the same delivery event.
 
+F3a implements this for committed local inbox records: a nullable unique
+`notifications.reminder_id`, owner-first current-state locking and one transaction
+for native database-notification insertion plus `scheduled -> sent` with `sent_at`.
+Failure rolls back both records; reprocessing terminal history is forbidden.
+External email/push exactly-once semantics are outside this guarantee.
+
 **BR-REM-005 — Target changes**  
 When a deadline/session changes, a deterministic Service recalculates relative reminders from the persisted anchor and offset. Hard-purge handling must reconcile relative reminders before a target is removed; target compatibility and purge reconciliation are explicitly Service-level because MySQL forbids target CHECKs involving the SET NULL FKs.
 
@@ -367,7 +373,7 @@ from this scoped lifecycle cleanup.
 Supported relative anchors are `task_deadline`, `subtask_deadline`, and `session_start`, each requiring its matching target. Persist the anchor, signed `offset_minutes`, and resolved `trigger_at = anchor_timestamp_utc + offset_minutes * 60 seconds`; negative offsets mean before the anchor. Anchor and offset are both present or both null. For absolute reminders they are null and `trigger_at` is authoritative.
 
 **BR-REM-007 — Reminder lifecycle**\
-Reminder statuses are `scheduled`, `sent`, and `cancelled`. Sent reminders require `sent_at`; non-sent reminders have no sent timestamp. V1 does not introduce reminder-delivery-history tables.
+Reminder statuses are `scheduled`, `sent`, and `cancelled`. Sent reminders require `sent_at`; non-sent reminders have no sent timestamp. F3a's inbox is the delivered record; no separate delivery-history/outbox table is introduced. Inbox `read_at` is independent of Reminder status and work completion.
 
 F1/F2 enforce BR-REM-001/002/003/005/006/007 through authenticated absolute and
 relative Reminder management. General reminders require a meaningful message;
@@ -389,9 +395,19 @@ public writes. GET never recalculates, cancels or repairs records. S3/Stage D/E2
 cleanup remains authoritative, retaining original session identities and metadata.
 No existing operation edits a session start in place or exposes hard purge.
 
-BR-REM-004 and actual notification delivery remain F3 work. Administrative hard
-purge must reconcile scheduled dependents before SET NULL; no speculative purge
-endpoint/hook is introduced. See [the F1/F2 contract and actual verification](reminders.md).
+F3a processes scheduled triggers at or before full-precision UTC now, including
+overdue records. Shared structural checks fail closed on foreign/broken references;
+valid but ineligible targets are cancelled with original metadata retained.
+Eligible relative reminders must match the exact current anchor-plus-offset trigger;
+stale/missing/overflow anchors fail without repair. A still-planned session may
+deliver after its start without inferring missed/completed state. Each corrupt
+candidate rolls back and is counted independently; the bounded batch continues.
+GET is read-only; owned marking-as-read is idempotent and preserves immutable
+payload and sent history. Existing retirement never clones reminders/notifications.
+Email/push and external retry channels remain future work. Administrative hard
+purge must reconcile scheduled dependents before SET NULL and separately account
+for polymorphic inbox ownership; no speculative endpoint/hook is introduced.
+See [the F1/F2/F3a contract and actual verification](reminders.md).
 
 ## 11. Progress and report rules
 

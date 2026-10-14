@@ -1,11 +1,16 @@
 <?php
 
 use App\Exceptions\ReminderConflictException;
+use App\Exceptions\StudyPlanConflictException;
+use App\Exceptions\StudySessionConflictException;
 use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\Notifications\NotificationInboxService;
+use App\Services\Planning\StudyReplanningPersistenceService;
 use App\Services\Planning\StudySessionLifecycleService;
 use App\Services\Planning\StudySessionReschedulingService;
+use App\Services\Reminders\ReminderDeliveryService;
 use App\Services\Reminders\ReminderService;
 use App\Services\Tasks\SubtaskService;
 use App\Services\Tasks\TaskService;
@@ -40,6 +45,17 @@ if (isset($input['now_after_lock'])) {
 try {
     $service = $app->make(ReminderService::class);
     switch ($input['action']) {
+        case 'dispatch':
+            $outcome = $app->make(ReminderDeliveryService::class)->process($owner->id, $input['reminder_id']);
+            break;
+        case 'read':
+            $notification = $app->make(NotificationInboxService::class)->read($owner, $input['notification_id']);
+            $outcome = ['status' => 'read', 'read_at' => $notification->getRawOriginal('read_at')];
+            break;
+        case 'replan':
+            $app->make(StudyReplanningPersistenceService::class)->confirm($owner, $input['preview_token'], true, true);
+            $outcome = ['status' => 'applied'];
+            break;
         case 'create':
             $reminder = $service->create($owner, $input['data']);
             $outcome = ['status' => 'created', 'id' => $reminder->id];
@@ -85,7 +101,7 @@ try {
             $outcome = ['status' => 'rescheduled'];
             break;
     }
-} catch (ReminderConflictException) {
+} catch (ReminderConflictException|StudySessionConflictException|StudyPlanConflictException) {
     $outcome = ['status' => 'conflict'];
 } catch (ValidationException) {
     $outcome = ['status' => 'invalid'];

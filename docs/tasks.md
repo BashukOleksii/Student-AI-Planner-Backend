@@ -6,7 +6,7 @@ MySQL Task/Subtask schema and enums. S1 adds nested Subtask creation, ordered
 listing, detail, partial editing and completion/reopening. S2 adds transactional
 Subtask reordering and read-only derived Task progress. S3 adds safe Task/Subtask
 soft deletion with synchronous dependency cancellation. Restore, hard purge,
-Reminder CRUD/delivery and AI tools remain deferred. [Stage C](study-plan-persistence.md)
+External notification delivery and AI tools remain deferred. [Stage C](study-plan-persistence.md)
 now provides explicit reviewed planning confirmation separately; Task/Subtask
 lifecycle and progress behavior do not change.
 
@@ -16,7 +16,11 @@ anchors. F2 atomically reconciles Task/Subtask deadline and completion changes;
 completion cancels invalidated reminders without changing StudySessions or other
 work. The strict single-target dependency helper and existing S3/Stage D/E2 cleanup
 policies remain intact. Session retirement never transfers/clones reminders to a
-successor. Notification delivery remains F3 work; hard purge is not exposed.
+successor. F3a delivers due reminders to the in-app inbox under the same owner-first boundary.
+Retirement committed first prevents delivery; delivery committed first preserves
+sent Reminder and immutable inbox history. No successor notification is cloned.
+Read state never alters work or sessions. External delivery and hard purge remain
+unimplemented.
 
 ## Endpoints
 
@@ -377,6 +381,6 @@ Stage D StudySession mutations follow the same owner-first serialization,
 validate historical attribution and require active eligible targets for transfers.
 Arbitrary database writers are outside that application guarantee. Stage D
 separate-process MySQL tests observe actual owner-lock contention between deletion
-and rescheduling. Restore, hard purge and reminder delivery remain future work.
+and rescheduling. Restore, hard purge and external reminder delivery remain future work; F3a in-app delivery preserves this cleanup contract.
 Planning Stages A–C and [StudySession Stage D](study-session-lifecycle.md) are
 implemented separately.
