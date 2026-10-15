@@ -328,6 +328,19 @@ schedulable duration and effort accounting are now implemented separately by
 Stage B implements advisory feasibility and automatic allocation; parent/child
 estimates are not double-counted.
 
+## G1 progress statistics
+
+G1 adds separate [progress statistics](progress-statistics.md) at
+`GET /api/statistics/progress`. Its independent current Task/Subtask counts do not
+change S2b's per-parent percentage. Period completions require current completed
+status and persisted `completed_at`; each item uses its own stored deadline for
+on-time/late/missing-deadline classification. Planning's inherited effective deadline
+does not apply. Deleted work and children under deleted parents are excluded;
+reopening, subsequent completion, deletion and deadline editing may change later
+reports of past activity because immutable historical transitions are unavailable.
+Compatible historical StudySessions remain included independently. Statistics never
+change work, progress, reminders or lifecycle state.
+
 ## S3 safe deletion and dependency cleanup
 
 DELETE ignores request-body target/ownership fields and returns 204 with no body.

@@ -99,6 +99,16 @@ and confirmation.
 
 ## Transitions and effort
 
+G1 [progress statistics](progress-statistics.md) reads the persisted result of these
+actions without invoking them. Sessions belong to the requested local period by
+original `starts_at`, with full scheduled seconds grouped by their current stored
+status. Completed actual minutes come exclusively from `actual_minutes`; null is
+reported as unknown, without Stage A's scheduled-credit fallback. Predecessors and
+successors remain distinct records, while only completed rows supply known actual
+time. Valid soft-deleted Task/Subtask references remain historical data under the
+existing C9/Stage C ownership checks. G1 does not infer missed/completed states or
+change session, reminder or inbox history.
+
 All public actions require the current source state to be `planned`.
 
 | Action | Time condition against captured UTC now | New state | Completion fields |

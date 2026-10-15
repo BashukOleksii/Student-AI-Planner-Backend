@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PlanningPreferenceController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\ProgressStatisticsController;
 use App\Http\Controllers\Api\ReminderController;
 use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\ScheduleImportController;
@@ -28,6 +29,8 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
 });
 
 Route::middleware('auth:sanctum')->group(function (): void {
+    Route::get('/statistics/progress', [ProgressStatisticsController::class, 'index'])->name('statistics.progress');
+
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'read'])->whereUuid('notification')->name('notifications.read');
 
