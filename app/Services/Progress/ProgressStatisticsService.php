@@ -31,24 +31,41 @@ class ProgressStatisticsService
             $children = Subtask::query()->whereHas('task', fn ($query) => $query->where('user_id', $owner->getKey()));
             $taskCurrent = $this->currentMetrics(clone $tasks, $now);
             $childCurrent = $this->currentMetrics(clone $children, $now);
-            $taskCompletions = $this->completions(clone $tasks, $coverage);
-            $childCompletions = $this->completions(clone $children, $coverage);
-            $sessionQuery = $this->inPeriod($owner->studySessions()->getQuery(), 'starts_at', $coverage);
-            $sessions = $sessionQuery->get(['id', 'task_id', 'subtask_id', 'status', 'starts_at', 'ends_at', 'actual_minutes']);
-            // Same owned historical-reference policy as C9 and Stage C session reads.
-            $this->context->validateSessionReferences($owner, $sessions);
+            $metrics = $this->activityMetrics($this->loadActivity($owner, $coverage), $coverage);
 
             return [
                 'as_of_utc' => $now->format('Y-m-d\TH:i:s.u\Z'),
                 'timezone' => $owner->timezone,
                 'period' => ['start_date' => $startDate, 'end_date' => $endDate, 'session_attribution' => 'starts_at'],
-                'tasks' => ['current' => $taskCurrent, 'completed_in_period' => $taskCompletions],
-                'subtasks' => ['current' => $childCurrent, 'completed_in_period' => $childCompletions],
-                'study_sessions' => ['started_in_period' => $this->sessionMetrics(
-                    $sessions->map(fn ($session) => $session->getAttributes())->all(), $coverage,
-                )],
+                'tasks' => ['current' => $taskCurrent, 'completed_in_period' => $metrics['tasks_completed']],
+                'subtasks' => ['current' => $childCurrent, 'completed_in_period' => $metrics['subtasks_completed']],
+                'study_sessions' => ['started_in_period' => $metrics['study_sessions']],
             ];
         });
+    }
+
+    /** Shared G1/G2a bounded sources; caller supplies the fresh owner and read transaction. */
+    public function loadActivity(User $owner, array $coverage): array
+    {
+        $tasks = $this->completions($owner->tasks()->getQuery(), $coverage);
+        $children = $this->completions(Subtask::query()->whereHas('task',
+            fn ($query) => $query->where('user_id', $owner->getKey())), $coverage);
+        $sessions = $this->inPeriod($owner->studySessions()->getQuery(), 'starts_at', $coverage)
+            ->get(['id', 'task_id', 'subtask_id', 'status', 'starts_at', 'ends_at', 'actual_minutes']);
+        $this->context->validateSessionReferences($owner, $sessions);
+
+        return ['tasks' => $tasks, 'subtasks' => $children,
+            'study_sessions' => $sessions->map(fn ($session) => $session->getAttributes())->all()];
+    }
+
+    /** Pure shared activity definitions, without lifetime current-state counts. */
+    public function activityMetrics(array $activity, array $coverage): array
+    {
+        return [
+            'tasks_completed' => $this->completionMetrics($activity['tasks'], $coverage),
+            'subtasks_completed' => $this->completionMetrics($activity['subtasks'], $coverage),
+            'study_sessions' => $this->sessionMetrics($activity['study_sessions'], $coverage),
+        ];
     }
 
     private function currentMetrics(Builder $query, CarbonImmutable $now): array
@@ -67,7 +84,7 @@ class ProgressStatisticsService
         $records = $this->inPeriod($query->where('status', TaskStatus::Completed), 'completed_at', $coverage)
             ->get(['status', 'completed_at', 'deadline_at']);
 
-        return $this->completionMetrics($records->map(fn ($record) => $record->getAttributes())->all(), $coverage);
+        return $records->map(fn ($record) => $record->getAttributes())->all();
     }
 
     /** Pure reduction of raw UTC persistence records; parent deadlines are never substituted. */
@@ -75,19 +92,26 @@ class ProgressStatisticsService
     {
         $result = ['total' => 0, 'on_time' => 0, 'late' => 0, 'without_deadline' => 0];
         foreach ($records as $record) {
-            if ($record['status'] !== TaskStatus::Completed->value) {
+            $completed = $this->completionInstant($record);
+            if ($completed === null) {
                 continue;
             }
-            $completed = $this->context->utcSeconds($record['completed_at']);
             if (! $this->contains($coverage, $completed)) {
                 continue;
             }
             $deadline = $record['deadline_at'] === null ? null : $this->context->utcSeconds($record['deadline_at']);
-            $result['total']++;
-            $result[$deadline === null ? 'without_deadline' : ($completed <= $deadline ? 'on_time' : 'late')]++;
+            $result['total'] = $this->add($result['total'], 1);
+            $key = $deadline === null ? 'without_deadline' : ($completed <= $deadline ? 'on_time' : 'late');
+            $result[$key] = $this->add($result[$key], 1);
         }
 
         return $result;
+    }
+
+    public function completionInstant(array $record): ?int
+    {
+        return $record['status'] === TaskStatus::Completed->value
+            ? $this->context->utcSeconds($record['completed_at']) : null;
     }
 
     /** Pure start-attributed full scheduled durations and explicitly known completed actual minutes. */
@@ -108,16 +132,16 @@ class ProgressStatisticsService
             if (StudySessionStatus::tryFrom($status) === null) {
                 throw new UnexpectedValueException('Invalid statistics source.');
             }
-            $result[$status]['count']++;
+            $result[$status]['count'] = $this->add($result[$status]['count'], 1);
             $result[$status]['scheduled_seconds'] = $this->add($result[$status]['scheduled_seconds'], $duration);
             if ($status === StudySessionStatus::Completed->value) {
                 if ($record['actual_minutes'] === null) {
-                    $result['completed_without_actual_minutes']++;
+                    $result['completed_without_actual_minutes'] = $this->add($result['completed_without_actual_minutes'], 1);
                 } else {
                     if (! is_int($record['actual_minutes']) || $record['actual_minutes'] < 1 || $record['actual_minutes'] > 65535) {
                         throw new UnexpectedValueException('Invalid statistics source.');
                     }
-                    $result['completed_with_actual_minutes']++;
+                    $result['completed_with_actual_minutes'] = $this->add($result['completed_with_actual_minutes'], 1);
                     $result['completed_actual_minutes'] = $this->add($result['completed_actual_minutes'], $record['actual_minutes']);
                 }
             }
@@ -135,7 +159,7 @@ class ProgressStatisticsService
         return $total + $value;
     }
 
-    private function contains(array $coverage, int $instant): bool
+    public function contains(array $coverage, int $instant): bool
     {
         foreach ($coverage as $range) {
             if ($instant >= $range['start'] && $instant < $range['end']) {

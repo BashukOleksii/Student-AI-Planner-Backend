@@ -259,9 +259,18 @@ session maintenance when deployed with a database session handler.
 
 ## G2 boundary and data limitations
 
-G1 provides no daily/weekly chart series, period comparisons, trend/forecast engine,
+Stage G2a now implements [daily progress trends](progress-trends.md) separately at
+`GET /api/statistics/trends`, with one bucket per requested nominal local date.
+G1's existing endpoint, fields and definitions are unchanged. Its bounded activity
+queries, reducers, UTC membership/storage-boundary helpers and historical-reference
+checks are shared with G2a. Daily sums reconcile exactly with G1 period activity on
+the same snapshot/clock; G1 current counts remain lifetime-only. G2a does not add
+historical states, comparisons, report files or AI integration. Earlier verification
+records below retain their original G1 checkpoint meaning.
+
+G1 itself provides no daily/weekly chart series, period comparisons, trend/forecast engine,
 subject breakdown, immutable historical snapshots, CSV/PDF/Excel export, scheduled
-report, AI summary/tool or notification analytics. G2 must define additional
+report, AI summary/tool or notification analytics. G2b must define additional
 attribution/history requirements explicitly rather than treat current-state work
 counts as past snapshots. Reports cannot infer actual minutes for null records or
 reconstruct hard-purged session history. All present metrics derive from the current

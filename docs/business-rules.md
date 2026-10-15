@@ -1,7 +1,7 @@
 # Business Rules
 
 Status: approved persistence baseline with current API enforcement recorded\
-Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. T1/T2 Task create/detail/PATCH and manual completion/reopening, plus T3 owned filtered/paginated listing, are implemented; S1 adds nested Subtask basic APIs and independent completion/reopening; S2 adds transactional reordering and read-only count-based Task progress. See [tasks.md](tasks.md). S3 implements safe Task/Subtask soft deletion and scoped synchronous dependency cancellation. PF1 free-time calculation and its read-only API are implemented; see [planning-foundation.md](planning-foundation.md). Stages A–C implement deterministic work selection, automatic planning and reviewed transactional persistence; Stage D adds session lifecycle and single-session rescheduling. F3a in-app Reminder delivery is implemented; G1 read-only progress statistics is implemented; external delivery, reports/trends and AI orchestration/tools remain future work. Import C2b implements confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B1 adds transient calendar/parity/timezone materialization. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
+Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. T1/T2 Task create/detail/PATCH and manual completion/reopening, plus T3 owned filtered/paginated listing, are implemented; S1 adds nested Subtask basic APIs and independent completion/reopening; S2 adds transactional reordering and read-only count-based Task progress. See [tasks.md](tasks.md). S3 implements safe Task/Subtask soft deletion and scoped synchronous dependency cancellation. PF1 free-time calculation and its read-only API are implemented; see [planning-foundation.md](planning-foundation.md). Stages A–C implement deterministic work selection, automatic planning and reviewed transactional persistence; Stage D adds session lifecycle and single-session rescheduling. F3a in-app Reminder delivery is implemented; G1 progress statistics and G2a daily trends are implemented; external delivery, period comparisons/reports and AI orchestration/tools remain future work. Import C2b implements confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B1 adds transient calendar/parity/timezone materialization. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
 
 Lesson association/replacement ownership, self-replacement/chain prohibition, Lesson lifecycle transitions and active overlap validation are implemented. Task Subject ownership, parent deadline bounds and manual completion/reopening are implemented in TaskService. S3 validates ownership, session task/subtask consistency and Reminder target compatibility for affected live deletion dependencies. Stage C implements session reads and reviewed creation; Stage D implements lifecycle, rescheduling chains and scoped scheduled-reminder cleanup. General Reminder APIs/recalculation/purge reconciliation remain future Service requirements. MySQL enforces supported scalar/timestamp CHECKs, FK existence/actions, and approved uniqueness; it does not enforce cross-row ownership or checks prohibited by AUTO_INCREMENT/SET NULL restrictions.
 
@@ -420,6 +420,11 @@ are independent active-record aggregates. Pending work is overdue only when its
 own non-null persisted deadline is strictly before the captured UTC clock. No
 combined parent/child work total, percentage, snapshot row or inferred event is added.
 
+G2a [daily progress trends](progress-trends.md) shares G1's source selection and
+metric reducers. Every requested local date has a bucket, including explicit zero
+days; exact integer daily sums reconcile with G1 period activity on the same
+snapshot. G1 current lifetime counts are not historical daily populations.
+
 **BR-STAT-002 — Period boundaries**  
 Day/week/month/custom-period statistics use the user's timezone.
 
@@ -428,6 +433,10 @@ The freshly persisted IANA timezone and existing exact half-open UTC membership
 expansion handle DST, skipped dates and disjoint historical occurrences. Task and
 Subtask completion use `completed_at`; sessions use original `starts_at` with the
 full record duration, without boundary clipping or completion-time attribution.
+
+G2a uses the same membership per nominal date: skipped dates remain zero, repeated
+or disjoint occurrences of a date share one bucket, and no UTC envelope fills a
+membership gap. Query count is independent of calendar-day count.
 
 **BR-STAT-003 — Planned vs actual separation**  
 Planned study duration comes from scheduled start/end; actual completed duration comes from `actual_minutes`. These are separate measures, not a single stored workload total.
@@ -452,6 +461,9 @@ The AI may summarize or explain a progress report only from tool-returned metric
 
 G1 adds no AI tool, LLM analysis, forecasting or report generation. That boundary
 and the approved BR-STAT-001–005 identifiers remain unchanged.
+
+G2a adds deterministic daily data only, with no AI consumer, forecasting, period
+comparison or generated report. It preserves all five approved rule identifiers.
 
 ## 12. AI agent rules
 
