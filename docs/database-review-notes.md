@@ -25,6 +25,14 @@ persistence and a single owner-first transaction enforce local idempotence.
 External delivery and hard purge remain deferred.
 See [reminders.md](reminders.md).
 
+H2 adds only durable chat coordination: `ai_conversation_turns` with an owned
+Conversation cascade FK, unique conversation/request UUID, content hash, finite
+lease and safe replay result, plus a Conversation/Message ID ordering index.
+Existing Conversation/Message columns and records remain unchanged. Short
+conversation locks serialize claims/finalization without a network transaction;
+this is not a new planning-run, analytics or generic audit entity. See
+[the H2 persistence contract](ai-agent-chat.md#persistence-concurrency-and-failure-policy).
+
 ## Source and current repository baseline
 
 The supplied Stage 01 review refers to an earlier SQL/ER draft, but no source SQL draft or ER image is present in this repository. Draft-specific observations below are carried forward from that review and remain unverified against the original artifacts. They describe possible design issues, not defects in the current migrations.

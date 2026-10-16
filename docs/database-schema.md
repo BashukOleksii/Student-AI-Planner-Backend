@@ -37,7 +37,7 @@ projected-conflict classification with transient row statuses, without staging
 or Lesson writes. No schema, enums or fixed fingerprint contract changed.
 See [schedule.md](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
 
-**Current application scope:** PF1/PF2/C9/C10, Stage A effort/work selection, Stage B automatic planning, Stage C reviewed confirmation/session reads, Stage D lifecycle/single-session rescheduling and Stage E1/E2 adaptive preview/atomic confirmation are implemented. Task/Subtask APIs and schedule-import confirmation are also implemented. F1/F2 management and F3a in-app Reminder delivery are implemented; external delivery, statistics and AI orchestration/tools remain deferred.
+**Current application scope:** PF1/PF2/C9/C10, Stage A effort/work selection, Stage B automatic planning, Stage C reviewed confirmation/session reads, Stage D lifecycle/single-session rescheduling and Stage E1/E2 adaptive preview/atomic confirmation are implemented. Task/Subtask APIs and schedule-import confirmation are also implemented. F1/F2 management and F3a in-app Reminder delivery are implemented; read-only G1/G2a/G2b statistics and H1/H2 AI tools/chat are implemented; external delivery, exports and mutating AI tools remain deferred.
 
 Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. T1/T2 enforce Task Subject ownership, parent deadline bounds and manual completion/reopening. S3 implements Task/Subtask deletion cleanup with eligible dependency ownership and target validation; Stage D implements session lifecycle/rescheduling and affected reminder preflight; F1 absolute Reminder APIs are implemented; F2 reconciliation and F3a local inbox delivery are implemented; product defaults remain undecided. Import C1/C2a/C2b now implement temporary XLSX upload, persisted preview/revalidation and confirmed atomic Lesson reconciliation. Destructive semester replacement is deferred. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. Stage D enforces inspected StudySession chains and explicit lifecycle operations; general editing/reopening remains deferred.
 
@@ -942,12 +942,13 @@ Indexes:
 
 - `INDEX(conversation_id, created_at)`;
 - `INDEX(tool_call_id)`.
+- H2 adds `INDEX(conversation_id, id)` for stable chronological pagination and bounded recent history.
 
 Eloquent:
 
 - `belongsTo(AiConversation::class)`.
 
-Messages are treated as append-oriented records; `updated_at` is absent. `AiMessage::UPDATED_AT = null` keeps automatic `created_at` support without writing an update timestamp. Role casts to `AiMessageRole`, tool calls to array, and creation time to datetime. Append-oriented usage is a future application convention, not database immutability; Eloquent updates remain schema-compatible. No soft deletes.
+Messages are treated as append-oriented records; `updated_at` is absent. `AiMessage::UPDATED_AT = null` keeps automatic `created_at` support without writing an update timestamp. Role casts to `AiMessageRole`, tool calls to array, and creation time to datetime. H2 implements append-oriented completed transcripts as an application convention, not database immutability; Eloquent updates remain schema-compatible. No soft deletes.
 
 ### 3.17 notifications (F3a)
 
@@ -984,6 +985,39 @@ only read/audit timing; it never updates Reminder or work lifecycle. A sent reco
 from before F3a is not backfilled. There is no second receipt/outbox table. See
 [the API, scheduler, failure and verification contract](reminders.md).
 
+### 3.18 ai_conversation_turns (H2)
+
+Additive migration `2026_10_16_000001_create_ai_conversation_turns_table.php`
+provides durable chat execution leases and request idempotency. Existing
+Conversation/Message columns and records remain unchanged.
+
+| Column | MySQL type | Null |
+| --- | --- | ---: |
+| `id` | BIGINT UNSIGNED, primary key | NO |
+| `conversation_id` | BIGINT UNSIGNED | NO |
+| `request_id` | CHAR(36), UUID | NO |
+| `input_hash` | CHAR(64), SHA-256 | NO |
+| `lease_token` | CHAR(36), UUID | YES |
+| `lease_expires_at` | DATETIME(6), UTC | YES |
+| `result` | JSON, safe committed public response | YES |
+| `created_at` | TIMESTAMP | YES |
+| `updated_at` | TIMESTAMP | YES |
+
+The FK is `conversation_id -> ai_conversations.id ON DELETE CASCADE`.
+`UNIQUE(conversation_id, request_id)` enforces durable request-key scope;
+`INDEX(conversation_id, lease_expires_at)` supports active-lease checks. The same
+migration adds `ai_messages_conversation_order_index(conversation_id, id)`.
+
+Services lock the owned conversation briefly for claim/finalization, enforce
+one unexpired turn, compare exact content hashes, and reject stale lease tokens
+using MySQL UTC time. The completed result and message transcript commit together.
+The JSON response snapshot intentionally has no separate message FKs: it is the
+bounded public response for exact retry replay, and contains no independent
+business state. There is no separate Eloquent model or public turn-table API.
+Record retention follows the conversation; future administrative message purges
+must address replay consistency. No network operation runs in these transactions.
+See [AI agent chat](ai-agent-chat.md).
+
 ## 4. Delete behavior matrix
 
 | Parent/entity | Normal domain action | FK/hard-delete behavior |
@@ -1002,7 +1036,8 @@ from before F3a is not backfilled. There is no second receipt/outbox table. See
 | StudySession | lifecycle status, not soft delete | target reminders set null |
 | Reminder | scheduled row may be cancelled; no public delete | cascade with user; inbox Reminder link becomes null |
 | Notification | mark read; no public delete | retained on Reminder purge; recipient cleanup must be explicit |
-| AiConversation | hard delete allowed | messages cascade |
+| AiConversation | no H2 delete endpoint; account/admin lifecycle separately | messages and turn coordination rows cascade |
+| AI conversation turn | internal lease/idempotency coordination | cascade with conversation |
 
 ## 5. Important cross-row/service rules not delegated to MySQL
 
@@ -1090,9 +1125,9 @@ Nulling a relative reminder's target leaves its persisted anchor/offset unchange
 
 ### 8.3 Diagram representation
 
-The DBML remains the approved Stage 02 diagram. The additive F3a native inbox is
-documented in section 3.17 and its migration; historical Stage 02 records below
-are unchanged.
+The DBML remains the approved Stage 02 diagram. The additive F3a native inbox and
+H2 conversation coordination are documented in sections 3.17/3.18 and their
+migrations; historical Stage 02 records below are unchanged.
 
 The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, with some unsigned attributes expressed only in notes. All keys and unsigned numeric values must follow the exact Markdown types, including unsigned `day_of_week` and signed `reminders.offset_minutes`. The diagram does not encode all CHECK expressions or Service invariants and must not be treated as a complete executable migration source.
 
@@ -1104,4 +1139,4 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
   introduced by the completed Stage 03 APIs.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup. Group 4 tests on MySQL 8.4.10 show that directly deleting a User who owns both a period and its import batch is rejected with error 1451 by `schedule_import_batches_academic_period_id_foreign`. Group 5 confirms that an isolated User/Subject/manual-Lesson graph can cascade, while a combined period/batch/Lesson history graph blocks direct User deletion with 1451. Hard-removing Lessons first still leaves the batch/period restriction; deleting batches next cascades their rows and then permits User deletion. Soft deletion does not remove restrictive references. Account hard purge is an ordered administrative operation, distinct from normal domain deletion; the approved FKs are unchanged.
 
-Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Task/Subtask workflows and deletion cleanup, PF1/PF2 algorithms and C10 read-only candidate evaluation are implemented. Stages A–C implement work selection, automatic planning and confirmed session creation; Stage D adds lifecycle and safe single-session rescheduling. F1/F2 implement absolute/relative Reminder mutation and target reconciliation; F3a adds native in-app notification delivery; further verticals must add external channels and other deferred capabilities. Import C2b now implements confirmed atomic reconciliation; external delivery, statistics and AI orchestration remain unimplemented. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.
+Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Task/Subtask workflows and deletion cleanup, PF1/PF2 algorithms and C10 read-only candidate evaluation are implemented. Stages A–C implement work selection, automatic planning and confirmed session creation; Stage D adds lifecycle and safe single-session rescheduling. F1/F2 implement absolute/relative Reminder mutation and target reconciliation; F3a adds native in-app notification delivery; further verticals must add external channels and other deferred capabilities. Import C2b now implements confirmed atomic reconciliation; read-only statistics and H1/H2 AI tools/chat are implemented; external delivery, exports and mutating AI tools remain deferred. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.

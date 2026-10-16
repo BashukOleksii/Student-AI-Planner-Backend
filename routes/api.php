@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AcademicPeriodController;
+use App\Http\Controllers\Api\AiConversationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EducationInstitutionController;
 use App\Http\Controllers\Api\FreeSlotController;
@@ -31,6 +32,14 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
 });
 
 Route::middleware('auth:sanctum')->group(function (): void {
+    Route::prefix('ai/conversations')->name('ai.conversations.')->group(function (): void {
+        Route::post('/', [AiConversationController::class, 'store'])->name('store');
+        Route::get('/', [AiConversationController::class, 'index'])->name('index');
+        Route::get('/{conversation}', [AiConversationController::class, 'show'])->whereNumber('conversation')->name('show');
+        Route::get('/{conversation}/messages', [AiConversationController::class, 'messages'])->whereNumber('conversation')->name('messages');
+        Route::post('/{conversation}/messages', [AiConversationController::class, 'send'])->whereNumber('conversation')->middleware('throttle:ai-messages')->name('send');
+    });
+
     Route::get('/statistics/reports/comparison', [ProgressComparisonController::class, 'index'])->name('statistics.reports.comparison');
     Route::get('/statistics/progress', [ProgressStatisticsController::class, 'index'])->name('statistics.progress');
     Route::get('/statistics/trends', [ProgressTrendsController::class, 'index'])->name('statistics.trends');

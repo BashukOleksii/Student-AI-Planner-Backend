@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\AiAgentException;
 use App\Exceptions\ReminderConflictException;
 use App\Exceptions\ReminderIntegrityException;
 use App\Exceptions\StudyPlanConflictException;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
         // Validate exact UTC wire formats instead of silently trimming timestamps.
         $middleware->trimStrings(except: [
+            fn (Request $request) => $request->is('api/ai/*'),
             fn (Request $request) => $request->is('api/statistics/progress', 'api/statistics/trends', 'api/statistics/reports/comparison'),
             fn (Request $request) => $request->is('api/reminders', 'api/reminders/*', 'api/notifications', 'api/notifications/*'),
             'deadline_at',
@@ -33,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         // Subject color and Task deadlines distinguish null from an invalid empty string.
         $middleware->convertEmptyStringsToNull(except: [
+            fn (Request $request) => $request->is('api/ai/*'),
             fn (Request $request) => $request->is('api/reminders', 'api/reminders/*', 'api/notifications', 'api/notifications/*'),
             fn (Request $request) => $request->is('api/subjects', 'api/subjects/*'),
             fn (Request $request) => $request->is('api/tasks', 'api/tasks/*'),
@@ -41,6 +44,19 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $exception, Request $request) {
+            if ($request->is('api/ai/*')) {
+                if ($exception instanceof AiAgentException) {
+                    return response()->json(['message' => $exception->getMessage(), 'code' => $exception->errorCode], $exception->status());
+                }
+                if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
+                    return null;
+                }
+                if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                }
+
+                return response()->json(['message' => 'The AI conversation could not be processed.', 'code' => 'persistence_error'], 500);
+            }
             if ($request->is('api/statistics/progress', 'api/statistics/trends', 'api/statistics/reports/comparison')) {
                 if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
                     return null;

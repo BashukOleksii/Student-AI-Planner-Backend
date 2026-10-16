@@ -1,7 +1,7 @@
 # Business Rules
 
 Status: approved persistence baseline with current API enforcement recorded\
-Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. T1/T2 Task create/detail/PATCH and manual completion/reopening, plus T3 owned filtered/paginated listing, are implemented; S1 adds nested Subtask basic APIs and independent completion/reopening; S2 adds transactional reordering and read-only count-based Task progress. See [tasks.md](tasks.md). S3 implements safe Task/Subtask soft deletion and scoped synchronous dependency cancellation. PF1 free-time calculation and its read-only API are implemented; see [planning-foundation.md](planning-foundation.md). Stages A–C implement deterministic work selection, automatic planning and reviewed transactional persistence; Stage D adds session lifecycle and single-session rescheduling. F3a in-app Reminder delivery is implemented; G1 progress statistics, G2a daily trends and G2b period comparisons are implemented; H1 read-only AI tools are implemented; external delivery, exports and LLM orchestration remain future work. Import C2b implements confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B1 adds transient calendar/parity/timezone materialization. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
+Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. T1/T2 Task create/detail/PATCH and manual completion/reopening, plus T3 owned filtered/paginated listing, are implemented; S1 adds nested Subtask basic APIs and independent completion/reopening; S2 adds transactional reordering and read-only count-based Task progress. See [tasks.md](tasks.md). S3 implements safe Task/Subtask soft deletion and scoped synchronous dependency cancellation. PF1 free-time calculation and its read-only API are implemented; see [planning-foundation.md](planning-foundation.md). Stages A–C implement deterministic work selection, automatic planning and reviewed transactional persistence; Stage D adds session lifecycle and single-session rescheduling. F3a in-app Reminder delivery is implemented; G1 progress statistics, G2a daily trends and G2b period comparisons are implemented; H1 read-only AI tools are implemented; H2 read-only chat is implemented; external delivery, exports and mutating AI tools remain future work. Import C2b implements confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B1 adds transient calendar/parity/timezone materialization. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
 
 Lesson association/replacement ownership, self-replacement/chain prohibition, Lesson lifecycle transitions and active overlap validation are implemented. Task Subject ownership, parent deadline bounds and manual completion/reopening are implemented in TaskService. S3 validates ownership, session task/subtask consistency and Reminder target compatibility for affected live deletion dependencies. Stage C implements session reads and reviewed creation; Stage D implements lifecycle, rescheduling chains and scoped scheduled-reminder cleanup. General Reminder APIs/recalculation/purge reconciliation remain future Service requirements. MySQL enforces supported scalar/timestamp CHECKs, FK existence/actions, and approved uniqueness; it does not enforce cross-row ownership or checks prohibited by AUTO_INCREMENT/SET NULL restrictions.
 
@@ -509,7 +509,7 @@ attribution fails closed without disclosing identifiers or exception details.
 If a mutating request lacks a required business parameter that cannot be safely derived, the agent asks for clarification instead of inventing it.
 
 H1 read tools reject missing required parameters with `invalid_arguments` and do
-not infer dates, IDs or other business values. The future H2 orchestrator owns
+not infer dates, IDs or other business values. The H2 orchestrator owns
 clarification or derivation from trusted context before invoking the Executor.
 
 **BR-AI-005 — Destructive confirmation**  
@@ -534,6 +534,25 @@ Persist user-owned AI conversations and their messages. Message roles are `syste
 
 Existing conversation/message persistence remains separate from H1 discovery and
 execution. H1 neither requires nor creates a conversation or message.
+
+H2 implements read-only conversational orchestration through authenticated REST,
+without changing BR-AI identifiers or H1 rules. The model dynamically selects H1
+tools and explains successful results; every call still uses the trusted owner's
+ToolExecutor. Relative dates use a trusted clock and persisted timezone; ambiguous
+parameters require clarification. Provider strict schemas adapt optional fields
+without weakening H1 validation. Untrusted messages/tool text cannot grant new
+capabilities or select owners, models, keys or system instructions.
+
+One active expiring MySQL lease per conversation and durable request-key/content
+binding prevent interleaved or duplicate successful turns. Network calls never
+run within database transactions. Successful user/assistant/tool history commits
+atomically with its replay result; provider failures leave no partial transcript.
+Stale workers cannot finalize or release a replacement claim. Provider round,
+tool-call, context, timeout and rate limits are server-controlled. Public history
+excludes internal prompts, provider state and full tool payloads. H2 stores only
+AI conversation/coordination data; study work, reminders and inbox state remain
+unchanged. Mutations and destructive confirmation remain future capabilities.
+See [the H2 contract](ai-agent-chat.md).
 
 ## 13. Authentication and security rules
 

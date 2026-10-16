@@ -1,5 +1,11 @@
 # Stage H1 — Read-only AI tools foundation
 
+H2 integration is now implemented separately in [AI agent chat](ai-agent-chat.md).
+Its orchestration layer calls this unchanged H1 Executor and wraps it in owned
+conversation persistence. Statements below about H1's absence of LLM/network or
+message writes describe the tool layer itself; H2 performs those activities
+outside H1. No read-tool schemas, validation, Services or REST contracts changed.
+
 H1 implements provider-independent discovery and deterministic execution of seven
 read-only application capabilities. It introduces no LLM, agent, HTTP endpoint,
 console entry point, schema, dependency or persistence workflow.

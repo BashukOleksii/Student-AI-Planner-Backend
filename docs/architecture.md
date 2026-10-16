@@ -1,6 +1,6 @@
 # Backend Architecture
 
-Status: Laravel/MySQL architecture with completed persistence, schedule/import, Task/Subtask APIs, planning Stages A–C, StudySession Stage D, adaptive Stages E1/E2, Reminder Stages F1/F2/F3a, read-only G1/G2a/G2b statistics and H1 AI tools\
+Status: Laravel/MySQL architecture with completed persistence, schedule/import, Task/Subtask APIs, planning Stages A–C, StudySession Stage D, adaptive Stages E1/E2, Reminder Stages F1/F2/F3a, read-only G1/G2a/G2b statistics and H1/H2 read-only AI tools/chat\
 Scope: Laravel backend only  
 Persistence target: MySQL through Eloquent ORM  
 Frontend: independent Vue application communicating through REST API
@@ -157,7 +157,7 @@ The repository now includes Stage 02 persistence Migration Groups 1–9 alongsid
 - Planning settings now expose authenticated singleton preferences (GET/PUT) and availability windows (GET/POST/PATCH/DELETE). Form Requests validate input, Resources expose only public fields, `PlanningPreferenceService` enforces cross-field bounds, and `StudyAvailabilityService` rejects same-user/day overlaps with serialized transactional mutations. The auto-discovered window Policy hides cross-user mutation targets with 404. See [the planning settings contract](planning-settings.md).
 - Academic Context has 20 authenticated CRUD routes with thin Controllers, Form Requests, public Resources, and auto-discovered ownership Policies. Academic Services enforce same-owner institution links, complete-candidate validation, uniqueness/date rules, and protected deletion; destructive guards prevent FK side effects on malformed foreign children, including soft-deleted history. Legacy foreign institution IDs serialize as null without GET repairs, with scoped eager loading on collections. See [the Academic Context contract](academic-context.md).
 - LessonService implements trusted manual-field mutations, complete-candidate owned associations/UTC intervals, active overlap validation, cancellation, replacement reuse, and atomic deletion/revert under owner locks. LessonPolicy hides foreign targets as 404; requests authorize before validation. ScheduleService supplies read-only today/date/ISO-week views with effective filtering, interval overlap and starts_at/ends_at/id ordering; presentation relations are eager loaded and ownership-masked. See [schedule.md](schedule.md);
-- Groups 1–9 complete Stage 02 persistence. Manual Lesson CRUD/lifecycle and bounded schedule views are now implemented. Import A adds a deterministic, database-independent workbook parser returning weekly rules; see [the parser contract](schedule.md#import-a-workbook-parser-foundation). PF1 free-time calculation and its read-only REST API are implemented; see [planning-foundation.md](planning-foundation.md). Automatic planning and confirmed persistence are implemented by Stages A–C; Stage D adds session lifecycle and single-session rescheduling. F3a in-app Reminder delivery is implemented; G1 progress statistics, G2a daily trends and G2b period comparisons are implemented; H1 read-only AI tools are implemented; external delivery, exports and LLM orchestration remain deferred. Import C2b now provides confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview; see [the C1 contract](schedule.md#import-c1-xlsx-upload-and-persisted-preview-api). Import B2 implements exact owned reference resolution and the fixed fingerprint generator. Import B1 adds transient AcademicPeriod/parity/timezone materialization; see [the occurrence contract](schedule.md#import-b1-transient-calendar-occurrences). The [V1 fingerprint contract](database-schema.md#fixed-v1-import-fingerprint-contract) is fixed and its pure generator is implemented by Import B2;
+- Groups 1–9 complete Stage 02 persistence. Manual Lesson CRUD/lifecycle and bounded schedule views are now implemented. Import A adds a deterministic, database-independent workbook parser returning weekly rules; see [the parser contract](schedule.md#import-a-workbook-parser-foundation). PF1 free-time calculation and its read-only REST API are implemented; see [planning-foundation.md](planning-foundation.md). Automatic planning and confirmed persistence are implemented by Stages A–C; Stage D adds session lifecycle and single-session rescheduling. F3a in-app Reminder delivery is implemented; G1 progress statistics, G2a daily trends and G2b period comparisons are implemented; H1 read-only AI tools are implemented; H2 read-only LLM orchestration/chat is implemented; external delivery, exports and mutating AI tools remain deferred. Import C2b now provides confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview; see [the C1 contract](schedule.md#import-c1-xlsx-upload-and-persisted-preview-api). Import B2 implements exact owned reference resolution and the fixed fingerprint generator. Import B1 adds transient AcademicPeriod/parity/timezone materialization; see [the occurrence contract](schedule.md#import-b1-transient-calendar-occurrences). The [V1 fingerprint contract](database-schema.md#fixed-v1-import-fingerprint-contract) is fixed and its pure generator is implemented by Import B2;
 - `Task` and `Subtask` share `TaskStatus`, retain completion/deadline metadata, and use soft deletion; Task additionally casts priority through integer-backed `TaskPriority`. `StudySession` has `StudySessionStatus`, task/subtask and predecessor/successor relationships, completion/actual-effort casts, and lifecycle history without soft deletion. `Reminder` has `ReminderStatus`, nullable `ReminderAnchor`, signed offsets, and explicit target relationships. `AiConversation` / `AiMessage` provide user/conversation/message relationships, `AiMessageRole`, JSON-array tool-call metadata, and creation timestamps without message `updated_at`. All six models have factories;
 - simple FKs enforce existence, while same-owner institution compatibility is now enforced by Academic Services. Lesson Subject/Teacher/AcademicPeriod and replacement ownership are enforced by LessonService. Task Subject ownership and parent deadline bounds are enforced by T1 TaskService; S3 enforces Reminder ownership/target compatibility and session task/subtask compatibility for eligible deletion dependencies; Stage C implements session reads/confirmed creation, and Stage D implements lifecycle, chain validation and scoped reminder cleanup; F1/F2 absolute/relative Reminder management and target reconciliation are implemented. Lesson/StudySession self-comparison CHECKs are deliberately omitted because MySQL prohibits them; FK existence and unique direct successors remain enforced. Reminder DB checks cover status, nullable anchor vocabulary, anchor/offset pairing, and sent-state consistency; max-one-target, target/anchor compatibility, ownership, recalculation, and purge cleanup remain Service responsibilities;
 - MySQL-backed `PlanningPersistenceTest`, `AcademicContextPersistenceTest`, `ScheduleImportPersistenceTest`, `LessonPersistenceTest`, `TaskPersistenceTest`, `StudySessionPersistenceTest`, `ReminderPersistenceTest`, `AiPersistenceTest`, and `PlanningMigrationTest` cover schema, relationships, enum/JSON/datetime casts, supported constraints, soft deletion/history, and physical-schema limitations. Import/Lesson tests retain restrictive account hard-delete coverage. Rollback/reapply dynamically counts domain migrations, preserves the four scaffold migrations and existing users, and verifies the exact migration/table snapshots for Groups 1–9. The full verification record is in [database-schema.md](database-schema.md); `AuthProfileTest` covers authentication/profile HTTP behavior, trusted ownership, public serialization, session rotation/invalidation, CSRF, and credentialed CORS.
@@ -381,6 +381,19 @@ No outer transaction, writer, route, queue, tool history or conversation workflo
 is added. AgentOrchestrator, LLM selection and clarification remain H2 work;
 mutating tools and confirmation remain later work. See the complete
 [H1 contract and verification](ai-tools-foundation.md).
+
+Stage H2 adds authenticated conversation create/list/detail/history/send endpoints,
+`AiConversationService`, and a bounded `AgentOrchestrator` over a narrow
+`LlmProvider` contract. The first adapter uses Laravel HTTP and the OpenAI Responses
+API with native strict function calling and stateless structured continuation.
+Only the seven H1 read tools are available, through the unchanged ToolExecutor.
+An additive coordination table stores expiring UUID turn claims and durable
+idempotency results; short conversation-row locks protect claim/finalization,
+while provider and tool work run outside transactions. Existing message fields
+hold coherent completed transcripts and private approved continuation metadata;
+public Resources exclude prompts, raw tool data and encrypted state. LLM transport,
+clarification and sequencing now exist; mutating tools remain H3 work. See
+[AI agent chat](ai-agent-chat.md) for configuration, contracts and verification.
 
 ## 9. Authentication and authorization
 
@@ -623,11 +636,11 @@ Implemented API capabilities (Stages 03–05):
 - authentication/profile, planning settings, Academic Context, manual Lesson CRUD/lifecycle, and bounded schedule endpoints and Resources;
 - ownership Policies, reusable deterministic Services, and thin controller boundaries.
 
-Future AI integration:
+Further AI integration:
 
-- LLM provider;
-- provider adaptation of the implemented H1 tool schemas;
-- orchestration prompt;
+- additional provider adapters if later justified;
+- mutating tool contracts and authorization;
+- broader real-model prompt evaluations;
 - confirmation matrix;
 - AI evaluation suite.
 
