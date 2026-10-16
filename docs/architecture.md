@@ -1,6 +1,6 @@
 # Backend Architecture
 
-Status: Laravel/MySQL architecture with completed persistence, schedule/import, Task/Subtask APIs, planning Stages A–C, StudySession Stage D, adaptive Stages E1/E2, Reminder Stages F1/F2/F3a and read-only G1/G2a/G2b statistics\
+Status: Laravel/MySQL architecture with completed persistence, schedule/import, Task/Subtask APIs, planning Stages A–C, StudySession Stage D, adaptive Stages E1/E2, Reminder Stages F1/F2/F3a, read-only G1/G2a/G2b statistics and H1 AI tools\
 Scope: Laravel backend only  
 Persistence target: MySQL through Eloquent ORM  
 Frontend: independent Vue application communicating through REST API
@@ -157,7 +157,7 @@ The repository now includes Stage 02 persistence Migration Groups 1–9 alongsid
 - Planning settings now expose authenticated singleton preferences (GET/PUT) and availability windows (GET/POST/PATCH/DELETE). Form Requests validate input, Resources expose only public fields, `PlanningPreferenceService` enforces cross-field bounds, and `StudyAvailabilityService` rejects same-user/day overlaps with serialized transactional mutations. The auto-discovered window Policy hides cross-user mutation targets with 404. See [the planning settings contract](planning-settings.md).
 - Academic Context has 20 authenticated CRUD routes with thin Controllers, Form Requests, public Resources, and auto-discovered ownership Policies. Academic Services enforce same-owner institution links, complete-candidate validation, uniqueness/date rules, and protected deletion; destructive guards prevent FK side effects on malformed foreign children, including soft-deleted history. Legacy foreign institution IDs serialize as null without GET repairs, with scoped eager loading on collections. See [the Academic Context contract](academic-context.md).
 - LessonService implements trusted manual-field mutations, complete-candidate owned associations/UTC intervals, active overlap validation, cancellation, replacement reuse, and atomic deletion/revert under owner locks. LessonPolicy hides foreign targets as 404; requests authorize before validation. ScheduleService supplies read-only today/date/ISO-week views with effective filtering, interval overlap and starts_at/ends_at/id ordering; presentation relations are eager loaded and ownership-masked. See [schedule.md](schedule.md);
-- Groups 1–9 complete Stage 02 persistence. Manual Lesson CRUD/lifecycle and bounded schedule views are now implemented. Import A adds a deterministic, database-independent workbook parser returning weekly rules; see [the parser contract](schedule.md#import-a-workbook-parser-foundation). PF1 free-time calculation and its read-only REST API are implemented; see [planning-foundation.md](planning-foundation.md). Automatic planning and confirmed persistence are implemented by Stages A–C; Stage D adds session lifecycle and single-session rescheduling. F3a in-app Reminder delivery is implemented; G1 progress statistics, G2a daily trends and G2b period comparisons are implemented; external delivery, exports and AI orchestration/tools remain deferred. Import C2b now provides confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview; see [the C1 contract](schedule.md#import-c1-xlsx-upload-and-persisted-preview-api). Import B2 implements exact owned reference resolution and the fixed fingerprint generator. Import B1 adds transient AcademicPeriod/parity/timezone materialization; see [the occurrence contract](schedule.md#import-b1-transient-calendar-occurrences). The [V1 fingerprint contract](database-schema.md#fixed-v1-import-fingerprint-contract) is fixed and its pure generator is implemented by Import B2;
+- Groups 1–9 complete Stage 02 persistence. Manual Lesson CRUD/lifecycle and bounded schedule views are now implemented. Import A adds a deterministic, database-independent workbook parser returning weekly rules; see [the parser contract](schedule.md#import-a-workbook-parser-foundation). PF1 free-time calculation and its read-only REST API are implemented; see [planning-foundation.md](planning-foundation.md). Automatic planning and confirmed persistence are implemented by Stages A–C; Stage D adds session lifecycle and single-session rescheduling. F3a in-app Reminder delivery is implemented; G1 progress statistics, G2a daily trends and G2b period comparisons are implemented; H1 read-only AI tools are implemented; external delivery, exports and LLM orchestration remain deferred. Import C2b now provides confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview; see [the C1 contract](schedule.md#import-c1-xlsx-upload-and-persisted-preview-api). Import B2 implements exact owned reference resolution and the fixed fingerprint generator. Import B1 adds transient AcademicPeriod/parity/timezone materialization; see [the occurrence contract](schedule.md#import-b1-transient-calendar-occurrences). The [V1 fingerprint contract](database-schema.md#fixed-v1-import-fingerprint-contract) is fixed and its pure generator is implemented by Import B2;
 - `Task` and `Subtask` share `TaskStatus`, retain completion/deadline metadata, and use soft deletion; Task additionally casts priority through integer-backed `TaskPriority`. `StudySession` has `StudySessionStatus`, task/subtask and predecessor/successor relationships, completion/actual-effort casts, and lifecycle history without soft deletion. `Reminder` has `ReminderStatus`, nullable `ReminderAnchor`, signed offsets, and explicit target relationships. `AiConversation` / `AiMessage` provide user/conversation/message relationships, `AiMessageRole`, JSON-array tool-call metadata, and creation timestamps without message `updated_at`. All six models have factories;
 - simple FKs enforce existence, while same-owner institution compatibility is now enforced by Academic Services. Lesson Subject/Teacher/AcademicPeriod and replacement ownership are enforced by LessonService. Task Subject ownership and parent deadline bounds are enforced by T1 TaskService; S3 enforces Reminder ownership/target compatibility and session task/subtask compatibility for eligible deletion dependencies; Stage C implements session reads/confirmed creation, and Stage D implements lifecycle, chain validation and scoped reminder cleanup; F1/F2 absolute/relative Reminder management and target reconciliation are implemented. Lesson/StudySession self-comparison CHECKs are deliberately omitted because MySQL prohibits them; FK existence and unique direct successors remain enforced. Reminder DB checks cover status, nullable anchor vocabulary, anchor/offset pairing, and sent-state consistency; max-one-target, target/anchor compatibility, ownership, recalculation, and purge cleanup remain Service responsibilities;
 - MySQL-backed `PlanningPersistenceTest`, `AcademicContextPersistenceTest`, `ScheduleImportPersistenceTest`, `LessonPersistenceTest`, `TaskPersistenceTest`, `StudySessionPersistenceTest`, `ReminderPersistenceTest`, `AiPersistenceTest`, and `PlanningMigrationTest` cover schema, relationships, enum/JSON/datetime casts, supported constraints, soft deletion/history, and physical-schema limitations. Import/Lesson tests retain restrictive account hard-delete coverage. Rollback/reapply dynamically counts domain migrations, preserves the four scaffold migrations and existing users, and verifies the exact migration/table snapshots for Groups 1–9. The full verification record is in [database-schema.md](database-schema.md); `AuthProfileTest` covers authentication/profile HTTP behavior, trusted ownership, public serialization, session rotation/invalidation, CSRF, and credentialed CORS.
@@ -343,8 +343,8 @@ The implemented Stage B application flow is Stage A selection → shared C9 cont
 and PF1 free time → pure projected allocation with PF2/C8 acceptance → transient
 sessions and exact unallocated seconds. Its advisory generation performs no
 transaction or persistence; the mutating plan acceptance in section 11 is
-implemented by Stage C confirmation. Stage C adds the HTTP adapter; AI tools remain
-future work. Preview continues to be read-only.
+implemented by Stage C confirmation. Stage C adds the HTTP adapter; mutating AI planning tools remain
+future work beyond H1. Preview continues to be read-only.
 
 ## 8. AI agent boundary
 
@@ -367,6 +367,20 @@ future work. Preview continues to be read-only.
 - silently violate planning settings to satisfy the user request.
 
 Tools are thin application adapters over Services. They receive structured arguments, obtain the authenticated user from trusted application context, call a Service, and return a structured result.
+
+Stage H1 implements this read-only boundary under `Services/AI/Tools`:
+`ToolRegistry` exposes seven fixed provider-independent JSON Schema-compatible
+definitions; `ToolExecutor` validates structured arguments and dispatches only
+through a server-owned match in `ReadOnlyTools`. Exact scalar typing and existing
+Service date/comparison validation reject malformed or owner-selecting arguments.
+The trusted User is supplied by the caller and its persisted timezone is reloaded;
+safe presenters mask foreign associations without forging HTTP authentication.
+Task pagination is capped at 50, session output at 100 with explicit truncation,
+and period reports retain existing 31-date limits and consistent-read semantics.
+No outer transaction, writer, route, queue, tool history or conversation workflow
+is added. AgentOrchestrator, LLM selection and clarification remain H2 work;
+mutating tools and confirmation remain later work. See the complete
+[H1 contract and verification](ai-tools-foundation.md).
 
 ## 9. Authentication and authorization
 
@@ -612,7 +626,7 @@ Implemented API capabilities (Stages 03–05):
 Future AI integration:
 
 - LLM provider;
-- tool schemas;
+- provider adaptation of the implemented H1 tool schemas;
 - orchestration prompt;
 - confirmation matrix;
 - AI evaluation suite.

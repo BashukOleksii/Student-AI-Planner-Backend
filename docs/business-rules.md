@@ -1,7 +1,7 @@
 # Business Rules
 
 Status: approved persistence baseline with current API enforcement recorded\
-Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. T1/T2 Task create/detail/PATCH and manual completion/reopening, plus T3 owned filtered/paginated listing, are implemented; S1 adds nested Subtask basic APIs and independent completion/reopening; S2 adds transactional reordering and read-only count-based Task progress. See [tasks.md](tasks.md). S3 implements safe Task/Subtask soft deletion and scoped synchronous dependency cancellation. PF1 free-time calculation and its read-only API are implemented; see [planning-foundation.md](planning-foundation.md). Stages A–C implement deterministic work selection, automatic planning and reviewed transactional persistence; Stage D adds session lifecycle and single-session rescheduling. F3a in-app Reminder delivery is implemented; G1 progress statistics, G2a daily trends and G2b period comparisons are implemented; external delivery, exports and AI orchestration/tools remain future work. Import C2b implements confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B1 adds transient calendar/parity/timezone materialization. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
+Rule IDs are stable references for implementation and tests. Physical details are recorded in [database-schema.md](database-schema.md); Migration Groups 1–9 are implemented and Stage 02 persistence is complete, including academic/import/Lesson data, Tasks/Subtasks, StudySessions, Reminders, and AI conversations/messages, with models, relationships, enums, factories, MySQL constraints, and persistence tests. Authentication + User Profile is implemented with Sanctum SPA sessions, trusted current-user context, IANA timezone validation, unique email validation, standard password hashing, and HTTP security tests. Planning Preferences and Study Availability APIs now enforce complete nullable settings replacement, database-safe numeric bounds, cross-field invariants, local-time intervals, overlap rejection, and ownership protection. Academic Context CRUD now enforces ownership Policies, same-owner institution links, uniqueness/date rules, public serialization, protected deletion, and malformed foreign-reference guards. Manual Lesson CRUD, cancellation/replacement, and bounded timezone-aware schedule views are implemented through LessonService/ScheduleService. T1/T2 Task create/detail/PATCH and manual completion/reopening, plus T3 owned filtered/paginated listing, are implemented; S1 adds nested Subtask basic APIs and independent completion/reopening; S2 adds transactional reordering and read-only count-based Task progress. See [tasks.md](tasks.md). S3 implements safe Task/Subtask soft deletion and scoped synchronous dependency cancellation. PF1 free-time calculation and its read-only API are implemented; see [planning-foundation.md](planning-foundation.md). Stages A–C implement deterministic work selection, automatic planning and reviewed transactional persistence; Stage D adds session lifecycle and single-session rescheduling. F3a in-app Reminder delivery is implemented; G1 progress statistics, G2a daily trends and G2b period comparisons are implemented; H1 read-only AI tools are implemented; external delivery, exports and LLM orchestration remain future work. Import C2b implements confirmed atomic import reconciliation. Import C1 implements authenticated upload and persisted preview. Import B2 adds exact owned reference resolution and fixed fingerprint generation. Import B1 adds transient calendar/parity/timezone materialization. Import A implements deterministic weekly-template parsing only; see [the parser contract](schedule.md#import-a-workbook-parser-foundation).
 
 Lesson association/replacement ownership, self-replacement/chain prohibition, Lesson lifecycle transitions and active overlap validation are implemented. Task Subject ownership, parent deadline bounds and manual completion/reopening are implemented in TaskService. S3 validates ownership, session task/subtask consistency and Reminder target compatibility for affected live deletion dependencies. Stage C implements session reads and reviewed creation; Stage D implements lifecycle, rescheduling chains and scoped scheduled-reminder cleanup. General Reminder APIs/recalculation/purge reconciliation remain future Service requirements. MySQL enforces supported scalar/timestamp CHECKs, FK existence/actions, and approved uniqueness; it does not enforce cross-row ownership or checks prohibited by AUTO_INCREMENT/SET NULL restrictions.
 
@@ -32,7 +32,7 @@ See [the E2 contract](adaptive-replanning.md#stage-e2-confirmation-contract).
 A user may read or mutate only resources that belong to that user, directly or through an owned parent. Education institutions, subjects, and teachers are user-owned in V1, not shared global catalogs. Optional institution references must resolve to the same owner. Academic Context APIs enforce this through Policies, user-scoped relationships and Services. Their destructive guards also prevent FK side effects on foreign malformed children, including soft-deleted Tasks/Lessons; unsafe legacy institution IDs are masked on reads without altering data. Lesson APIs enforce owned Subject/Teacher/AcademicPeriod and replacement links; schedule views query only the trusted owner and mask foreign presentation relations without repairing persistence. C9 requires candidate evaluation source reads through the trusted owner, with fail-closed batch validation of selected session Task/Subtask compatibility, including valid deleted history.
 
 **BR-GEN-002 — Trusted user context**  
-Public API requests and AI tool arguments must not be able to choose another user's ID. The authenticated user is obtained from trusted server context. This is enforced by all current identity/profile, planning-settings, Academic Context, and Lesson/Schedule APIs; other domain/AI entry points remain future work. C9 candidate evaluation accepts a trusted User from an application caller, never a public owner ID; authentication globals cannot substitute another owner.
+Public API requests and AI tool arguments must not be able to choose another user's ID. The authenticated user is obtained from trusted server context. This is enforced by all current identity/profile, planning-settings, Academic Context, and Lesson/Schedule APIs; H1 also enforces it for the seven read-only AI tools; future orchestration must retain this boundary. C9 candidate evaluation accepts a trusted User from an application caller, never a public owner ID; authentication globals cannot substitute another owner.
 
 **BR-GEN-003 — Deterministic business logic**  
 Deadline checks, free-time calculation, conflicts, priority ordering, workload limits, progress metrics, and schedule import validation are implemented in PHP Services, not delegated to the LLM. C9 integration assembles Eloquent inputs and delegates calculations to unchanged C1–C8.
@@ -491,11 +491,26 @@ The AI agent decides what tool(s) to call and in what sequence, but deterministi
 **BR-AI-002 — Structured tool contract**  
 Tool input/output is structured and validated before a Service call.
 
+H1 implements seven fixed read-only definitions with strict JSON scalar types,
+explicit required properties and rejection of unknown/null/nested values. The
+Executor returns one stable success/error envelope; only allowlisted names may
+dispatch. Existing Services retain date, range, filtering and comparison rules.
+See [AI tools foundation](ai-tools-foundation.md) for exact schemas and errors.
+
 **BR-AI-003 — Authorization cannot be bypassed**  
 Every tool operation executes under the authenticated user's trusted context and normal authorization rules.
 
+H1 accepts the User only from a trusted application caller, reloads persisted
+timezone and uses owner-scoped Service reads. Arguments cannot select user/owner
+or timezone; foreign presentation references are masked and unsafe session
+attribution fails closed without disclosing identifiers or exception details.
+
 **BR-AI-004 — Missing required information**  
 If a mutating request lacks a required business parameter that cannot be safely derived, the agent asks for clarification instead of inventing it.
+
+H1 read tools reject missing required parameters with `invalid_arguments` and do
+not infer dates, IDs or other business values. The future H2 orchestrator owns
+clarification or derivation from trusted context before invoking the Executor.
 
 **BR-AI-005 — Destructive confirmation**  
 Bulk deletion, large replacement operations, or similarly destructive actions require explicit confirmation before execution.
@@ -506,11 +521,19 @@ The agent should use the returned tool result as the source of truth before movi
 **BR-AI-007 — No hidden mutation**  
 The agent must clearly report successful mutations and failures. It must not claim a task, plan, or reminder was changed unless the tool confirmed the mutation.
 
+All H1 tools are read-only, including execution side effects: no conversation,
+message, tool log, snapshot, notification/read-state or reminder persistence,
+no plan/session creation, and no external requests or background dispatch.
+Bounded task/session outputs expose pagination or explicit truncation metadata.
+
 **BR-AI-008 — Mutation policy is server-controlled**  
 Which actions require confirmation is controlled by backend/tool policy, not solely by prompt wording.
 
 **BR-AI-009 — Conversation metadata**\
 Persist user-owned AI conversations and their messages. Message roles are `system`, `user`, `assistant`, and `tool`; structured tool-call metadata may remain JSON because it is orchestration metadata rather than deterministic planning constraints.
+
+Existing conversation/message persistence remains separate from H1 discovery and
+execution. H1 neither requires nor creates a conversation or message.
 
 ## 13. Authentication and security rules
 
