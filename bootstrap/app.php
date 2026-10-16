@@ -23,7 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
         // Validate exact UTC wire formats instead of silently trimming timestamps.
         $middleware->trimStrings(except: [
-            fn (Request $request) => $request->is('api/statistics/progress', 'api/statistics/trends'),
+            fn (Request $request) => $request->is('api/statistics/progress', 'api/statistics/trends', 'api/statistics/reports/comparison'),
             fn (Request $request) => $request->is('api/reminders', 'api/reminders/*', 'api/notifications', 'api/notifications/*'),
             'deadline_at',
             fn (Request $request) => $request->is('api/lessons', 'api/lessons/*'),
@@ -41,7 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $exception, Request $request) {
-            if ($request->is('api/statistics/progress', 'api/statistics/trends')) {
+            if ($request->is('api/statistics/progress', 'api/statistics/trends', 'api/statistics/reports/comparison')) {
                 if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
                     return null;
                 }

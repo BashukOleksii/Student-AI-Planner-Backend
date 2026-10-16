@@ -268,13 +268,20 @@ the same snapshot/clock; G1 current counts remain lifetime-only. G2a does not ad
 historical states, comparisons, report files or AI integration. Earlier verification
 records below retain their original G1 checkpoint meaning.
 
+G2b now implements [read-only two-period comparisons](progress-comparisons.md)
+with the same bounded source loader and reducers. It fetches the exact union of two
+equal nominal-length memberships within one snapshot, then returns period totals,
+checked signed differences and factual directions/unknown-duration flags. It never
+uses G1 lifetime current counts as historical populations. The G1 contract and
+original checkpoint verification below remain unchanged.
+
 G1 itself provides no daily/weekly chart series, period comparisons, trend/forecast engine,
 subject breakdown, immutable historical snapshots, CSV/PDF/Excel export, scheduled
-report, AI summary/tool or notification analytics. G2b must define additional
-attribution/history requirements explicitly rather than treat current-state work
-counts as past snapshots. Reports cannot infer actual minutes for null records or
-reconstruct hard-purged session history. All present metrics derive from the current
-authorized persisted snapshot.
+report, AI summary/tool or notification analytics. G2b explicitly defines
+attribution/history limitations and does not treat current-state work counts as
+past snapshots. Reports cannot infer actual minutes for null records or reconstruct
+hard-purged session history. All present metrics derive from the current authorized
+persisted snapshot.
 
 ## Verification
 

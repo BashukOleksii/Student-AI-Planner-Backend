@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PlanningPreferenceController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\ProgressComparisonController;
 use App\Http\Controllers\Api\ProgressStatisticsController;
 use App\Http\Controllers\Api\ProgressTrendsController;
 use App\Http\Controllers\Api\ReminderController;
@@ -30,6 +31,7 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
 });
 
 Route::middleware('auth:sanctum')->group(function (): void {
+    Route::get('/statistics/reports/comparison', [ProgressComparisonController::class, 'index'])->name('statistics.reports.comparison');
     Route::get('/statistics/progress', [ProgressStatisticsController::class, 'index'])->name('statistics.progress');
     Route::get('/statistics/trends', [ProgressTrendsController::class, 'index'])->name('statistics.trends');
 

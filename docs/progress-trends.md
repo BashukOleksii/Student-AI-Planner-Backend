@@ -238,13 +238,19 @@ G2a does not suppress or redefine that behavior.
 
 ## G2b and remaining boundaries
 
-Period comparisons, immutable historical snapshots, historical daily pending or
-overdue counts, original-deadline reconstruction, forecasting/scores, subject
-analytics, reports/exports, scheduled generation, frontend charts, AI explanation/
-tools, Reminder/notification analytics and additional aggregation modes remain
-unimplemented. G2b must define comparison/report semantics explicitly. Existing
-missing actual minutes and mutable work-history limitations remain visible rather
-than being replaced by invented values.
+G2b now implements [two-period comparisons](progress-comparisons.md) through the
+same G1 activity loader and metric reducers used here. Equal nominal-length,
+non-overlapping memberships share one fresh owner, timezone, clock and database
+snapshot. Each period's totals reconcile exactly with this endpoint's `totals` on
+unchanged data/clock. G2b adds signed differences and factual observations, including
+unknown-duration flags; the G2a contract and original verification below remain
+unchanged.
+
+Immutable historical snapshots, historical daily pending/overdue populations,
+original-deadline reconstruction, forecasting/scores, subject analytics, exports,
+scheduled generation, frontend charts, AI explanations/tools, notification analytics
+and additional aggregation modes remain unimplemented. Missing actual minutes and
+mutable work history remain explicit limitations.
 
 ## Verification and changed-file review
 
