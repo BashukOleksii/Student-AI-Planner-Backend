@@ -14,7 +14,8 @@ use Illuminate\Validation\ValidationException;
 class TaskActionConfirmationService
 {
     public function __construct(private TaskActionArgumentValidator $validator, private TaskActionPresenter $presenter,
-        private TaskActionState $states, private TaskService $tasks) {}
+        private TaskActionState $states, private TaskService $tasks,
+        private SubtaskReminderActionRegistry $additional, private SubtaskReminderActionService $management) {}
 
     public function query(User $owner, string $conversation)
     {
@@ -58,34 +59,38 @@ class TaskActionConfirmationService
             $expired = $this->elapsed($action);
             $next = $this->states->next($action->status, $expired, $operation);
             if ($next === 'executed') {
-                $arguments = $this->validator->validate($action->type, $action->arguments);
-                $task = isset($arguments['task_id']) ? $owner->tasks()->whereKey($arguments['task_id'])->lockForUpdate()->first() : null;
-                if (isset($arguments['task_id']) && ($task === null
-                    || ! hash_equals($action->target_hash ?? '', $this->presenter->fingerprint($task)))) {
-                    throw new AiAgentException('action_stale');
-                }
-                try {
-                    $values = array_diff_key($arguments, ['task_id' => true]);
-                    $result = match ($action->type) {
-                        'propose_task_create' => $this->tasks->create($owner, $values),
-                        'propose_task_update' => $this->tasks->update($owner, $task, $values),
-                        'propose_task_complete' => $this->tasks->complete($owner, $task),
-                        'propose_task_reopen' => $this->tasks->reopen($owner, $task),
-                        default => throw new AiAgentException('persistence_error'),
-                    };
-                } catch (ValidationException) {
-                    throw new AiAgentException('action_validation_failed');
-                }
-                if ($action->type === 'propose_task_reopen' && $result->status !== TaskStatus::Pending) {
-                    throw new AiAgentException('persistence_error');
+                if ($this->additional->find($action->type) !== null) {
+                    $receipt = $this->management->execute($owner, $action);
+                } else {
+                    $arguments = $this->validator->validate($action->type, $action->arguments);
+                    $task = isset($arguments['task_id']) ? $owner->tasks()->whereKey($arguments['task_id'])->lockForUpdate()->first() : null;
+                    if (isset($arguments['task_id']) && ($task === null
+                        || ! hash_equals($action->target_hash ?? '', $this->presenter->fingerprint($task)))) {
+                        throw new AiAgentException('action_stale');
+                    }
+                    try {
+                        $values = array_diff_key($arguments, ['task_id' => true]);
+                        $result = match ($action->type) {
+                            'propose_task_create' => $this->tasks->create($owner, $values),
+                            'propose_task_update' => $this->tasks->update($owner, $task, $values),
+                            'propose_task_complete' => $this->tasks->complete($owner, $task),
+                            'propose_task_reopen' => $this->tasks->reopen($owner, $task),
+                            default => throw new AiAgentException('persistence_error'),
+                        };
+                    } catch (ValidationException) {
+                        throw new AiAgentException('action_validation_failed');
+                    }
+                    if ($action->type === 'propose_task_reopen' && $result->status !== TaskStatus::Pending) {
+                        throw new AiAgentException('persistence_error');
+                    }
+                    $subjectId = $result->subject_id === null ? null : $owner->subjects()->whereKey($result->subject_id)->value('id');
+                    $receipt = ['task' => $this->presenter->task($result, $subjectId)];
                 }
                 // Any slow dependency lock/event that crosses expiry rolls the entire business mutation back.
                 if ($this->elapsed($action)) {
                     throw new AiAgentException('action_expired');
                 }
-                $subjectId = $result->subject_id === null ? null : $owner->subjects()->whereKey($result->subject_id)->value('id');
-                $action->receipt = ['action_id' => $action->id, 'type' => $action->type,
-                    'task' => $this->presenter->task($result, $subjectId)];
+                $action->receipt = ['action_id' => $action->id, 'type' => $action->type, ...$receipt];
             }
             $action->status = $next;
             $action->resolved_at = DB::selectOne('SELECT UTC_TIMESTAMP(6) AS instant')->instant;
@@ -118,6 +123,10 @@ class TaskActionConfirmationService
             'executed' => 'Task action executed.', 'rejected' => 'Task action rejected. No task was changed.',
             default => 'Task action expired. No task was changed.',
         };
+        if (! str_starts_with($action->type, 'propose_task_')) {
+            $domain = str_starts_with($action->type, 'propose_subtask_') ? 'Subtask' : 'Reminder';
+            $content = $domain.' action '.$action->status.'.'.($action->status === 'executed' ? '' : ' No business data was changed.');
+        }
         $message = $conversation->messages()->create(['role' => 'assistant', 'content' => $content,
             'tool_calls' => ['version' => 2, 'action_event' => $event]]);
         if (! $message->exists || ! $conversation->touch()) {

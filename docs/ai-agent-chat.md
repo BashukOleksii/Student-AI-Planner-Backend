@@ -1,5 +1,12 @@
 # Stage H2 — Authenticated read-only AI chat
 
+H3b extends provider discovery to twenty definitions: the original seven H1 reads,
+four H3a Task proposals, two new reads and seven Subtask/Reminder proposals. H2
+leases, provider continuation, bounded history and successful-turn atomicity remain.
+A global proposal counter prevents cross-domain batching. Server outcome events and
+latest-ten state projection include safe Subtask/Reminder result IDs. See
+[H3b](ai-subtask-reminder-actions.md) for superseding action contracts and verification.
+
 Stage H3a extends this H2 baseline with four Task proposal definitions and durable
 server-side confirmation. H1 read tools, ordinary H2 turns and provider continuation
 remain supported. Proposal turns add a structured `action` result and deterministic

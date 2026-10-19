@@ -1,5 +1,14 @@
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
+H3b reuses ai_pending_actions without new columns. A separate additive migration
+expands its allowed action types; the applied H3a migration remains unchanged.
+Conservative composite target fingerprints fit the existing target_hash. Guarded
+rollback protects retained H3b history. See [H3b](ai-subtask-reminder-actions.md).
+The same migration adds a stable Conversation user_id reference index and
+rebuilds its user_id/updated_at sorting index. A reproduced InnoDB FK shared-lock
+wait on User during a timestamp-only rejection update justifies the extra index;
+FK semantics and sorting remain unchanged. Guarded down removes the extra index.
+
 H3a adds `ai_pending_actions` for durable confirmation and result replay.
 Existing messages/turns alone cannot represent an independently confirmed action,
 reviewed arguments, stale-target guard and atomic business receipt. Conversation

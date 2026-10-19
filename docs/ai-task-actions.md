@@ -1,5 +1,13 @@
 # Stage H3a — confirmed conversational Task actions
 
+H3b extends this H3a baseline through the same table, status policy, expiration,
+confirmation/rejection endpoints, durable receipts and history. Seven Subtask/
+Reminder proposals share the global one-mutation-per-turn limit with the unchanged
+four Task schemas. Two separate discovery reads leave H1 untouched. Error codes
+remain compatible; action-level messages use domain-neutral wording. The later
+CHECK expansion and Reminder transaction core are documented in
+[H3b](ai-subtask-reminder-actions.md). Historical H3a verification below is retained.
+
 H3a adds one two-phase capability: the agent proposes one Task mutation, and the
 student explicitly confirms or rejects the persisted proposal. All four mutations
 require confirmation. The server owns this policy; neither a model argument nor a

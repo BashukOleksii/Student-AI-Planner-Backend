@@ -1,5 +1,12 @@
 # Tasks and Subtasks — T1–T3 and S1–S3
 
+H3b exposes four confirmed AI Subtask actions and list_subtasks_for_task, extending
+H3a's existing action endpoints. Shared SubtaskInputRules and read-only candidate
+preparation reuse direct REST/domain validation. Position is assigned only at
+confirmation; lifecycle preserves parent/session status and reconciles dependent
+Reminders through existing Services. No AI deletion or reordering is added.
+See [the H3b contract](ai-subtask-reminder-actions.md).
+
 H3a exposes Task create/update/complete/reopen as AI proposals requiring explicit
 server-side confirmation. It shares `TaskInputRules` with SaveTaskRequest and uses
 TaskService's extracted read-only complete-candidate `prepare()` for create/update

@@ -49,9 +49,7 @@ class SubtaskService
     {
         return DB::transaction(function () use ($user, $task, $values): Subtask {
             $task = $this->lockParent($user, $task);
-            $candidate = ['description' => null, 'estimated_minutes' => null, 'deadline_at' => null,
-                ...$this->editableValues($values)];
-            $this->validateDeadline($task, $candidate);
+            $candidate = $this->prepare($task, $values);
             $last = $task->subtasks()->orderByDesc('position')->lockForUpdate()->first(['id', 'position']);
             $position = ($last?->position ?? 0) + 1;
             if ($position > 65535) {
@@ -69,12 +67,8 @@ class SubtaskService
         return DB::transaction(function () use ($user, $task, $subtask, $values): Subtask {
             $task = $this->lockParent($user, $task);
             $subtask = $task->subtasks()->lockForUpdate()->findOrFail($subtask->getKey());
-            $candidate = $subtask->only(self::EDITABLE_FIELDS);
             $deadline = $subtask->getRawOriginal('deadline_at');
-            $candidate['deadline_at'] = $deadline === null ? null
-                : CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $deadline, 'UTC');
-            $candidate = array_replace($candidate, $this->editableValues($values));
-            $this->validateDeadline($task, $candidate);
+            $candidate = $this->prepare($task, $values, $subtask);
             if (! $subtask->update($candidate)) {
                 throw new ReminderIntegrityException;
             }
@@ -148,6 +142,21 @@ class SubtaskService
 
             return $task->subtasks()->orderBy('position')->orderBy('id')->get();
         });
+    }
+
+    /** Read-only candidate checks. Position allocation remains exclusively in create(). */
+    public function prepare(Task $task, array $values, ?Subtask $subtask = null): array
+    {
+        $candidate = $subtask === null ? ['description' => null, 'estimated_minutes' => null, 'deadline_at' => null]
+            : $subtask->only(self::EDITABLE_FIELDS);
+        if ($subtask !== null) {
+            $raw = $subtask->getRawOriginal('deadline_at');
+            $candidate['deadline_at'] = $raw === null ? null : CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $raw, 'UTC');
+        }
+        $candidate = array_replace($candidate, $this->editableValues($values));
+        $this->validateDeadline($task, $candidate);
+
+        return $candidate;
     }
 
     private function invalidPermutation(): never

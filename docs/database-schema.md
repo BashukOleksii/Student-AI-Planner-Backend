@@ -1,5 +1,15 @@
 # Physical Database Schema
 
+H3b adds one migration, 2026_10_19_000001_expand_ai_pending_action_types.php,
+expanding ai_pending_actions' action-type CHECK from four Task types to eleven
+Task/Subtask/Reminder types. No column, table, FK or business schema is added.
+The same migration adds a stable Conversation user_id FK-support index and
+rebuilds the existing user_id/updated_at sorting index to prevent timestamp-only
+updates from acquiring an implicit User lock during rejection.
+Existing receipts remain compatible. Down restores four types only when retained
+history is compatible; otherwise it refuses before DDL rather than deleting data.
+See [H3b persistence](ai-subtask-reminder-actions.md#persistence-and-migration-rollback).
+
 Status: **Migration Groups 1–9 implemented; Stage 02 persistence complete**\
 Scope: Laravel backend + MySQL + Eloquent\
 Important: this is the canonical repository adaptation of the approved `stage-02-database-schema-spec.md`. All nine approved persistence groups are implemented alongside the Laravel/Sanctum scaffold. The MySQL enforcement decisions below preserve the approved tables, columns, keys, and delete actions.
@@ -37,7 +47,7 @@ projected-conflict classification with transient row statuses, without staging
 or Lesson writes. No schema, enums or fixed fingerprint contract changed.
 See [schedule.md](schedule.md#import-b3-transient-identity-and-projected-schedule-classification).
 
-**Current application scope:** PF1/PF2/C9/C10, Stage A effort/work selection, Stage B automatic planning, Stage C reviewed confirmation/session reads, Stage D lifecycle/single-session rescheduling and Stage E1/E2 adaptive preview/atomic confirmation are implemented. Task/Subtask APIs and schedule-import confirmation are also implemented. F1/F2 management and F3a in-app Reminder delivery are implemented; read-only G1/G2a/G2b statistics and H1/H2 AI tools/chat are implemented; H3a confirmed Task actions are implemented; external delivery, exports and other AI mutation domains remain deferred.
+**Current application scope:** PF1/PF2/C9/C10, Stage A effort/work selection, Stage B automatic planning, Stage C reviewed confirmation/session reads, Stage D lifecycle/single-session rescheduling and Stage E1/E2 adaptive preview/atomic confirmation are implemented. Task/Subtask APIs and schedule-import confirmation are also implemented. F1/F2 management and F3a in-app Reminder delivery are implemented; read-only G1/G2a/G2b statistics and H1/H2 AI tools/chat are implemented; H3a/H3b confirmed Task, Subtask and Reminder actions are implemented; external delivery, exports and further AI mutation domains remain deferred.
 
 Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materializes preference rows only on authenticated PUT, preserves side-effect-free GET, and implements trusted-user ownership and availability-overlap validation for the current APIs. Stage 04 enforces Academic Context institution compatibility and its destructive-operation ownership boundary. Lesson Subject/Teacher/AcademicPeriod and original/replacement ownership are enforced by LessonService. T1/T2 enforce Task Subject ownership, parent deadline bounds and manual completion/reopening. S3 implements Task/Subtask deletion cleanup with eligible dependency ownership and target validation; Stage D implements session lifecycle/rescheduling and affected reminder preflight; F1 absolute Reminder APIs are implemented; F2 reconciliation and F3a local inbox delivery are implemented; product defaults remain undecided. Import C1/C2a/C2b now implement temporary XLSX upload, persisted preview/revalidation and confirmed atomic Lesson reconciliation. Destructive semester replacement is deferred. Simple foreign keys enforce existence, not cross-row matching ownership or task/subtask compatibility. LessonService enforces self-replacement/chain prohibitions and Lesson lifecycle transitions. Stage D enforces inspected StudySession chains and explicit lifecycle operations; general editing/reopening remains deferred.
 
@@ -910,6 +920,12 @@ FK:
 Indexes:
 
 - `INDEX(user_id, updated_at)`.
+- H3b: `INDEX(user_id)` named `ai_conversations_owner_reference_index` supports
+  the owner FK without changing index keys during conversation activity updates.
+  The migration rebuilds the sorting index after adding this stable reference
+  index. Rejection therefore progresses while a domain writer holds User; no
+  owner/domain mutation is involved. Downgrade removes the new index only after
+  confirming retained action types are compatible.
 
 Eloquent:
 
@@ -1018,24 +1034,29 @@ Record retention follows the conversation; future administrative message purges
 must address replay consistency. No network operation runs in these transactions.
 See [AI agent chat](ai-agent-chat.md).
 
-### 3.19 ai_pending_actions (H3a)
+### 3.19 ai_pending_actions (H3a/H3b)
 
 Additive migration `2026_10_17_000001_create_ai_pending_actions_table.php`
 adds UUID action identity, conversation and unique originating-turn FKs, bounded
 call_id/type/status strings, canonical arguments/preview JSON, nullable target
 SHA-256, UTC DATETIME(6) expiry/resolution and nullable durable receipt JSON.
-Status defaults to pending; CHECKs constrain four action types, four states and
+Status defaults to pending; H3b migration
+`2026_10_19_000001_expand_ai_pending_action_types.php` expands the type CHECK
+from four Task types to eleven Task/Subtask/Reminder types. CHECKs retain four states and
 receipt/resolution consistency. An index on conversation_id/created_at supports
 owned history. Both FKs cascade; conversation ownership and matching committed
 turn provenance are rechecked by the confirmation Service. No Task FK or redundant
-owner column is added; immutable history survives normal Task soft deletion.
+owner column is added; immutable history survives normal Task/Subtask soft deletion.
 
 A single successful H2 turn transaction inserts its proposal. Explicit confirmation
-commits existing TaskService mutations, action receipt/state and version-2 message
+commits TaskService/SubtaskService or shared ReminderMutationService effects,
+action receipt/state and version-2 message
 outcome atomically. MySQL supplies the 15-minute expiry. Full columns, read-time
 expiry projection, lock order, schema limitations, API and rollback tests are in
 [the H3a contract](ai-task-actions.md). This does not change Task/Reminder schema or
 H1 read contracts. Rollback/reapply preserves existing H2 conversations/messages/turns.
+The H3b downgrade restores four types only when no H3b history remains; otherwise
+it refuses before DDL. See [H3b persistence](ai-subtask-reminder-actions.md#persistence-and-migration-rollback).
 
 ## 4. Delete behavior matrix
 
@@ -1159,4 +1180,4 @@ The supplied DBML uses `bigint`, `smallint`, `tinyint`, and `int` shorthand, wit
   introduced by the completed Stage 03 APIs.
 - Account hard-purge ordering must respect the approved restrictive historical references and reminder cleanup. Group 4 tests on MySQL 8.4.10 show that directly deleting a User who owns both a period and its import batch is rejected with error 1451 by `schedule_import_batches_academic_period_id_foreign`. Group 5 confirms that an isolated User/Subject/manual-Lesson graph can cascade, while a combined period/batch/Lesson history graph blocks direct User deletion with 1451. Hard-removing Lessons first still leaves the batch/period restriction; deleting batches next cascades their rows and then permits User deletion. Soft deletion does not remove restrictive references. Account hard purge is an ordered administrative operation, distinct from normal domain deletion; the approved FKs are unchanged.
 
-Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Task/Subtask workflows and deletion cleanup, PF1/PF2 algorithms and C10 read-only candidate evaluation are implemented. Stages A–C implement work selection, automatic planning and confirmed session creation; Stage D adds lifecycle and safe single-session rescheduling. F1/F2 implement absolute/relative Reminder mutation and target reconciliation; F3a adds native in-app notification delivery; further verticals must add external channels and other deferred capabilities. Import C2b now implements confirmed atomic reconciliation; read-only statistics and H1/H2 AI tools/chat are implemented; H3a confirmed Task actions are implemented; external delivery, exports and other AI mutation domains remain deferred. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.
+Stage 02 persistence is complete through Groups 1–9. Stage 03 now implements Authentication/Profile and Planning Preferences/Study Availability APIs, reusable setting/overlap Services, and availability ownership authorization. Stage 04 completes institutions/periods/subjects/teachers APIs and their ownership/relationship/deletion Services. Stage 05 completes manual Lesson CRUD/lifecycle and timezone/DST-safe today/date/ISO-week schedule views. Task/Subtask workflows and deletion cleanup, PF1/PF2 algorithms and C10 read-only candidate evaluation are implemented. Stages A–C implement work selection, automatic planning and confirmed session creation; Stage D adds lifecycle and safe single-session rescheduling. F1/F2 implement absolute/relative Reminder mutation and target reconciliation; F3a adds native in-app notification delivery; further verticals must add external channels and other deferred capabilities. Import C2b now implements confirmed atomic reconciliation; read-only statistics and H1/H2 AI tools/chat are implemented; H3a/H3b confirmed Task, Subtask and Reminder actions are implemented; external delivery, exports and further AI mutation domains remain deferred. Review this specification and the [companion DBML](database-schema.dbml) before any future schema changes.

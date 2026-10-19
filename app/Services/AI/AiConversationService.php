@@ -199,8 +199,10 @@ class AiConversationService
         if ($actions->isNotEmpty()) {
             $states = $actions->map(fn ($action) => ['action_id' => $action->id, 'type' => $action->type,
                 'status' => $action->status === 'pending' && $action->elapsed ? 'expired' : $action->status,
-                'task_id' => $action->receipt['task']['id'] ?? null])->all();
-            $history[] = ['role' => 'assistant', 'content' => 'Server-recorded task action states (data): '.$this->limits->json($states),
+                'task_id' => $action->receipt['task']['id'] ?? $action->receipt['subtask']['task_id'] ?? null,
+                ...(isset($action->receipt['subtask']) ? ['subtask_id' => $action->receipt['subtask']['id']] : []),
+                ...(isset($action->receipt['reminder']) ? ['reminder_id' => $action->receipt['reminder']['id']] : [])])->all();
+            $history[] = ['role' => 'assistant', 'content' => 'Server-recorded action states (data): '.$this->limits->json($states),
                 'calls' => [], 'state' => [], 'call_id' => null];
         }
 

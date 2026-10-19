@@ -1,5 +1,11 @@
 # Stage H1 — Read-only AI tools foundation
 
+H3b adds list_subtasks_for_task and list_reminders through ManagementReadTools,
+which validates two separately registered definitions and delegates to existing
+owned Services. H1's seven schemas, Registry/Executor dispatch and read-only rules
+remain unchanged. Seven new proposal definitions execute only through the H3a
+confirmation extension. See [H3b](ai-subtask-reminder-actions.md).
+
 H3a leaves all seven H1 definitions, argument contracts, Executor dispatch and
 read-only effects unchanged. Agent discovery additionally includes four separate
 Task proposal definitions. Those execute through TaskActionProposalService, never

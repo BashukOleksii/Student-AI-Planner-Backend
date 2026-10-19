@@ -1,5 +1,14 @@
 # Stages F1/F2/F3a — Reminders and In-App Notifications
 
+H3b adds confirmed AI Reminder create/update/cancel proposals and list_reminders.
+Absolute/relative rules, target eligibility, future clocks, sent/cancelled history,
+synchronization and delivery remain authoritative. Public ReminderService writes
+retain their outermost guard; ReminderMutationService holds the shared internal
+writer used by both REST and H3a's receipt transaction. No proposal, confirmation
+or read Tool delivers a Reminder or mutates the inbox. See
+[H3b](ai-subtask-reminder-actions.md) and
+[ADR-003](decisions/ADR-003-reminder-confirmation-transaction.md).
+
 F1/F2 implement authenticated reminder management and deterministic target
 synchronization. F3a adds atomic delivery to a persistent in-app inbox, a bounded
 Artisan dispatcher, minute scheduling and authenticated inbox reads. Delivery means
