@@ -15,7 +15,8 @@ class TaskActionConfirmationService
 {
     public function __construct(private TaskActionArgumentValidator $validator, private TaskActionPresenter $presenter,
         private TaskActionState $states, private TaskService $tasks,
-        private SubtaskReminderActionRegistry $additional, private SubtaskReminderActionService $management) {}
+        private SubtaskReminderActionRegistry $additional, private SubtaskReminderActionService $management,
+        private PlanningActionRegistry $planningRegistry, private PlanningActionService $planning) {}
 
     public function query(User $owner, string $conversation)
     {
@@ -25,14 +26,14 @@ class TaskActionConfirmationService
             ->select('ai_pending_actions.*')->selectRaw('expires_at <= UTC_TIMESTAMP(6) AS elapsed');
     }
 
-    public function decide(User $owner, string $conversationId, string $actionId, string $operation): array
+    public function decide(User $owner, string $conversationId, string $actionId, string $operation, array $consent = []): array
     {
         // Durability and lock ordering require our own outermost transaction.
         if (DB::transactionLevel() !== 0) {
             throw new AiAgentException('persistence_error');
         }
 
-        return DB::transaction(function () use ($owner, $conversationId, $actionId, $operation): array {
+        $outcome = DB::transaction(function () use ($owner, $conversationId, $actionId, $operation, $consent): array {
             $conversation = $owner->aiConversations()->whereKey($conversationId)->lockForUpdate()->firstOrFail();
             $action = AiPendingAction::where('conversation_id', $conversationId)->whereKey($actionId)->lockForUpdate()->firstOrFail();
             // No consistent read may establish a REPEATABLE READ snapshot before the owner wait.
@@ -43,6 +44,7 @@ class TaskActionConfirmationService
             if (! DB::table('ai_conversation_turns')->where('id', $action->turn_id)->where('conversation_id', $conversationId)->whereNotNull('result')->exists()) {
                 throw new AiAgentException('persistence_error');
             }
+            PlanningActionConsent::validate($action->type, $operation, $consent);
             if ($action->status === 'executed') {
                 $this->states->next($action->status, false, $operation);
 
@@ -59,7 +61,21 @@ class TaskActionConfirmationService
             $expired = $this->elapsed($action);
             $next = $this->states->next($action->status, $expired, $operation);
             if ($next === 'executed') {
-                if ($this->additional->find($action->type) !== null) {
+                if ($this->planningRegistry->find($action->type) !== null) {
+                    try {
+                        // A savepoint rolls back a failed domain attempt while retaining the
+                        // conversation/action/owner prefix for an authoritative failure event.
+                        $receipt = DB::transaction(fn () => $this->planning->execute($owner, $action, $consent));
+                    } catch (AiAgentException|ValidationException $exception) {
+                        $code = $exception instanceof AiAgentException ? $exception->errorCode : 'acceptance_required';
+                        if (! in_array($code, ['action_stale', 'action_conflict', 'action_token_invalid', 'action_validation_failed', 'acceptance_required'], true)) {
+                            throw $exception;
+                        }
+                        $this->recordPlanningFailure($conversation, $action, $code);
+
+                        return ['failure' => $exception];
+                    }
+                } elseif ($this->additional->find($action->type) !== null) {
                     $receipt = $this->management->execute($owner, $action);
                 } else {
                     $arguments = $this->validator->validate($action->type, $action->arguments);
@@ -102,6 +118,22 @@ class TaskActionConfirmationService
 
             return $this->outcome($action, $operation);
         });
+        if (isset($outcome['failure'])) {
+            throw $outcome['failure'];
+        }
+
+        return $outcome;
+    }
+
+    /** Domain savepoint already rolled back; the same outer transaction retains all coordination locks. */
+    private function recordPlanningFailure(AiConversation $conversation, AiPendingAction $action, string $code): void
+    {
+        $message = $conversation->messages()->create(['role' => 'assistant',
+            'content' => 'Planning action confirmation failed. No business data was changed.',
+            'tool_calls' => ['version' => 2, 'action_event' => ['action_id' => $action->id, 'status' => 'failed', 'error_code' => $code, 'receipt' => null]]]);
+        if (! $message->exists || ! $conversation->touch()) {
+            throw new AiAgentException('persistence_error');
+        }
     }
 
     private function elapsed(AiPendingAction $action): bool
@@ -124,7 +156,8 @@ class TaskActionConfirmationService
             default => 'Task action expired. No task was changed.',
         };
         if (! str_starts_with($action->type, 'propose_task_')) {
-            $domain = str_starts_with($action->type, 'propose_subtask_') ? 'Subtask' : 'Reminder';
+            $domain = $this->planningRegistry->find($action->type) !== null ? 'Planning'
+                : (str_starts_with($action->type, 'propose_subtask_') ? 'Subtask' : 'Reminder');
             $content = $domain.' action '.$action->status.'.'.($action->status === 'executed' ? '' : ' No business data was changed.');
         }
         $message = $conversation->messages()->create(['role' => 'assistant', 'content' => $content,

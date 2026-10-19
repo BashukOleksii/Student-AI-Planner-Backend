@@ -36,6 +36,7 @@ class AiTaskActionPersistenceTest extends TestCase
             'target_hash' => ['char(64)', true, null], 'status' => ['varchar(16)', false, 'pending'],
             'expires_at' => ['datetime(6)', false, null], 'receipt' => ['json', true, null],
             'resolved_at' => ['datetime(6)', true, null], 'created_at' => ['timestamp', true, null], 'updated_at' => ['timestamp', true, null],
+            'protected_payload' => ['longtext', true, null],
         ], false);
         $this->assertForeignKeys('ai_pending_actions', ['conversation_id' => ['ai_conversations', 'cascade'], 'turn_id' => ['ai_conversation_turns', 'cascade']]);
         $this->assertIndex('ai_pending_actions', 'ai_pending_actions_turn_id_unique', ['turn_id'], true);
@@ -61,7 +62,7 @@ class AiTaskActionPersistenceTest extends TestCase
         $message = $conversation->messages()->create(['role' => 'user', 'content' => 'Preserved'])->refresh();
         DB::table('ai_pending_actions')->insert($values);
         $before = [$conversation->getAttributes(), $message->getAttributes(), DB::table('ai_conversation_turns')->sole()];
-        $this->artisan('migrate:rollback', ['--step' => 2])->assertExitCode(0);
+        $this->artisan('migrate:rollback', ['--step' => 3])->assertExitCode(0);
         $this->assertFalse(Schema::hasTable('ai_pending_actions'));
         $this->assertEquals($before, [$conversation->fresh()->getAttributes(), $message->fresh()->getAttributes(), DB::table('ai_conversation_turns')->sole()]);
         $this->artisan('migrate')->assertExitCode(0);

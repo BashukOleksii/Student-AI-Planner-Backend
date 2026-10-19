@@ -1,5 +1,13 @@
 # Stages E1/E2 — Adaptive Replanning Preview and Atomic Confirmation
 
+H3c exposes E2 as one confirmed AI operation, retaining full release-set comparison,
+valid/cannot-replan preservation, one-to-one successors, Reminder cleanup and both
+acceptance flags. Public confirm retains the outermost guard; trusted
+confirmWithinTransaction shares the same writer under the H3 transaction.
+Server-issued tokens stay encrypted/private and expire at their original deadline.
+See [H3c](ai-study-planning-actions.md) and
+[ADR-004](decisions/ADR-004-ai-planning-confirmation-transaction.md).
+
 Stage E1 detects constraint-invalid future reservations and proposes deterministic
 one-to-one replacements. All operations are read-only and advisory. It does not
 perform Stage E2 confirmation/application, change statuses, create successors,

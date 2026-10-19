@@ -25,7 +25,7 @@ class AiMessageResource extends JsonResource
             'tool_result' => is_array($result) && is_bool($result['ok'] ?? null) && is_string($result['tool'] ?? null)
                 && preg_match('/\A[a-zA-Z0-9_-]{1,64}\z/', $result['tool']) ? [
                     'call_id' => $this->tool_call_id, 'name' => $result['tool'], 'ok' => $result['ok'],
-                    'error_code' => in_array($result['error']['code'] ?? null, ['unknown_tool', 'invalid_arguments', 'not_found', 'access_denied', 'execution_failed'], true)
+                    'error_code' => in_array($result['error']['code'] ?? null, ['unknown_tool', 'invalid_arguments', 'not_found', 'access_denied', 'execution_failed', 'review_too_large', 'invalid_preview'], true)
                         ? $result['error']['code'] : null,
                 ] : null,
             ...(($this->tool_calls['version'] ?? null) === 2 ? ['action_event' => $this->tool_calls['action_event']] : []),

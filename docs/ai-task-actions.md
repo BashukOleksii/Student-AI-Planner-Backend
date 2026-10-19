@@ -1,5 +1,11 @@
 # Stage H3a — confirmed conversational Task actions
 
+H3c adds three planning proposals through this same pending-action lifecycle.
+The four Task definitions and empty-body Task confirmation contract are unchanged.
+One attempted proposal per turn now spans fourteen mutation definitions; private
+planning tokens and distinct client consent apply only to H3c planning actions.
+Historical H3a results below remain unchanged. See [H3c](ai-study-planning-actions.md).
+
 H3b extends this H3a baseline through the same table, status policy, expiration,
 confirmation/rejection endpoints, durable receipts and history. Seven Subtask/
 Reminder proposals share the global one-mutation-per-turn limit with the unchanged

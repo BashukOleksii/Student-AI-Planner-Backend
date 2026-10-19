@@ -1,5 +1,11 @@
 # Stage H2 — Authenticated read-only AI chat
 
+H3c adds three planning proposals to provider discovery (23 definitions). The
+global one-mutation limit includes all fourteen proposals. Tokens and acceptance
+flags are never model arguments; client consent is validated only on confirmation.
+Complete reviews commit with successful H2 turns, and server-recorded planning
+outcomes/failed attempts survive bounded history. See [H3c](ai-study-planning-actions.md).
+
 H3b extends provider discovery to twenty definitions: the original seven H1 reads,
 four H3a Task proposals, two new reads and seven Subtask/Reminder proposals. H2
 leases, provider continuation, bounded history and successful-turn atomicity remain.

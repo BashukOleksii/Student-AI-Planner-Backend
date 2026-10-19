@@ -38,49 +38,60 @@ class StudyPlanPersistenceService
         if (! is_bool($acceptPartial)) {
             throw ValidationException::withMessages(['accept_partial' => ['The accept partial field must be a boolean.']]);
         }
-        $review = $this->decode($previewToken, $user);
+        $this->decode($previewToken, $user);
         if (DB::transactionLevel() !== 0) {
             throw new LogicException('Study plan confirmation requires an outermost transaction.');
         }
 
-        return DB::transaction(function () use ($user, $previewToken, $review, $acceptPartial): array {
-            // First database read in this transaction is a current locking read.
-            // Cooperating mutations hold this same owner lock before touching planning data.
-            $owner = User::whereKey($user->getKey())->lockForUpdate()->firstOrFail(['id', 'timezone']);
-            $this->decode($previewToken, $owner); // A lock wait can outlive the token.
-            $parameters = $review['parameters'];
-            try {
-                $current = $this->planner->plan($owner, $parameters['start_date'], $parameters['end_date'],
-                    $parameters['task_id'], $parameters['subtask_id']);
-            } catch (ModelNotFoundException) {
-                // Targets were owned at issue time; disappearing/reparented targets make this review stale.
-                throw new StudyPlanConflictException;
-            }
-            if (! $this->confirmation->matches($review['plan'], $current)) {
-                throw new StudyPlanConflictException;
-            }
-            $error = $this->confirmation->acceptanceError($current, $acceptPartial);
-            if ($error !== null) {
-                throw ValidationException::withMessages([$error => [$error === 'accept_partial'
-                    ? 'Explicit acceptance is required to save this partial plan.' : 'This preview contains no new sessions to save.']]);
-            }
-            $this->validateBatch($owner, $current, $parameters);
-            $created = new Collection;
-            foreach ($current['sessions'] as $proposal) {
-                $session = $owner->studySessions()->create($this->confirmation->sessionAttributes($owner->getKey(), $proposal));
-                if (! $session->exists) {
-                    throw new LogicException('A proposed session could not be saved.');
-                }
-                $created->push($session);
-            }
-            // Time can advance during a large batch or model event: fail and roll back all inserts.
-            $this->decode($previewToken, $owner);
-            if (! $this->confirmation->startsAreFuture($current['sessions'], CarbonImmutable::now('UTC'))) {
-                throw new StudyPlanConflictException;
-            }
+        return DB::transaction(fn () => $this->confirmWithinTransaction($user, $previewToken, $acceptPartial));
+    }
 
-            return ['plan' => $current, 'sessions' => $created];
-        });
+    /** Trusted caller owns atomic commit and must lock owner before any consistent read. */
+    public function confirmWithinTransaction(User $user, string $previewToken, mixed $acceptPartial = false): array
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('Study plan execution requires an existing owner-first transaction.');
+        }
+        if (! is_bool($acceptPartial)) {
+            throw ValidationException::withMessages(['accept_partial' => ['The accept partial field must be a boolean.']]);
+        }
+        $review = $this->decode($previewToken, $user);
+        // First database read in this transaction is a current locking read.
+        // Cooperating mutations hold this same owner lock before touching planning data.
+        $owner = User::whereKey($user->getKey())->lockForUpdate()->firstOrFail(['id', 'timezone']);
+        $this->decode($previewToken, $owner); // A lock wait can outlive the token.
+        $parameters = $review['parameters'];
+        try {
+            $current = $this->planner->plan($owner, $parameters['start_date'], $parameters['end_date'],
+                $parameters['task_id'], $parameters['subtask_id']);
+        } catch (ModelNotFoundException) {
+            // Targets were owned at issue time; disappearing/reparented targets make this review stale.
+            throw new StudyPlanConflictException;
+        }
+        if (! $this->confirmation->matches($review['plan'], $current)) {
+            throw new StudyPlanConflictException;
+        }
+        $error = $this->confirmation->acceptanceError($current, $acceptPartial);
+        if ($error !== null) {
+            throw ValidationException::withMessages([$error => [$error === 'accept_partial'
+                ? 'Explicit acceptance is required to save this partial plan.' : 'This preview contains no new sessions to save.']]);
+        }
+        $this->validateBatch($owner, $current, $parameters);
+        $created = new Collection;
+        foreach ($current['sessions'] as $proposal) {
+            $session = $owner->studySessions()->create($this->confirmation->sessionAttributes($owner->getKey(), $proposal));
+            if (! $session->exists) {
+                throw new LogicException('A proposed session could not be saved.');
+            }
+            $created->push($session);
+        }
+        // Time can advance during a large batch or model event: fail and roll back all inserts.
+        $this->decode($previewToken, $owner);
+        if (! $this->confirmation->startsAreFuture($current['sessions'], CarbonImmutable::now('UTC'))) {
+            throw new StudyPlanConflictException;
+        }
+
+        return ['plan' => $current, 'sessions' => $created];
     }
 
     private function decode(string $token, User $owner): array

@@ -537,7 +537,7 @@ class AiSubtaskReminderActionsTest extends TestCase
         Http::preventStrayRequests();
         Http::fake(function ($request) use ($f) {
             $this->assertSame(0, DB::transactionLevel());
-            $this->assertCount(20, $request['tools']);
+            $this->assertCount(23, $request['tools']);
             $this->assertStringNotContainsString('INJECTION:', $request['instructions']);
             $this->assertStringContainsString('executed', json_encode($request['input']));
             $this->assertStringContainsString('"subtask_id":'.$f['child']->id, implode(' ', array_column($request['input'], 'content')));

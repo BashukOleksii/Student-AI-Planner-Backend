@@ -6,6 +6,7 @@ use App\Exceptions\StudySessionConflictException;
 use App\Models\User;
 use App\Services\Reminders\ReminderDependencyService;
 use Carbon\CarbonImmutable;
+use Closure;
 use LogicException;
 
 class StudySessionReschedulingService
@@ -21,17 +22,50 @@ class StudySessionReschedulingService
 
     public function reschedule(User $user, string $id, mixed $startsAt, mixed $endsAt): array
     {
+        return $this->mutation->run($user, $id, $this->action($startsAt, $endsAt));
+    }
+
+    public function rescheduleWithinTransaction(User $user, string $id, mixed $startsAt, mixed $endsAt): array
+    {
+        return $this->mutation->runWithinTransaction($user, $id, $this->action($startsAt, $endsAt));
+    }
+
+    /** Preliminary checks only: final effort and C10 feasibility are checked after source retirement. */
+    public function preview(User $user, string $id, mixed $startsAt, mixed $endsAt): array
+    {
         $candidate = ['start' => $this->rules->timestamp($startsAt), 'end' => $this->rules->timestamp($endsAt)];
         $duration = (new TimeIntervalService)->durationSeconds($candidate);
 
-        return $this->mutation->run($user, $id, function ($owner, $source, $task, $child, $interval, $now, $chain) use ($candidate, $duration): array {
-            $transition = $this->rules->transition('reschedule', $source->status, $interval, $now);
-            $this->mutation->validateChain($chain, $source->id);
+        return $this->mutation->read($user, $id, function ($owner, $source, $task, $child, $interval, $now, $chain) use ($candidate, $duration): array {
+            $this->preflight($source, $task, $child, $interval, $now, $chain, $candidate, $duration);
+
+            return ['original' => $source, 'candidate' => $candidate,
+                'summary' => array_diff_key($this->rules->replacementSummary($interval['end'] - $interval['start'], $duration, $duration),
+                    ['unallocated_work_seconds' => true]),
+                'records' => ['task' => $task, 'child' => $child, ...$chain->mapWithKeys(fn ($row) => ['session_'.$row->id => $row])->all()]];
+        });
+    }
+
+    private function preflight($source, $task, $child, $interval, $now, $chain, array $candidate, int $duration): array
+    {
+        $transition = $this->rules->transition('reschedule', $source->status, $interval, $now);
+        $this->mutation->validateChain($chain, $source->id);
+        if ($task->trashed() || $child?->trashed() || $duration > $interval['end'] - $interval['start']
+            || ! $this->fields->startsAreFuture([$candidate], $now)) {
+            throw new StudySessionConflictException;
+        }
+
+        return $transition;
+    }
+
+    private function action(mixed $startsAt, mixed $endsAt): Closure
+    {
+        $candidate = ['start' => $this->rules->timestamp($startsAt), 'end' => $this->rules->timestamp($endsAt)];
+        $duration = (new TimeIntervalService)->durationSeconds($candidate);
+
+        return function ($owner, $source, $task, $child, $interval, $now, $chain) use ($candidate, $duration): array {
+            $transition = $this->preflight($source, $task, $child, $interval, $now, $chain, $candidate, $duration);
             $originalSeconds = $interval['end'] - $interval['start'];
-            if ($task->trashed() || $child?->trashed() || $duration > $originalSeconds
-                || ! $this->fields->startsAreFuture([$candidate], $now)) {
-                throw new StudySessionConflictException;
-            }
             $reminders = $this->reminders->scheduledForSession($owner, $source);
             // Release only inside this transaction. All later failures restore the old reservation.
             if (! $source->update($transition)) {
@@ -70,6 +104,6 @@ class StudySessionReschedulingService
             }
 
             return ['original' => $source, 'replacement' => $replacement, 'summary' => $summary];
-        });
+        };
     }
 }

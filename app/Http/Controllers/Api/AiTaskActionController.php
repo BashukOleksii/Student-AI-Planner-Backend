@@ -33,7 +33,7 @@ class AiTaskActionController extends Controller
 
     private function decide(AiTaskActionRequest $request, string $conversation, string $action, TaskActionConfirmationService $service, string $operation): JsonResponse
     {
-        $outcome = $service->decide($request->user(), $conversation, $action, $operation);
+        $outcome = $service->decide($request->user(), $conversation, $action, $operation, $request->validated());
 
         return response()->json(['data' => (new AiPendingActionResource($outcome['action']))->resolve($request),
             'replayed' => $outcome['replayed']], $outcome['status']);

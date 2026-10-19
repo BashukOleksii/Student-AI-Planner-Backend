@@ -23,27 +23,47 @@ class StudySessionMutationContextService
             throw new LogicException('Study session mutation requires an outermost transaction.');
         }
 
-        return DB::transaction(function () use ($user, $id, $action): mixed {
-            // The first read is a current read, before establishing any RR snapshot.
-            $owner = User::whereKey($user->getKey())->lockForUpdate()->firstOrFail(['id', 'timezone']);
-            $source = $owner->studySessions()->whereKey($id)->firstOrFail();
-            Gate::forUser($owner)->authorize('update', $source);
-            $task = $owner->tasks()->withTrashed()->whereKey($source->task_id)->lockForUpdate()->first();
-            $child = $source->subtask_id === null || $task === null ? null
-                : $task->subtasks()->withTrashed()->whereKey($source->subtask_id)->lockForUpdate()->first();
-            if ($task === null || ($source->subtask_id !== null && $child === null)) {
-                throw new UnexpectedValueException('Invalid study session source relationships.');
-            }
-            // Discover both directions without filtering owners: a foreign edge must fail closed.
-            // Visited IDs guarantee termination even on a corrupt cycle. Lock the component by ID.
-            $locked = $this->lockChainRecords($owner, [$source->id], $source);
-            $source = $locked[$source->id];
-            $interval = ['start' => $this->context->utcSeconds($source->getRawOriginal('starts_at')),
-                'end' => $this->context->utcSeconds($source->getRawOriginal('ends_at'))];
-            $now = CarbonImmutable::now('UTC'); // Capture after contention, retain full precision.
+        return DB::transaction(fn () => $this->runWithinTransaction($user, $id, $action));
+    }
 
-            return $action($owner, $source, $task, $child, $interval, $now, $locked);
-        });
+    public function runWithinTransaction(User $user, string $id, Closure $action): mixed
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('Study session execution requires an existing owner-first transaction.');
+        }
+        // The first read is a current read, before establishing any RR snapshot.
+        $owner = User::whereKey($user->getKey())->lockForUpdate()->firstOrFail(['id', 'timezone']);
+
+        return $this->inspect($owner, $id, $action, true);
+    }
+
+    /** SELECT-only source context; callers may share a read snapshot, never a writer. */
+    public function read(User $user, string $id, Closure $action): mixed
+    {
+        $owner = User::whereKey($user->getKey())->firstOrFail(['id', 'timezone']);
+
+        return $this->inspect($owner, $id, $action, false);
+    }
+
+    private function inspect(User $owner, string $id, Closure $action, bool $lock): mixed
+    {
+        $source = $owner->studySessions()->whereKey($id)->firstOrFail();
+        Gate::forUser($owner)->authorize('update', $source);
+        $task = $owner->tasks()->withTrashed()->whereKey($source->task_id)->when($lock, fn ($query) => $query->lockForUpdate())->first();
+        $child = $source->subtask_id === null || $task === null ? null
+            : $task->subtasks()->withTrashed()->whereKey($source->subtask_id)->when($lock, fn ($query) => $query->lockForUpdate())->first();
+        if ($task === null || ($source->subtask_id !== null && $child === null)) {
+            throw new UnexpectedValueException('Invalid study session source relationships.');
+        }
+        // Discover both directions without filtering owners: a foreign edge must fail closed.
+        // Visited IDs guarantee termination even on a corrupt cycle. Lock the component by ID.
+        $locked = $this->chainRecords($owner, [$source->id], $source, $lock);
+        $source = $locked[$source->id];
+        $interval = ['start' => $this->context->utcSeconds($source->getRawOriginal('starts_at')),
+            'end' => $this->context->utcSeconds($source->getRawOriginal('ends_at'))];
+        $now = CarbonImmutable::now('UTC'); // Capture after contention, retain full precision.
+
+        return $action($owner, $source, $task, $child, $interval, $now, $locked);
     }
 
     /** Owner and work locks must already be held. Discover both directions, lock once by ID. */
@@ -52,6 +72,12 @@ class StudySessionMutationContextService
         if (DB::transactionLevel() === 0) {
             throw new LogicException('History locking requires a mutation transaction.');
         }
+
+        return $this->chainRecords($owner, $sourceIds, $attribution, true);
+    }
+
+    private function chainRecords(User $owner, array $sourceIds, ?StudySession $attribution, bool $lock): Collection
+    {
         $records = [];
         $pending = $sourceIds;
         while ($pending !== []) {
@@ -75,7 +101,7 @@ class StudySessionMutationContextService
             $pending = array_values(array_unique($next));
         }
 
-        return StudySession::whereIn('id', array_keys($records))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        return StudySession::whereIn('id', array_keys($records))->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get()->keyBy('id');
     }
 
     public function validateChain(Collection $records, int $sourceId): void

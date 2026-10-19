@@ -1,5 +1,13 @@
 # Stage C — Study Plan Confirmation, Persistence and REST API
 
+H3c reuses this exact planner/token/acceptance/batch-validation implementation for
+confirmed AI proposals. Public confirm retains its outermost guard and response;
+trusted confirmWithinTransaction requires a caller-owned owner-first transaction
+and never independently commits. H3 wraps it with its conversation/action prefix,
+private token storage, explicit client consent and durable receipt replay. Direct
+REST replay still conflicts. See [H3c](ai-study-planning-actions.md) and
+[ADR-004](decisions/ADR-004-ai-planning-confirmation-transaction.md).
+
 Stage C adds authenticated preview, explicit confirmation, atomic MySQL insertion
 and owned StudySession retrieval. Stage A accounting/order, Stage B greedy
 allocation and C9/PF1/PF2 source/constraint policies remain authoritative. There

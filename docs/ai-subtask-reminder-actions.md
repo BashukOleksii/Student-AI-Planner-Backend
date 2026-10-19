@@ -1,5 +1,12 @@
 # Stage H3b — confirmed Subtask and Reminder actions
 
+H3c extends this shared confirmation baseline with three planning proposals.
+The twenty H1/H3a/H3b definitions remain unchanged. Existing Task/Subtask/Reminder
+and manual-session confirmations retain empty bodies; only new plan/E2 actions
+accept their respective genuine boolean client-consent fields. Tokens remain
+private; no new confirmation framework is introduced. Historical H3b verification
+below is retained. See [H3c](ai-study-planning-actions.md).
+
 H3b extends H3a's existing two-phase confirmation path. The model may propose one
 mutation per turn across Task, Subtask and Reminder domains. Only an authenticated
 explicit action-confirmation request executes a stored proposal. A conversational

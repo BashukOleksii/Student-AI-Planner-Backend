@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['id', 'conversation_id', 'turn_id', 'call_id', 'type', 'arguments', 'preview', 'target_hash', 'status', 'expires_at', 'receipt', 'resolved_at'])]
+#[Fillable(['id', 'conversation_id', 'turn_id', 'call_id', 'type', 'arguments', 'preview', 'target_hash', 'status', 'expires_at', 'receipt', 'resolved_at', 'protected_payload'])]
+#[Hidden(['protected_payload'])]
 class AiPendingAction extends Model
 {
     public $incrementing = false;
@@ -22,7 +24,7 @@ class AiPendingAction extends Model
 
     protected function casts(): array
     {
-        return ['arguments' => 'array', 'preview' => 'array', 'receipt' => 'array',
+        return ['arguments' => 'array', 'preview' => 'array', 'receipt' => 'array', 'protected_payload' => 'encrypted:array',
             'expires_at' => 'immutable_datetime', 'resolved_at' => 'immutable_datetime'];
     }
 }

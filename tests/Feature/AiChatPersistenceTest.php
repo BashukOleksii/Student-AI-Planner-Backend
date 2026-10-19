@@ -43,7 +43,7 @@ class AiChatPersistenceTest extends TestCase
         $message = AiMessage::factory()->create(['tool_calls' => ['historical' => ['retained' => true]]])->refresh();
         $conversation = $message->conversation;
         $before = [$conversation->getAttributes(), $message->getAttributes()];
-        $this->artisan('migrate:rollback', ['--step' => 3])->assertExitCode(0);
+        $this->artisan('migrate:rollback', ['--step' => 4])->assertExitCode(0);
         $this->assertFalse(Schema::hasTable('ai_pending_actions'));
         $this->assertFalse(Schema::hasTable('ai_conversation_turns'));
         $this->assertSame($before, [$conversation->fresh()->getAttributes(), $message->fresh()->getAttributes()]);

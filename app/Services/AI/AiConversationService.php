@@ -5,8 +5,11 @@ namespace App\Services\AI;
 use App\Enums\AiMessageRole;
 use App\Exceptions\AiAgentException;
 use App\Models\AiConversation;
+use App\Models\AiMessage;
 use App\Models\AiPendingAction;
 use App\Models\User;
+use App\Services\AI\Actions\PlanningActionRegistry;
+use App\Services\AI\Actions\PlanningActionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +18,8 @@ use Throwable;
 
 class AiConversationService
 {
-    public function __construct(private AgentOrchestrator $orchestrator, private AgentLimits $limits) {}
+    public function __construct(private AgentOrchestrator $orchestrator, private AgentLimits $limits,
+        private PlanningActionRegistry $planningRegistry, private PlanningActionService $planning) {}
 
     public function create(User $owner): AiConversation
     {
@@ -153,9 +157,18 @@ class AiConversationService
             }
             $action = null;
             if (($proposal = $turn['proposal'] ?? null) !== null) {
+                $expires = DB::selectOne('SELECT DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 15 MINUTE) AS expires')->expires;
+                if ($this->planningRegistry->find($proposal['type']) !== null
+                    && ($domainExpires = $this->planning->expiration($owner, $proposal)) !== null) {
+                    $clock = DB::selectOne('SELECT LEAST(DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 15 MINUTE), ?) AS expires, ? <= UTC_TIMESTAMP(6) AS elapsed', [$domainExpires, $domainExpires]);
+                    if ($clock->elapsed) {
+                        throw new AiAgentException('action_expired');
+                    }
+                    $expires = $clock->expires;
+                }
                 $action = AiPendingAction::create([
                     ...$proposal, 'conversation_id' => $conversation->id, 'turn_id' => $claim['id'],
-                    'status' => 'pending', 'expires_at' => DB::selectOne('SELECT DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 15 MINUTE) AS expires')->expires,
+                    'status' => 'pending', 'expires_at' => $expires,
                 ]);
                 if (! $action->exists) {
                     throw new AiAgentException('persistence_error');
@@ -170,6 +183,12 @@ class AiConversationService
                 throw new AiAgentException('persistence_error');
             }
             $this->assertCurrent($claim);
+            if ($action !== null && $this->planningRegistry->find($action->type) !== null) {
+                $this->planning->expiration($owner, $proposal);
+                if (AiPendingAction::whereKey($action->id)->where('expires_at', '<=', DB::raw('UTC_TIMESTAMP(6)'))->exists()) {
+                    throw new AiAgentException('action_expired');
+                }
+            }
             $updated = DB::table('ai_conversation_turns')->where('id', $claim['id'])->where('lease_token', $claim['token'])
                 ->update(['result' => $this->limits->json($result), 'lease_token' => null, 'lease_expires_at' => null, 'updated_at' => DB::raw('UTC_TIMESTAMP()')]);
             if ($updated !== 1) {
@@ -201,11 +220,26 @@ class AiConversationService
                 'status' => $action->status === 'pending' && $action->elapsed ? 'expired' : $action->status,
                 'task_id' => $action->receipt['task']['id'] ?? $action->receipt['subtask']['task_id'] ?? null,
                 ...(isset($action->receipt['subtask']) ? ['subtask_id' => $action->receipt['subtask']['id']] : []),
-                ...(isset($action->receipt['reminder']) ? ['reminder_id' => $action->receipt['reminder']['id']] : [])])->all();
+                ...(isset($action->receipt['reminder']) ? ['reminder_id' => $action->receipt['reminder']['id']] : []),
+                ...($this->planningRegistry->find($action->type) === null ? [] : [
+                    'applied' => $action->receipt['applied'] ?? false,
+                    'created_session_count' => count($action->receipt['sessions'] ?? $action->receipt['replacement_sessions'] ?? []),
+                    'original_session_id' => $action->receipt['original']['id'] ?? null,
+                    'replacement_session_id' => $action->receipt['replacement']['id'] ?? null,
+                    'last_attempt' => $this->planningAttempt($id, $action->id),
+                ])])->all();
             $history[] = ['role' => 'assistant', 'content' => 'Server-recorded action states (data): '.$this->limits->json($states),
                 'calls' => [], 'state' => [], 'call_id' => null];
         }
 
         return $history;
+    }
+
+    private function planningAttempt(string $conversationId, string $actionId): ?array
+    {
+        $event = AiMessage::where('conversation_id', $conversationId)->where('tool_calls->version', 2)
+            ->where('tool_calls->action_event->action_id', $actionId)->orderByDesc('id')->first()?->tool_calls['action_event'] ?? null;
+
+        return $event === null ? null : array_intersect_key($event, array_flip(['status', 'error_code']));
     }
 }

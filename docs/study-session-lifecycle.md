@@ -1,5 +1,13 @@
 # Stage D — StudySession Lifecycle and Single-Session Rescheduling
 
+H3c adds a confirmed manual-rescheduling proposal using this same Stage D writer.
+Public run/reschedule retain outermost behavior; trusted runWithinTransaction and
+rescheduleWithinTransaction require a caller-owned owner-first transaction. A shared
+read-only preview performs preliminary source/chain/lifecycle/duration checks, not
+complete feasibility. Final effort and C10 checks still run after transactional
+source retirement. See [H3c](ai-study-planning-actions.md) and
+[ADR-004](decisions/ADR-004-ai-planning-confirmation-transaction.md).
+
 Stage D adds explicit authenticated lifecycle actions and safe transfer of one
 upcoming reservation. Stage A–C and PF1/PF2/C9/C10 remain authoritative and
 unchanged. No schema, status, background job, effort total or planning-history

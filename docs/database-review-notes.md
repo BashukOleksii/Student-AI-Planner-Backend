@@ -1,5 +1,11 @@
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
+H3c adds one private encrypted pending-action field and expands the existing type
+CHECK to fourteen. No StudySession, Task, Reminder or planning schema changes are
+needed. Tokens fit one bounded server-only payload; guarded rollback preserves
+planning history and legacy receipts. See [H3c](ai-study-planning-actions.md) and
+[ADR-004](decisions/ADR-004-ai-planning-confirmation-transaction.md).
+
 H3b reuses ai_pending_actions without new columns. A separate additive migration
 expands its allowed action types; the applied H3a migration remains unchanged.
 Conservative composite target fingerprints fit the existing target_hash. Guarded

@@ -14,6 +14,8 @@ class AiAgentException extends RuntimeException
             'action_expired' => 'The action expired. No business data was changed.',
             'action_executed' => 'An executed action cannot be rejected.',
             'action_stale' => 'The action target has changed. Request a new proposal.',
+            'action_conflict' => 'The requested planning change is no longer feasible. Request a fresh proposal.',
+            'action_token_invalid' => 'The protected planning review is invalid or expired. Request a fresh proposal.',
             'action_validation_failed' => 'The action is no longer valid. Review the target and request a new proposal.',
             'ai_unavailable' => 'The AI service is unavailable.',
             'provider_error' => 'The AI provider could not complete the request.',
@@ -31,9 +33,9 @@ class AiAgentException extends RuntimeException
         return match ($this->errorCode) {
             'ai_unavailable' => 503,
             'provider_error', 'invalid_provider_response' => 502,
-            'conversation_busy', 'turn_expired', 'idempotency_conflict', 'action_executed', 'action_stale' => 409,
+            'conversation_busy', 'turn_expired', 'idempotency_conflict', 'action_executed', 'action_stale', 'action_conflict' => 409,
             'action_expired' => 410,
-            'execution_limit_reached', 'multiple_actions', 'action_validation_failed' => 422,
+            'execution_limit_reached', 'multiple_actions', 'action_validation_failed', 'action_token_invalid' => 422,
             default => 500,
         };
     }
