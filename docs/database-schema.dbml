@@ -296,6 +296,7 @@ Table ai_messages {
 
   indexes {
     (conversation_id, created_at)
+    (conversation_id, id) [name: 'ai_messages_conversation_order_index']
     tool_call_id
   }
 
@@ -346,3 +347,48 @@ Ref: reminders.study_session_id > study_sessions.id [delete: set null]
 
 Ref: ai_conversations.user_id > users.id [delete: cascade]
 Ref: ai_messages.conversation_id > ai_conversations.id [delete: cascade]
+
+// H2 durable turn coordination (referenced by H3a).
+Table ai_conversation_turns {
+  id bigint [pk, increment]
+  conversation_id bigint [not null]
+  request_id char(36) [not null]
+  input_hash char(64) [not null]
+  lease_token char(36)
+  lease_expires_at datetime(6)
+  result json
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (conversation_id, request_id) [unique, name: 'ai_turns_conversation_request_unique']
+    (conversation_id, lease_expires_at) [name: 'ai_turns_conversation_lease_index']
+  }
+}
+Ref: ai_conversation_turns.conversation_id > ai_conversations.id [delete: cascade]
+
+// Stage H3a. Service enforces matching committed turn/conversation ownership.
+Table ai_pending_actions {
+  id char(36) [pk]
+  conversation_id bigint [not null]
+  turn_id bigint [not null, unique]
+  call_id varchar(128) [not null]
+  type varchar(32) [not null, note: 'Four propose_task_* names; CHECK enforced']
+  arguments json [not null]
+  preview json [not null]
+  target_hash char(64)
+  status varchar(16) [not null, default: 'pending', note: 'pending/executed/rejected/expired; CHECK enforced']
+  expires_at datetime(6) [not null]
+  receipt json [note: 'Required only for executed; CHECK enforced']
+  resolved_at datetime(6) [note: 'Required for terminal status; CHECK enforced']
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (conversation_id, created_at) [name: 'ai_actions_conversation_created_index']
+  }
+  Note: 'Both FKs cascade on delete. Owner derives from conversation. No Task FK; historical review survives Task soft deletion.'
+}
+
+Ref: ai_pending_actions.conversation_id > ai_conversations.id [delete: cascade]
+Ref: ai_pending_actions.turn_id > ai_conversation_turns.id [delete: cascade]

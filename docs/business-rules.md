@@ -532,6 +532,19 @@ Which actions require confirmation is controlled by backend/tool policy, not sol
 **BR-AI-009 — Conversation metadata**\
 Persist user-owned AI conversations and their messages. Message roles are `system`, `user`, `assistant`, and `tool`; structured tool-call metadata may remain JSON because it is orchestration metadata rather than deterministic planning constraints.
 
+H3a implements BR-AI-001–009 for four confirmed Task actions. Proposal definitions
+are separate from H1 read tools and require exact typed allowlisted arguments.
+Missing/ambiguous details require clarification. All four actions require explicit
+authenticated REST confirmation under server policy; conversational yes and prompt
+injection cannot authorize mutation. Proposals become confirmable only with a
+committed turn. Confirmation revalidates ownership, target state and current domain
+constraints, and commits TaskService effects, receipt and deterministic history
+atomically. Idempotent confirmation replays that receipt. Rejection/expiry/stale or
+failed validation never claims a Task mutation. See [H3a](ai-task-actions.md).
+Completion/reopening retain the direct Task lifecycle's preservation of unrelated
+legacy fields; create/update retain complete-candidate validation. Foreign Subject
+references remain masked in action previews and execution receipts.
+
 Existing conversation/message persistence remains separate from H1 discovery and
 execution. H1 neither requires nor creates a conversation or message.
 

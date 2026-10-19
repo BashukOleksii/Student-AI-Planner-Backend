@@ -10,6 +10,11 @@ class AiAgentException extends RuntimeException
     public function __construct(public readonly string $errorCode)
     {
         parent::__construct(match ($errorCode) {
+            'multiple_actions' => 'Only one task action may be proposed per turn.',
+            'action_expired' => 'The task action expired. No task was changed.',
+            'action_executed' => 'An executed action cannot be rejected.',
+            'action_stale' => 'The task has changed. Request a new proposal.',
+            'action_validation_failed' => 'The task action is no longer valid. Review the task and request a new proposal.',
             'ai_unavailable' => 'The AI service is unavailable.',
             'provider_error' => 'The AI provider could not complete the request.',
             'invalid_provider_response' => 'The AI provider returned an invalid response.',
@@ -26,8 +31,9 @@ class AiAgentException extends RuntimeException
         return match ($this->errorCode) {
             'ai_unavailable' => 503,
             'provider_error', 'invalid_provider_response' => 502,
-            'conversation_busy', 'turn_expired', 'idempotency_conflict' => 409,
-            'execution_limit_reached' => 422,
+            'conversation_busy', 'turn_expired', 'idempotency_conflict', 'action_executed', 'action_stale' => 409,
+            'action_expired' => 410,
+            'execution_limit_reached', 'multiple_actions', 'action_validation_failed' => 422,
             default => 500,
         };
     }

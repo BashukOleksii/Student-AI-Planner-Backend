@@ -97,9 +97,7 @@ class TaskService
     {
         return DB::transaction(function () use ($user, $values): Task {
             $this->lockOwner($user);
-            $candidate = ['description' => null, 'subject_id' => null, 'priority' => TaskPriority::Normal,
-                'estimated_minutes' => null, 'deadline_at' => null, ...$this->editableValues($values)];
-            $this->validateCandidate($user, $candidate);
+            $candidate = $this->prepare($user, $values, null, true);
 
             return $user->tasks()->create([
                 ...$candidate, 'status' => TaskStatus::Pending, 'completed_at' => null,
@@ -112,12 +110,8 @@ class TaskService
         return DB::transaction(function () use ($user, $task, $values): Task {
             $this->lockOwner($user);
             $task = $user->tasks()->lockForUpdate()->findOrFail($task->getKey());
-            $candidate = $task->only(self::EDITABLE_FIELDS);
             $deadline = $task->getRawOriginal('deadline_at');
-            $candidate['deadline_at'] = $deadline === null ? null
-                : CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $deadline, 'UTC');
-            $candidate = array_replace($candidate, $this->editableValues($values));
-            $this->validateCandidate($user, $candidate, $task);
+            $candidate = $this->prepare($user, $values, $task, true);
             if (! $task->update($candidate)) {
                 throw new ReminderIntegrityException;
             }
@@ -161,6 +155,24 @@ class TaskService
         });
     }
 
+    /** Read-only complete-candidate validation, also used by the authoritative writers. */
+    public function prepare(User $user, array $values, ?Task $task = null, bool $lock = false): array
+    {
+        $candidate = $task === null
+            ? ['description' => null, 'subject_id' => null, 'priority' => TaskPriority::Normal,
+                'estimated_minutes' => null, 'deadline_at' => null]
+            : $task->only(self::EDITABLE_FIELDS);
+        if ($task !== null) {
+            $deadline = $task->getRawOriginal('deadline_at');
+            $candidate['deadline_at'] = $deadline === null ? null
+                : CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $deadline, 'UTC');
+        }
+        $candidate = array_replace($candidate, $this->editableValues($values));
+        $this->validateCandidate($user, $candidate, $task, $lock);
+
+        return $candidate;
+    }
+
     private function lockOwner(User $user): void
     {
         User::whereKey($user->getKey())->lockForUpdate()->firstOrFail();
@@ -176,16 +188,16 @@ class TaskService
         return $values;
     }
 
-    private function validateCandidate(User $user, array $candidate, ?Task $task = null): void
+    private function validateCandidate(User $user, array $candidate, ?Task $task = null, bool $lock = true): void
     {
         if ($candidate['subject_id'] !== null
-            && $user->subjects()->whereKey($candidate['subject_id'])->lockForUpdate()->first() === null) {
+            && $user->subjects()->whereKey($candidate['subject_id'])->when($lock, fn ($query) => $query->lockForUpdate())->first() === null) {
             throw ValidationException::withMessages(['subject_id' => ['The selected subject is invalid.']]);
         }
 
         if ($task !== null && $candidate['deadline_at'] !== null
             && $task->subtasks()->whereNotNull('deadline_at')->where('deadline_at', '>', $candidate['deadline_at'])
-                ->lockForUpdate()->first() !== null) {
+                ->when($lock, fn ($query) => $query->lockForUpdate())->first() !== null) {
             throw ValidationException::withMessages(['deadline_at' => ['The task deadline must not be earlier than an existing subtask deadline.']]);
         }
     }

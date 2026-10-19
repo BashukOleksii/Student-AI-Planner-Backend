@@ -1,12 +1,22 @@
 # Tasks and Subtasks — T1–T3 and S1–S3
 
+H3a exposes Task create/update/complete/reopen as AI proposals requiring explicit
+server-side confirmation. It shares `TaskInputRules` with SaveTaskRequest and uses
+TaskService's extracted read-only complete-candidate `prepare()` for create/update
+previews. Completion/reopening preserve existing lifecycle semantics, including
+unrelated legacy fields; foreign Subject references stay masked in action output.
+Authoritative writers retain existing transactions, owner/Task locking, Subject
+and child-deadline validation and Reminder synchronization. No AI deletion,
+Subtask/StudySession mutation or Reminder creation is added. See
+[confirmed Task actions](ai-task-actions.md).
+
 Implemented: authenticated Task creation, detail retrieval, partial updates,
 completion, reopening and filtered/paginated listing. Persistence uses the existing
 MySQL Task/Subtask schema and enums. S1 adds nested Subtask creation, ordered
 listing, detail, partial editing and completion/reopening. S2 adds transactional
 Subtask reordering and read-only derived Task progress. S3 adds safe Task/Subtask
 soft deletion with synchronous dependency cancellation. Restore, hard purge,
-External notification delivery and AI tools remain deferred. [Stage C](study-plan-persistence.md)
+External notification delivery and further AI mutation domains remain deferred. [Stage C](study-plan-persistence.md)
 now provides explicit reviewed planning confirmation separately; Task/Subtask
 lifecycle and progress behavior do not change.
 

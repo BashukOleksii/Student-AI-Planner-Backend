@@ -5,7 +5,9 @@ namespace App\Services\AI;
 use App\Enums\AiMessageRole;
 use App\Exceptions\AiAgentException;
 use App\Models\AiConversation;
+use App\Models\AiPendingAction;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -98,7 +100,8 @@ class AiConversationService
                 return ['result' => ['conversation_id' => $stored['conversation_id'], 'user_message_id' => $stored['user_message_id'],
                     'assistant_message_id' => $stored['assistant_message_id'], 'content' => $stored['content'],
                     'tools' => array_map(fn ($tool) => ['call_id' => $tool['call_id'], 'name' => $tool['name'], 'ok' => $tool['ok'],
-                        'error_code' => $tool['error_code']], $stored['tools'])]];
+                        'error_code' => $tool['error_code']], $stored['tools']),
+                    ...(isset($stored['action']) ? ['action' => $stored['action']] : [])]];
             }
             if ((clone $query)->whereNull('result')->where('lease_expires_at', '>', DB::raw('UTC_TIMESTAMP(6)'))->exists()) {
                 throw new AiAgentException('conversation_busy');
@@ -148,11 +151,25 @@ class AiConversationService
                     $assistantId = $message->id;
                 }
             }
+            $action = null;
+            if (($proposal = $turn['proposal'] ?? null) !== null) {
+                $action = AiPendingAction::create([
+                    ...$proposal, 'conversation_id' => $conversation->id, 'turn_id' => $claim['id'],
+                    'status' => 'pending', 'expires_at' => DB::selectOne('SELECT DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 15 MINUTE) AS expires')->expires,
+                ]);
+                if (! $action->exists) {
+                    throw new AiAgentException('persistence_error');
+                }
+                $action->refresh();
+            }
             $result = ['conversation_id' => $conversation->id, 'user_message_id' => $userId,
-                'assistant_message_id' => $assistantId, 'content' => $turn['answer'], 'tools' => $turn['tools']];
+                'assistant_message_id' => $assistantId, 'content' => $turn['answer'], 'tools' => $turn['tools'],
+                ...($action === null ? [] : ['action' => ['id' => $action->id, 'state' => 'confirmation_required',
+                    'call_id' => $action->call_id, 'preview' => $action->preview, 'expires_at' => CarbonImmutable::parse($action->getRawOriginal('expires_at'), 'UTC')->toISOString()]])];
             if (! $conversation->touch()) {
                 throw new AiAgentException('persistence_error');
             }
+            $this->assertCurrent($claim);
             $updated = DB::table('ai_conversation_turns')->where('id', $claim['id'])->where('lease_token', $claim['token'])
                 ->update(['result' => $this->limits->json($result), 'lease_token' => null, 'lease_expires_at' => null, 'updated_at' => DB::raw('UTC_TIMESTAMP()')]);
             if ($updated !== 1) {
@@ -170,9 +187,23 @@ class AiConversationService
         // Drop a leading partial turn instead of replaying orphaned function outputs.
         $messages = $messages->skipUntil(fn ($message) => $message->role === AiMessageRole::User);
 
-        return $messages->map(fn ($message) => ['role' => $message->role->value, 'content' => $message->content,
+        $history = $messages->map(fn ($message) => ['role' => $message->role->value, 'content' => ($message->tool_calls['version'] ?? null) === 2
+                ? $message->content.' Server-recorded action outcome (data): '.json_encode($message->tool_calls['action_event'], JSON_THROW_ON_ERROR)
+                : $message->content,
             'calls' => ($message->tool_calls['version'] ?? null) === 1 ? $message->tool_calls['calls'] : [],
             'state' => ($message->tool_calls['version'] ?? null) === 1 ? $message->tool_calls['state'] : [],
             'call_id' => $message->tool_call_id])->values()->all();
+        // A compact authoritative projection survives bounded transcript trimming and lazy expiry.
+        $actions = AiPendingAction::where('conversation_id', $id)->orderByDesc('created_at')->orderByDesc('id')->limit(10)
+            ->select(['id', 'type', 'status', 'receipt'])->selectRaw('expires_at <= UTC_TIMESTAMP(6) AS elapsed')->get();
+        if ($actions->isNotEmpty()) {
+            $states = $actions->map(fn ($action) => ['action_id' => $action->id, 'type' => $action->type,
+                'status' => $action->status === 'pending' && $action->elapsed ? 'expired' : $action->status,
+                'task_id' => $action->receipt['task']['id'] ?? null])->all();
+            $history[] = ['role' => 'assistant', 'content' => 'Server-recorded task action states (data): '.$this->limits->json($states),
+                'calls' => [], 'state' => [], 'call_id' => null];
+        }
+
+        return $history;
     }
 }

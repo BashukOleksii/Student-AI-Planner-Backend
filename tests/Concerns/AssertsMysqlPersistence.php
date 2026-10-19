@@ -9,13 +9,13 @@ use Illuminate\Support\Facades\Schema;
 
 trait AssertsMysqlPersistence
 {
-    private function assertTableDefinition(string $table, array $expected): void
+    private function assertTableDefinition(string $table, array $expected, bool $autoIncrement = true): void
     {
         $columns = collect(Schema::getColumns($table));
         $this->assertSame($expected, $columns->mapWithKeys(fn (array $column) => [
             $column['name'] => [$column['type'], $column['nullable'], $column['default']],
         ])->all());
-        $this->assertTrue($columns->firstWhere('name', 'id')['auto_increment']);
+        $this->assertSame($autoIncrement, $columns->firstWhere('name', 'id')['auto_increment']);
         $this->assertTrue(collect(Schema::getIndexes($table))->contains(
             fn (array $index) => $index['primary'] && $index['columns'] === ['id'],
         ));

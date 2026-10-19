@@ -9,6 +9,10 @@ class OpenAiToolSchema
     {
         return array_map(function ($definition): array {
             $schema = $definition['parameters'];
+            if (($definition['strict'] ?? true) === false) {
+                return ['type' => 'function', 'name' => $definition['name'], 'description' => $definition['description'],
+                    'parameters' => $schema, 'strict' => false];
+            }
             foreach ($schema['properties'] as $name => &$rule) {
                 if (! in_array($name, $schema['required'], true)) {
                     $rule['type'] = [$rule['type'], 'null'];
@@ -28,7 +32,7 @@ class OpenAiToolSchema
     public function arguments(string $name, array $arguments, array $definitions): array
     {
         foreach ($definitions as $definition) {
-            if ($definition['name'] !== $name) {
+            if ($definition['name'] !== $name || ($definition['strict'] ?? true) === false) {
                 continue;
             }
             $schema = $definition['parameters'];

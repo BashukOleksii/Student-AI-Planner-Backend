@@ -1,5 +1,11 @@
 # Stage H1 — Read-only AI tools foundation
 
+H3a leaves all seven H1 definitions, argument contracts, Executor dispatch and
+read-only effects unchanged. Agent discovery additionally includes four separate
+Task proposal definitions. Those execute through TaskActionProposalService, never
+through H1 ToolExecutor, and cannot call a Task writer. Explicit authenticated
+confirmation is a separate server operation. See [the H3a contract](ai-task-actions.md).
+
 H2 integration is now implemented separately in [AI agent chat](ai-agent-chat.md).
 Its orchestration layer calls this unchanged H1 Executor and wraps it in owned
 conversation persistence. Statements below about H1's absence of LLM/network or

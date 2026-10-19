@@ -1,5 +1,15 @@
 # Stage H2 — Authenticated read-only AI chat
 
+Stage H3a extends this H2 baseline with four Task proposal definitions and durable
+server-side confirmation. H1 read tools, ordinary H2 turns and provider continuation
+remain supported. Proposal turns add a structured `action` result and deterministic
+confirmation-required wording; only their successful transcript commit inserts a
+pending action. Outcome events use message metadata version 2, while H2 calls keep
+version 1. The provider receives one compact projection of the latest ten action
+states in addition to bounded transcript history. No transaction spans provider
+I/O. See [Task actions](ai-task-actions.md) for the superseding mutation boundary,
+provider omission/null schemas, REST contracts, lock order and verification.
+
 H2 adds synchronous conversational orchestration over the seven unchanged
 [H1 read tools](ai-tools-foundation.md). The LLM selects tools and explains their
 results. PHP Services still decide schedule membership, free time, attribution,

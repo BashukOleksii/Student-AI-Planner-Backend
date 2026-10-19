@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AcademicPeriodController;
 use App\Http\Controllers\Api\AiConversationController;
+use App\Http\Controllers\Api\AiTaskActionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EducationInstitutionController;
 use App\Http\Controllers\Api\FreeSlotController;
@@ -36,6 +37,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/', [AiConversationController::class, 'store'])->name('store');
         Route::get('/', [AiConversationController::class, 'index'])->name('index');
         Route::get('/{conversation}', [AiConversationController::class, 'show'])->whereNumber('conversation')->name('show');
+        Route::get('/{conversation}/actions', [AiTaskActionController::class, 'index'])->whereNumber('conversation')->name('actions.index');
+        Route::get('/{conversation}/actions/{action}', [AiTaskActionController::class, 'show'])->whereNumber('conversation')->whereUuid('action')->name('actions.show');
+        Route::post('/{conversation}/actions/{action}/confirm', [AiTaskActionController::class, 'confirm'])->whereNumber('conversation')->whereUuid('action')->name('actions.confirm');
+        Route::post('/{conversation}/actions/{action}/reject', [AiTaskActionController::class, 'reject'])->whereNumber('conversation')->whereUuid('action')->name('actions.reject');
         Route::get('/{conversation}/messages', [AiConversationController::class, 'messages'])->whereNumber('conversation')->name('messages');
         Route::post('/{conversation}/messages', [AiConversationController::class, 'send'])->whereNumber('conversation')->middleware('throttle:ai-messages')->name('send');
     });

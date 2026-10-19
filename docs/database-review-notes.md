@@ -1,5 +1,15 @@
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
+H3a adds `ai_pending_actions` for durable confirmation and result replay.
+Existing messages/turns alone cannot represent an independently confirmed action,
+reviewed arguments, stale-target guard and atomic business receipt. Conversation
+and unique turn FKs preserve provenance; ownership derives through conversation.
+Task identity stays inside immutable arguments/history so normal soft deletion
+cannot erase the review. Cross-row conversation/turn consistency remains enforced
+by the Service; the two simple FKs establish existence. CHECKs enforce vocabulary
+and receipt/resolution state. Rollback is additive and preserves H2 records. See
+[the schema and locking contract](ai-task-actions.md#additive-persistence).
+
 Status: historical draft review; persistence decisions resolved by the approved Stage 02 design. All nine approved persistence groups (Migration Groups 1–9) are implemented; Stage 02 persistence is complete.
 
 The canonical design is [database-schema.md](database-schema.md), with [database-schema.dbml](database-schema.dbml) as its diagram source. The earlier draft below is neither the approved design nor the current application schema. New MySQL implementation issues are recorded in the canonical schema's implementation gate and must be resolved before affected migrations.
