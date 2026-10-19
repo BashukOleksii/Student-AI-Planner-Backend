@@ -84,10 +84,8 @@ class AiConversationService
 
     private function claim(User $owner, string $id, string $content, string $requestId): array
     {
+        $this->limits->validate();
         $lease = $this->limits->get('turn_lease_seconds');
-        if ($lease <= $this->limits->get('max_turn_seconds')) {
-            throw new AiAgentException('ai_unavailable');
-        }
 
         return DB::transaction(function () use ($owner, $id, $content, $requestId, $lease): array {
             $owner->aiConversations()->whereKey($id)->lockForUpdate()->firstOrFail();

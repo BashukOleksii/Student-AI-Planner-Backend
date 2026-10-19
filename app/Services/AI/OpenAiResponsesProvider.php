@@ -68,9 +68,7 @@ class OpenAiResponsesProvider implements LlmProvider
             }
 
             $parsed = $this->parse($data['output'], $definitions);
-            if (is_string($parsed['text']) && str_contains($parsed['text'], $key)) {
-                throw new AiAgentException('invalid_provider_response');
-            }
+            $this->rejectCredentialEcho($parsed, $key);
 
             return $parsed;
         } catch (JsonException) {
@@ -128,7 +126,7 @@ class OpenAiResponsesProvider implements LlmProvider
                         ...(in_array($item['phase'] ?? null, ['commentary', 'final_answer'], true) ? ['phase' => $item['phase']] : [])];
                     break;
                 case 'reasoning':
-                    if (! $this->identifier($item['id'] ?? null) || ! is_string($item['encrypted_content'] ?? null) || $item['encrypted_content'] === '') {
+                    if (($item['status'] ?? 'completed') !== 'completed' || ! $this->identifier($item['id'] ?? null) || ! is_string($item['encrypted_content'] ?? null) || $item['encrypted_content'] === '') {
                         throw new AiAgentException('invalid_provider_response');
                     }
                     // Keep only encrypted continuation. Never store raw chain-of-thought or summaries.
@@ -146,6 +144,22 @@ class OpenAiResponsesProvider implements LlmProvider
         $this->limits->json($state);
 
         return ['text' => $text === '' ? null : $text, 'calls' => $calls, 'state' => $state];
+    }
+
+    /** Reject verbatim transport credentials in arguments, identifiers and continuation as well as text. */
+    private function rejectCredentialEcho(mixed $value, string $key): void
+    {
+        if (is_string($value) && str_contains($value, $key)) {
+            throw new AiAgentException('invalid_provider_response');
+        }
+        if (is_array($value) || $value instanceof stdClass) {
+            foreach ($value as $field => $item) {
+                if (is_string($field)) {
+                    $this->rejectCredentialEcho($field, $key);
+                }
+                $this->rejectCredentialEcho($item, $key);
+            }
+        }
     }
 
     private function identifier(mixed $value): bool

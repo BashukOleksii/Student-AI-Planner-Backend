@@ -1,5 +1,10 @@
 # Authentication + User Profile
 
+H4 verifies the existing backend through cookie/CSRF HTTP workflows and adds strict
+configuration checks, safe AI diagnostics, retry-header CORS exposure and offline CI.
+Domain rules and confirmation transactions remain unchanged. See [backend readiness](backend-integration-readiness.md)
+and [the frontend REST contract](frontend-api-contract.md) for current setup and recovery.
+
 Implemented mode: Laravel Sanctum first-party SPA cookies/sessions with Laravel's
 `web` guard. No bearer token is returned or required. The existing token table is
 preserved. Controllers use Form Requests and UserResource without additional

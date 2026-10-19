@@ -1,5 +1,10 @@
 # Backend Architecture
 
+H4 verifies the existing backend through cookie/CSRF HTTP workflows and adds strict
+configuration checks, safe AI diagnostics, retry-header CORS exposure and offline CI.
+Domain rules and confirmation transactions remain unchanged. See [backend readiness](backend-integration-readiness.md)
+and [the frontend REST contract](frontend-api-contract.md) for current setup and recovery.
+
 H3c adds three confirmed planning proposals (23 total tools), using the existing
 H3 pending-action lifecycle and deterministic Stage C/D/E2 Services. Tokens are
 server-generated, encrypted in hidden action metadata and never exposed to the

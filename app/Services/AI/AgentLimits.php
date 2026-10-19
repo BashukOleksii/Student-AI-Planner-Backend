@@ -8,6 +8,18 @@ class AgentLimits
 {
     public function __construct(private array $settings) {}
 
+    public function validate(): void
+    {
+        foreach (['max_tool_rounds', 'max_tool_calls', 'max_history_messages', 'max_context_bytes',
+            'max_tool_result_bytes', 'max_output_tokens', 'request_timeout', 'max_turn_seconds',
+            'turn_lease_seconds', 'requests_per_minute'] as $name) {
+            $this->get($name);
+        }
+        if ($this->get('turn_lease_seconds') <= $this->get('max_turn_seconds')) {
+            throw new AiAgentException('ai_unavailable');
+        }
+    }
+
     public function get(string $name): int
     {
         $maximum = match ($name) {

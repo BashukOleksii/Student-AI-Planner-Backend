@@ -20,24 +20,55 @@ selects the separate MySQL test database `student_planner_testing`.
 
 ## Project Status
 
-Stage 01 architecture and Stage 02 MySQL persistence are complete. The completed
-application/API verticals implement registration, login, logout, current-user
-profile retrieval/update, Planning Preferences, Study Availability Windows, and
-Academic Context CRUD for institutions, periods, subjects, and teachers, plus manual
-Lessons, cancellation/replacement lifecycle, and timezone-aware schedule views.
-See [Authentication + User Profile](docs/auth-profile.md)
-for routes, responses, and the Vue SPA local configuration and CSRF flow.
+The backend implements authenticated academic/schedule CRUD and reviewed Excel
+schedule import; Tasks/Subtasks and lifecycle/progress; free-time calculation,
+deterministic study planning, adaptive replanning and session rescheduling;
+absolute/relative Reminders with in-app delivery/inbox; and progress statistics,
+daily trends and period comparisons.
 
-The repository is not yet feature-complete. Tasks, planning, imports, reminders, reports, and AI orchestration remain planned work.
-See [Planning settings API](docs/planning-settings.md) for singleton preferences,
-recurring local availability, overlap validation, and ownership protection.
-See [Academic Context API](docs/academic-context.md) for the completed Stage 04
-CRUD contracts, same-owner institution rules, and guarded deletion/history behavior.
+H1–H3c provide cookie-authenticated AI conversations, nine read-only Tools and
+fourteen mutation proposal Tools through the OpenAI Responses adapter. Every AI
+mutation requires explicit authenticated confirmation, deterministic domain
+validation and atomic durable receipt/history persistence. The LLM never writes
+business records directly. H4 adds cross-domain REST verification, safe operational
+boundaries, frontend API documentation and a minimal offline verification workflow.
 
-See [Lesson and Schedule API](docs/schedule.md) for UTC manual input, lifecycle,
-local date/week views, DST boundaries, and presentation timestamps.
+The independent Vue 3 frontend, production deployment, external notification
+transports, streaming/voice and additional providers are not implemented. Paid
+live-provider testing is opt-in and was not run for H4.
+
+Use **PHP 8.4.1+ for the current lock file**, Composer 2 and MySQL 8.4. Root PHP
+^8.3 is the declared constraint; locked Symfony packages impose the higher actual
+minimum. See [backend setup, smoke and readiness](docs/backend-integration-readiness.md)
+for dependencies, database guards, configuration, CI and known limitations.
+See [the frontend REST contract](docs/frontend-api-contract.md) for Sanctum/CSRF,
+conversations, action review/consent, errors and domain refresh endpoints.
+
+Useful feature contracts:
+
+- [Authentication + User Profile](docs/auth-profile.md)
+- [Planning settings](docs/planning-settings.md)
+- [Academic Context](docs/academic-context.md)
+- [Lessons, schedule and import](docs/schedule.md)
+- [Tasks/Subtasks](docs/tasks.md)
+- [Study plan persistence](docs/study-plan-persistence.md)
+- [Adaptive replanning](docs/adaptive-replanning.md)
+- [Session lifecycle](docs/study-session-lifecycle.md)
+- [Reminders and inbox delivery](docs/reminders.md)
+- [Progress statistics](docs/progress-statistics.md)
+- [Daily trends](docs/progress-trends.md) and [period comparisons](docs/progress-comparisons.md)
+- [AI chat](docs/ai-agent-chat.md) and [confirmed planning actions](docs/ai-study-planning-actions.md)
+
+The reproducible offline smoke (guarded disposable MySQL only; no OpenAI key needed):
+
+```sh
+vendor/bin/phpunit tests/Feature/BackendIntegrationSmokeTest.php
+```
 
 ## Documentation
+
+- [Backend integration and readiness](docs/backend-integration-readiness.md)
+- [Frontend REST API contract](docs/frontend-api-contract.md)
 
 - [Lesson and Schedule API](docs/schedule.md)
 - [Academic Context API](docs/academic-context.md)

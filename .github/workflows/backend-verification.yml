@@ -1,0 +1,103 @@
+name: Backend verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: student_planner_testing
+          MYSQL_ROOT_PASSWORD: disposable-ci-password
+          MYSQL_ROOT_HOST: '%'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      APP_ENV: testing
+      APP_DEBUG: 'false'
+      DB_URL: ''
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_DATABASE: student_planner_testing
+      DB_USERNAME: root
+      DB_PASSWORD: disposable-ci-password
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      OPENAI_API_KEY: ''
+      OPENAI_MODEL: gpt-5.4-mini
+      AI_LIVE_SMOKE: '0'
+      AI_LIVE_ALLOW_PAID: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql, mbstring, xml, dom, fileinfo, gd, zip, intl, bcmath
+          coverage: none
+          tools: composer:v2
+          ini-values: memory_limit=512M
+      - name: Install locked dependencies
+        run: |
+          composer validate --strict --no-check-publish
+          composer install --no-interaction --prefer-dist --no-progress
+          composer check-platform-reqs
+      - name: Initialize test-only application
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+          php artisan config:cache
+          php artisan config:clear
+          php artisan route:list --path=api --except-vendor
+      - name: Require real MySQL isolation and lock instrumentation
+        run: |
+          php <<'PHP'
+          <?php
+          if (getenv('APP_ENV') !== 'testing' || getenv('DB_DATABASE') !== 'student_planner_testing') {
+              throw new RuntimeException('Unsafe CI database configuration.');
+          }
+          $db = new PDO('mysql:host=127.0.0.1;port=3306;dbname=student_planner_testing', getenv('DB_USERNAME'), getenv('DB_PASSWORD'));
+          $row = $db->query('SELECT VERSION() AS version, @@transaction_isolation AS isolation_level, @@performance_schema AS instrumentation')->fetch(PDO::FETCH_ASSOC);
+          if (!str_starts_with($row['version'], '8.4.') || $row['isolation_level'] !== 'REPEATABLE-READ' || (int) $row['instrumentation'] !== 1) {
+              throw new RuntimeException('Required MySQL capabilities are unavailable.');
+          }
+          foreach (['data_locks', 'data_lock_waits', 'threads'] as $table) {
+              $db->query('SELECT COUNT(*) FROM performance_schema.'.$table)->fetchColumn();
+          }
+          echo json_encode($row, JSON_THROW_ON_ERROR).PHP_EOL;
+          PHP
+      - name: Verify migrations and formatting
+        run: |
+          php artisan migrate --force
+          php artisan migrate:rollback --force
+          php artisan migrate --force
+          vendor/bin/pint --test
+          git diff --check
+      - name: Run complete offline MySQL suite including independent processes
+        run: vendor/bin/phpunit --log-junit phpunit-full.xml
+      - name: Retain verification results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-phpunit-results
+          path: phpunit-full.xml
+          if-no-files-found: error
+          retention-days: 7

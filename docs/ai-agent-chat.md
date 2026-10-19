@@ -1,5 +1,10 @@
 # Stage H2 — Authenticated read-only AI chat
 
+H4 verifies the existing backend through cookie/CSRF HTTP workflows and adds strict
+configuration checks, safe AI diagnostics, retry-header CORS exposure and offline CI.
+Domain rules and confirmation transactions remain unchanged. See [backend readiness](backend-integration-readiness.md)
+and [the frontend REST contract](frontend-api-contract.md) for current setup and recovery.
+
 H3c adds three planning proposals to provider discovery (23 definitions). The
 global one-mutation limit includes all fourteen proposals. Tokens and acceptance
 flags are never model arguments; client consent is validated only on confirmation.

@@ -5,11 +5,13 @@ use App\Exceptions\ReminderConflictException;
 use App\Exceptions\ReminderIntegrityException;
 use App\Exceptions\StudyPlanConflictException;
 use App\Exceptions\StudySessionConflictException;
+use App\Http\Middleware\ObserveAiRequest;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -22,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        $middleware->api(prepend: [ObserveAiRequest::class]);
         // Validate exact UTC wire formats instead of silently trimming timestamps.
         $middleware->trimStrings(except: [
             fn (Request $request) => $request->is('api/ai/*'),
@@ -43,6 +46,22 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Never let default exception reporting persist AI prompts, SQL bindings or private payloads.
+        $exceptions->report(function (Throwable $exception) {
+            if (request()->is('api/ai/*')) {
+                $code = match ($exception instanceof AiAgentException ? $exception->status() : 500) {
+                    409 => 'conflict', 410 => 'expired', 422 => 'invalid_request',
+                    502 => 'provider_error', 503 => 'ai_unavailable', default => 'persistence_error',
+                };
+                try {
+                    Log::warning('ai.failure', ['code' => $code]);
+                } catch (Throwable) {
+                    // A logging outage must not replace the original safe response.
+                }
+
+                return false;
+            }
+        });
         $exceptions->render(function (Throwable $exception, Request $request) {
             if ($request->is('api/ai/*')) {
                 if ($exception instanceof AiAgentException) {
@@ -52,7 +71,12 @@ return Application::configure(basePath: dirname(__DIR__))
                     return null;
                 }
                 if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
-                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                    return match ($exception->getStatusCode()) {
+                        404 => response()->json(['message' => 'Not found.'], 404),
+                        419 => response()->json(['message' => 'CSRF token mismatch.'], 419),
+                        429 => response()->json(['message' => 'Too Many Attempts.'], 429, $exception->getHeaders()),
+                        default => null,
+                    };
                 }
 
                 return response()->json(['message' => 'The AI conversation could not be processed.', 'code' => 'persistence_error'], 500);
