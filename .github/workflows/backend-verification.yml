@@ -67,34 +67,18 @@ jobs:
           php artisan config:cache
           php artisan config:clear
           php artisan route:list --path=api --except-vendor
-      - name: Require real MySQL isolation and lock instrumentation
+      - name: Verify disposable MySQL migrations and lock instrumentation
+        env:
+          DISPOSABLE_CI_MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
+        run: php .github/scripts/verify-ci-migrations.php
+      - name: Verify formatting
         run: |
-          php <<'PHP'
-          <?php
-          if (getenv('APP_ENV') !== 'testing' || getenv('DB_DATABASE') !== 'student_planner_testing') {
-              throw new RuntimeException('Unsafe CI database configuration.');
-          }
-          $db = new PDO('mysql:host=127.0.0.1;port=3306;dbname=student_planner_testing', getenv('DB_USERNAME'), getenv('DB_PASSWORD'));
-          $row = $db->query('SELECT VERSION() AS version, @@transaction_isolation AS isolation_level, @@performance_schema AS instrumentation')->fetch(PDO::FETCH_ASSOC);
-          if (!str_starts_with($row['version'], '8.4.') || $row['isolation_level'] !== 'REPEATABLE-READ' || (int) $row['instrumentation'] !== 1) {
-              throw new RuntimeException('Required MySQL capabilities are unavailable.');
-          }
-          foreach (['data_locks', 'data_lock_waits', 'threads'] as $table) {
-              $db->query('SELECT COUNT(*) FROM performance_schema.'.$table)->fetchColumn();
-          }
-          echo json_encode($row, JSON_THROW_ON_ERROR).PHP_EOL;
-          PHP
-      - name: Verify migrations and formatting
-        run: |
-          php artisan migrate --force
-          php artisan migrate:rollback --force
-          php artisan migrate --force
           vendor/bin/pint --test
           git diff --check
       - name: Run complete offline MySQL suite including independent processes
         run: vendor/bin/phpunit --log-junit phpunit-full.xml
       - name: Retain verification results
-        if: always()
+        if: ${{ always() && hashFiles('phpunit-full.xml') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: backend-phpunit-results
