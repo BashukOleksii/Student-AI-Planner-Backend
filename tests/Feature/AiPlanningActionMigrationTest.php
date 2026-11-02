@@ -5,12 +5,12 @@ namespace Tests\Feature;
 use App\Models\AiConversation;
 use App\Models\AiPendingAction;
 use App\Services\AI\Actions\PlanningActionRegistry;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Tests\Concerns\AssertsMysqlPersistence;
+use Tests\Concerns\UsesForwardOnlyMigrations as DatabaseMigrations;
 use Tests\TestCase;
 
 class AiPlanningActionMigrationTest extends TestCase

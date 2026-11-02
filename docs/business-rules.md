@@ -1,5 +1,11 @@
 # Business Rules
 
+Stage 11 extends the existing one-proposal/explicit-confirmation rules to Lesson
+create/update/cancel/replacement. Shared LessonService validation remains authoritative;
+reviewed graph/reference changes are stale, new overlap is revalidated and imported
+identity is immutable. No automatic rescheduling follows a Lesson change. See
+[the complete rules and limits](ai-lesson-actions.md).
+
 H3c extends BR-AI-001–009 to deterministic study-plan creation, adaptive replanning
 and manual session rescheduling. One global proposal attempt per turn remains.
 Explicit partial acceptance and separate unplaced-cancellation acceptance preserve

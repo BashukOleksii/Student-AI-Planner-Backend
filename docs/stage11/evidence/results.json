@@ -1,0 +1,58 @@
+{
+  "date_utc": "2026-11-02T20:16:00.850561+00:00",
+  "backend_baseline": "f618bba290f919dc3561b0462c59b3b86ade82d8",
+  "frontend_inspected_head": "d6e03fe79fbe139d5f96949514945cd410e26364",
+  "scope": "Backend implementation only; Frontend integration and tests deferred",
+  "mysql": {
+    "version": "8.4.10",
+    "schema": "student_planner_isolated_stage11",
+    "socket": "/tmp/stage11-mysql.sock",
+    "networking": false,
+    "retained_databases_used": false,
+    "stopped_after_tests": true
+  },
+  "provider": "Fake HTTP / deterministic test doubles only; no paid OpenAI verification",
+  "checks": {
+    "targeted": {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 244,
+      "passed": 244,
+      "assertions": 2337,
+      "duration_ms": 11457,
+      "command": "vendor/bin/phpunit --filter='LessonAction|LessonApi|LessonLifecycle|LessonSecurity' --log-junit /tmp/stage11-targeted.xml",
+      "junit_path": "/tmp/stage11-targeted.xml",
+      "junit_sha256": "115b30ce848634d1219f65638f81a23e942ab454ffad57dbadb66407afa4e124"
+    },
+    "compatibility": {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 30,
+      "passed": 30,
+      "assertions": 7694,
+      "duration_ms": 11434,
+      "command": "vendor/bin/phpunit --filter='BackendIntegrationSmoke|AiChatPersistence|AiTaskActionPersistence|PlanningMigration|multi_round_discovery|local_date_and_dst_previews' --log-junit /tmp/stage11-compatibility.xml",
+      "junit_path": "/tmp/stage11-compatibility.xml",
+      "junit_sha256": "174ff3992afb42367073e3b72514b359c37d1056e783a21e23c884a6a94cfe3d"
+    },
+    "backend_regression": {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 5531,
+      "passed": 5531,
+      "assertions": 53706,
+      "duration_ms": 272853,
+      "command": "vendor/bin/phpunit  --log-junit /tmp/stage11-backend-regression.xml",
+      "junit_path": "/tmp/stage11-backend-regression.xml",
+      "junit_sha256": "f68c1fc371936a97e96d615179896e76c11892d51b1f1206cae3269d9daf72ad"
+    },
+    "pint": {
+      "result": "passed",
+      "command": "vendor/bin/pint --dirty --test"
+    },
+    "diff_check": {
+      "result": "passed",
+      "command": "git diff --check"
+    }
+  }
+}

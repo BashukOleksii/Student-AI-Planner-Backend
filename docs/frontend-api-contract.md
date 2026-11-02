@@ -1,5 +1,10 @@
 # Frontend REST integration contract — H4
 
+Stage 11 Backend adds four Lesson proposal types using the same endpoints and
+resources below. The independent Frontend is unchanged and must integrate
+[the exact Lesson REST contract](stage11/frontend-rest-contract.md) before enabling
+confirmation of these types. Full system acceptance remains pending.
+
 The Vue 3/TypeScript frontend is a separate, future application. This document
 covers the implemented cookie-authenticated API, without a new namespace or
 provider-specific client dependency. Route/Resource code is authoritative. H4

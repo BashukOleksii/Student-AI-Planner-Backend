@@ -1,5 +1,12 @@
 # Stage H2 — Authenticated read-only AI chat
 
+Stage 11 appends four Lesson proposal definitions to the H3 allowlist (27 total:
+9 reads, 18 proposals). The existing successful-turn proposal persistence, action
+resource and explicit REST decision endpoints are reused. The one-proposal limit
+includes Lesson attempts; LessonService owns preflight and all writes. See
+[Lesson actions](ai-lesson-actions.md) and the [exact Frontend contract](stage11/frontend-rest-contract.md).
+Earlier H2/H3 test counts and discovery counts below describe those stages.
+
 H4 verifies the existing backend through cookie/CSRF HTTP workflows and adds strict
 configuration checks, safe AI diagnostics, retry-header CORS exposure and offline CI.
 Domain rules and confirmation transactions remain unchanged. See [backend readiness](backend-integration-readiness.md)

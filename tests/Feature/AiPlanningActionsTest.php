@@ -546,7 +546,7 @@ class AiPlanningActionsTest extends TestCase
         Http::preventStrayRequests();
         Http::fake(function ($request) {
             $this->assertSame(0, DB::transactionLevel());
-            $this->assertCount(23, $request['tools']);
+            $this->assertCount(27, $request['tools']);
             $this->assertStringContainsString('action_stale', json_encode($request['input']));
             $this->assertStringContainsString('failed', json_encode($request['input']));
             $this->assertStringNotContainsString('preview_token', json_encode($request->data()));
@@ -560,8 +560,13 @@ class AiPlanningActionsTest extends TestCase
 
     public static function calendars(): array
     {
-        return [['2027-03-28', 120, '2027-03-28T00:30:00Z', '2027-03-28T02:30:00Z'],
-            ['2026-10-25', 240, '2026-10-24T23:30:00Z', '2026-10-25T03:30:00Z']];
+        // Keep protected reviews future-dated relative to both application and MySQL clocks.
+        $year = (int) gmdate('Y') + 1;
+        $spring = new \DateTimeImmutable("last Sunday of March $year", new \DateTimeZone('UTC'));
+        $autumn = new \DateTimeImmutable("last Sunday of October $year", new \DateTimeZone('UTC'));
+
+        return [[$spring->format('Y-m-d'), 120, $spring->format('Y-m-d').'T00:30:00Z', $spring->format('Y-m-d').'T02:30:00Z'],
+            [$autumn->format('Y-m-d'), 240, $autumn->modify('-1 day')->format('Y-m-d').'T23:30:00Z', $autumn->format('Y-m-d').'T03:30:00Z']];
     }
 
     #[DataProvider('calendars')]

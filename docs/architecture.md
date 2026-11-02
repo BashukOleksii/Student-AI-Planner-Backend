@@ -1,5 +1,12 @@
 # Backend Architecture
 
+Stage 11 adds four confirmed Lesson proposals, bringing discovery to 27 tools
+(9 reads and 18 proposals). It reuses H3 pending actions and explicit decisions;
+all writes remain in LessonService. Shared read-only preflight, complete graph/
+association fingerprints and one forward-only CHECK migration preserve the existing
+transaction/receipt rules. Frontend integration is deferred. See [Lesson actions](ai-lesson-actions.md),
+[ADR-005](decisions/ADR-005-ai-lesson-confirmation.md) and the [REST handoff](stage11/frontend-rest-contract.md).
+
 H4 verifies the existing backend through cookie/CSRF HTTP workflows and adds strict
 configuration checks, safe AI diagnostics, retry-header CORS exposure and offline CI.
 Domain rules and confirmation transactions remain unchanged. See [backend readiness](backend-integration-readiness.md)

@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Support\TestDatabase;
 use Tests\TestCase;
 
 class AiSharedRateLimitTest extends TestCase
@@ -26,7 +27,7 @@ class AiSharedRateLimitTest extends TestCase
         $start = function ($user, $conversation) use ($config, $prefix, &$workers): Process {
             $worker = new Process([PHP_BINARY, base_path('tests/Support/ai_rate_limit_worker.php')], base_path(), [
                 'APP_ENV' => 'testing', 'APP_KEY' => config('app.key'), 'APP_DEBUG' => 'true', 'DB_URL' => '', 'DB_CONNECTION' => 'mysql',
-                'DB_HOST' => $config['host'], 'DB_PORT' => (string) $config['port'], 'DB_DATABASE' => 'student_planner_testing',
+                'DB_HOST' => $config['host'], 'DB_PORT' => (string) $config['port'], 'DB_DATABASE' => TestDatabase::name(),
                 'DB_USERNAME' => $config['username'], 'DB_PASSWORD' => $config['password'], 'DB_SOCKET' => $config['unix_socket'] ?? '',
                 'CACHE_STORE' => 'database', 'CACHE_PREFIX' => $prefix, 'SESSION_DRIVER' => 'array',
             ], json_encode(['owner' => $user->id, 'conversation' => $conversation->id, 'key' => (string) Str::uuid()])."\n", 15);

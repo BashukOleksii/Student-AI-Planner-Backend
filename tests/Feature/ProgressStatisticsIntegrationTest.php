@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\TestDatabase;
 use Tests\TestCase;
 
 class ProgressStatisticsIntegrationTest extends TestCase
@@ -151,7 +152,7 @@ class ProgressStatisticsIntegrationTest extends TestCase
         $task->update(['deadline_at' => '2026-10-19 08:00:01']);
         config(['database.connections.statistics_writer' => config('database.connections.mysql')]);
         $writer = DB::connection('statistics_writer');
-        $this->assertSame('student_planner_testing', $writer->selectOne('SELECT DATABASE() AS name')->name);
+        $this->assertSame(TestDatabase::name(), $writer->selectOne('SELECT DATABASE() AS name')->name);
         $changed = false;
         DB::listen(function (QueryExecuted $event) use (&$changed, $writer, $task): void {
             if (! $changed && str_contains($event->sql, 'COUNT(*) AS total')) {

@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\AssertsProgressComparison;
+use Tests\Support\TestDatabase;
 use Tests\TestCase;
 
 class ProgressComparisonIntegrationTest extends TestCase
@@ -100,7 +101,7 @@ class ProgressComparisonIntegrationTest extends TestCase
         $this->assertSame('REPEATABLE-READ', DB::selectOne('SELECT @@transaction_isolation AS level')->level);
         config(['database.connections.comparison_writer' => config('database.connections.mysql')]);
         $writer = DB::connection('comparison_writer');
-        $this->assertSame('student_planner_testing', $writer->selectOne('SELECT DATABASE() AS name')->name);
+        $this->assertSame(TestDatabase::name(), $writer->selectOne('SELECT DATABASE() AS name')->name);
         $this->assertNotSame(DB::connection()->getPdo(), $writer->getPdo());
         $changed = false;
         DB::listen(function (QueryExecuted $event) use (&$changed, $writer, $records, $user, $afterOwner): void {

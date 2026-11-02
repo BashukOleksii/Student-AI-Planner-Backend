@@ -16,7 +16,8 @@ class TaskActionConfirmationService
     public function __construct(private TaskActionArgumentValidator $validator, private TaskActionPresenter $presenter,
         private TaskActionState $states, private TaskService $tasks,
         private SubtaskReminderActionRegistry $additional, private SubtaskReminderActionService $management,
-        private PlanningActionRegistry $planningRegistry, private PlanningActionService $planning) {}
+        private PlanningActionRegistry $planningRegistry, private PlanningActionService $planning,
+        private LessonActionRegistry $lessonRegistry, private LessonActionService $lessons) {}
 
     public function query(User $owner, string $conversation)
     {
@@ -75,6 +76,8 @@ class TaskActionConfirmationService
 
                         return ['failure' => $exception];
                     }
+                } elseif ($this->lessonRegistry->find($action->type) !== null) {
+                    $receipt = $this->lessons->execute($owner, $action);
                 } elseif ($this->additional->find($action->type) !== null) {
                     $receipt = $this->management->execute($owner, $action);
                 } else {
@@ -157,7 +160,8 @@ class TaskActionConfirmationService
         };
         if (! str_starts_with($action->type, 'propose_task_')) {
             $domain = $this->planningRegistry->find($action->type) !== null ? 'Planning'
-                : (str_starts_with($action->type, 'propose_subtask_') ? 'Subtask' : 'Reminder');
+                : ($this->lessonRegistry->find($action->type) !== null ? 'Lesson'
+                    : (str_starts_with($action->type, 'propose_subtask_') ? 'Subtask' : 'Reminder'));
             $content = $domain.' action '.$action->status.'.'.($action->status === 'executed' ? '' : ' No business data was changed.');
         }
         $message = $conversation->messages()->create(['role' => 'assistant', 'content' => $content,

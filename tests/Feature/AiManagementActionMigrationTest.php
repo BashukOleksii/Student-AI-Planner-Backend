@@ -3,12 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\AiConversation;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Tests\Concerns\AssertsMysqlPersistence;
+use Tests\Concerns\UsesForwardOnlyMigrations as DatabaseMigrations;
 use Tests\TestCase;
 
 class AiManagementActionMigrationTest extends TestCase

@@ -1,5 +1,10 @@
 # Stage H1 — Read-only AI tools foundation
 
+Stage 11 adds a separate LessonActionRegistry with four proposal tools (27 total
+orchestrator definitions). H1's seven read-only definitions/Executor stay unchanged.
+Lesson creation/update/cancellation/replacement execute only through existing H3
+explicit confirmation. See [Lesson actions](ai-lesson-actions.md).
+
 H3b adds list_subtasks_for_task and list_reminders through ManagementReadTools,
 which validates two separately registered definitions and delegates to existing
 owned Services. H1's seven schemas, Registry/Executor dispatch and read-only rules

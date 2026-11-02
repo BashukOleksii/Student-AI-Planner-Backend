@@ -2,6 +2,7 @@
 
 // Independent test HTTP process: guarded MySQL only, no migrations and no upstream requests.
 use App\Models\AiPendingAction;
+use App\Models\Lesson;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\AI\LlmProvider;
@@ -11,14 +12,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\TestDatabase;
 
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 $connection = DB::connection();
 if (! $app->environment('testing') || $connection->getDriverName() !== 'mysql'
-    || $connection->getDatabaseName() !== 'student_planner_testing'
-    || $connection->selectOne('SELECT DATABASE() AS name')->name !== 'student_planner_testing') {
+    || $connection->getDatabaseName() !== TestDatabase::name()
+    || $connection->selectOne('SELECT DATABASE() AS name')->name !== TestDatabase::name()) {
     throw new RuntimeException('Unsafe concurrency test database.');
 }
 Http::preventStrayRequests();
@@ -43,6 +45,9 @@ if (($input['gate_on'] ?? null) === 'task_written') {
     };
     Task::created($listener);
     Task::updated($listener);
+} elseif (($input['gate_on'] ?? null) === 'lesson_written') {
+    Lesson::created(fn () => $gate('lesson_written'));
+    Lesson::updated(fn () => $gate('lesson_written'));
 } elseif (($input['gate_on'] ?? null) === 'action_saved') {
     AiPendingAction::updated(fn () => $gate('action_saved'));
 }
@@ -75,14 +80,15 @@ $operation = $input['operation'];
 $path = match ($operation) {
     'confirm', 'reject' => '/api/ai/conversations/'.$input['conversation_id'].'/actions/'.$input['action_id'].'/'.$operation,
     'chat' => '/api/ai/conversations/'.$input['conversation_id'].'/messages',
+    'lesson_update' => '/api/lessons/'.$input['lesson_id'],
     'task_update' => '/api/tasks/'.$input['task_id'],
     'task_complete' => '/api/tasks/'.$input['task_id'].'/complete',
     'task_reopen' => '/api/tasks/'.$input['task_id'].'/reopen',
 };
 $body = match ($operation) {
-    'chat' => ['content' => 'Independent question.'], 'task_update' => ['title' => 'Direct concurrent edit'], default => (object) [],
+    'chat' => ['content' => 'Independent question.'], 'task_update' => ['title' => 'Direct concurrent edit'], 'lesson_update' => ['room' => 'Direct concurrent edit'], default => (object) [],
 };
-$request = Request::create($path, $operation === 'task_update' ? 'PATCH' : 'POST', [], [], [], [
+$request = Request::create($path, in_array($operation, ['task_update', 'lesson_update'], true) ? 'PATCH' : 'POST', [], [], [], [
     'CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json',
     'HTTP_IDEMPOTENCY_KEY' => $input['request_id'] ?? '',
 ], json_encode($body, JSON_THROW_ON_ERROR));

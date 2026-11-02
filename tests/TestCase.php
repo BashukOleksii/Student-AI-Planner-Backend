@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Tests\Support\TestDatabase;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -14,8 +15,8 @@ abstract class TestCase extends BaseTestCase
         // Fail before RefreshDatabase can run any destructive migration commands.
         $this->assertTrue($app->environment('testing'));
         $this->assertSame('mysql', $connection->getDriverName());
-        $this->assertSame('student_planner_testing', $connection->getDatabaseName());
-        $this->assertSame('student_planner_testing', $connection->selectOne('SELECT DATABASE() AS name')->name);
+        $this->assertSame(TestDatabase::name(), $connection->getDatabaseName());
+        $this->assertSame(TestDatabase::name(), $connection->selectOne('SELECT DATABASE() AS name')->name);
 
         return $app;
     }

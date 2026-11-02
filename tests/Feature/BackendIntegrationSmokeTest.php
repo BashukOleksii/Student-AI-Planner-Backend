@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\AI\Actions\LessonActionRegistry;
 use App\Services\AI\Actions\PlanningActionRegistry;
 use App\Services\AI\Actions\SubtaskReminderActionRegistry;
 use App\Services\AI\Actions\TaskActionRegistry;
@@ -66,9 +67,9 @@ class BackendIntegrationSmokeTest extends TestCase
             $body = $request->data();
             $names = [...array_column((new ToolRegistry)->definitions(), 'name'), ...array_column((new TaskActionRegistry)->definitions(), 'name'),
                 ...array_column((new SubtaskReminderActionRegistry)->readDefinitions(), 'name'),
-                ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES];
+                ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES];
             $this->assertSame($names, array_column($body['tools'], 'name'));
-            $this->assertCount(23, array_unique($names));
+            $this->assertCount(27, array_unique($names));
             foreach ($body['tools'] as $tool) {
                 $this->assertSame('function', $tool['type']);
                 $this->assertFalse($tool['parameters']['additionalProperties']);
@@ -96,7 +97,7 @@ class BackendIntegrationSmokeTest extends TestCase
     public static function mutations(): array
     {
         $names = [...array_column((new TaskActionRegistry)->definitions(), 'name'),
-            ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES];
+            ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES];
 
         return [...array_map(fn ($name) => [$name, false], $names), ['propose_reminder_create', true], ['propose_study_plan_create', true]];
     }
@@ -130,6 +131,11 @@ class BackendIntegrationSmokeTest extends TestCase
             $this->browser('PATCH', $childPath, ['estimated_minutes' => 600])->assertOk();
         }
         $arguments = match ($name) {
+            'propose_lesson_create', 'propose_lesson_replacement' => [
+                ...($name === 'propose_lesson_replacement' ? ['lesson_id' => $f['lesson']['id']] : []),
+                'subject_id' => $f['subject']['id'], 'type' => 'lecture', 'starts_at' => ($f['utc'])(14), 'ends_at' => ($f['utc'])(15)],
+            'propose_lesson_update' => ['lesson_id' => $f['lesson']['id'], 'room' => 'Reviewed room'],
+            'propose_lesson_cancel' => ['lesson_id' => $f['lesson']['id']],
             'propose_task_create' => ['title' => 'AI task', 'estimated_minutes' => 30],
             'propose_task_update' => ['task_id' => $f['task']['id'], 'title' => 'Updated task'],
             'propose_task_complete', 'propose_task_reopen' => ['task_id' => $f['task']['id']],
@@ -171,14 +177,19 @@ class BackendIntegrationSmokeTest extends TestCase
         }
         Http::assertSentCount(3);
         $receipt = $this->browser('POST', $actionPath.'/confirm', $consent)->assertOk()->assertJsonPath('data.status', 'executed')->json('data.receipt');
-        $row = $receipt['task'] ?? $receipt['subtask'] ?? $receipt['reminder'] ?? $receipt['sessions'][0] ?? $receipt['replacement_sessions'][0] ?? $receipt['replacement'];
+        $row = $receipt['lesson'] ?? $receipt['task'] ?? $receipt['subtask'] ?? $receipt['reminder'] ?? $receipt['sessions'][0] ?? $receipt['replacement_sessions'][0] ?? $receipt['replacement'];
         $readPath = match (true) {
+            isset($receipt['lesson']) => '/api/lessons/'.$row['id'],
             isset($receipt['task']) => '/api/tasks/'.$row['id'],
             isset($receipt['subtask']) => '/api/tasks/'.$row['task_id'].'/subtasks/'.$row['id'],
             isset($receipt['reminder']) => '/api/reminders/'.$row['id'],
             default => '/api/study-sessions/'.$row['id'],
         };
-        $this->browser('GET', $readPath)->assertOk()->assertExactJson(['data' => $row]);
+        $expectedRow = isset($receipt['lesson']) ? array_diff_key($row, ['subject' => true, 'teacher' => true, 'academic_period' => true]) : $row;
+        $this->browser('GET', $readPath)->assertOk()->assertExactJson(['data' => $expectedRow]);
+        if ($name === 'propose_lesson_replacement') {
+            $this->browser('GET', '/api/lessons/'.$f['lesson']['id'])->assertOk()->assertJsonPath('data.status', 'replaced');
+        }
         if ($source !== null) {
             $this->browser('GET', '/api/study-sessions/'.$source['id'])->assertOk()->assertJsonPath('data.status', 'rescheduled');
             $this->browser('GET', '/api/reminders/'.$reminder['id'])->assertOk()->assertJsonPath('data.status', 'cancelled');

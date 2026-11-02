@@ -11,6 +11,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
+use Tests\Support\TestDatabase;
 use Tests\TestCase;
 
 class AiChatConcurrencyTest extends TestCase
@@ -36,7 +37,7 @@ class AiChatConcurrencyTest extends TestCase
         $stream = new InputStream;
         $process = new Process([PHP_BINARY, base_path('tests/Support/ai_chat_worker.php')], base_path(), [
             'APP_ENV' => 'testing', 'DB_URL' => '', 'DB_CONNECTION' => 'mysql', 'DB_HOST' => config('database.connections.mysql.host'),
-            'DB_PORT' => (string) config('database.connections.mysql.port'), 'DB_DATABASE' => 'student_planner_testing',
+            'DB_PORT' => (string) config('database.connections.mysql.port'), 'DB_DATABASE' => TestDatabase::name(),
             'DB_USERNAME' => config('database.connections.mysql.username'), 'DB_PASSWORD' => config('database.connections.mysql.password'),
             'CACHE_STORE' => 'array', 'SESSION_DRIVER' => 'array', 'QUEUE_CONNECTION' => 'sync',
         ], $stream, 15);

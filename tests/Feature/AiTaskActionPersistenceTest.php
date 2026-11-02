@@ -4,11 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\AiConversation;
 use App\Models\AiPendingAction;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\Concerns\AssertsMysqlPersistence;
+use Tests\Concerns\UsesForwardOnlyMigrations as DatabaseMigrations;
 use Tests\TestCase;
 
 class AiTaskActionPersistenceTest extends TestCase
@@ -62,6 +62,7 @@ class AiTaskActionPersistenceTest extends TestCase
         $message = $conversation->messages()->create(['role' => 'user', 'content' => 'Preserved'])->refresh();
         DB::table('ai_pending_actions')->insert($values);
         $before = [$conversation->getAttributes(), $message->getAttributes(), DB::table('ai_conversation_turns')->sole()];
+        $this->assertSame(1, $this->excludeForwardOnlyOverlayFromLegacyRollback());
         $this->artisan('migrate:rollback', ['--step' => 3])->assertExitCode(0);
         $this->assertFalse(Schema::hasTable('ai_pending_actions'));
         $this->assertEquals($before, [$conversation->fresh()->getAttributes(), $message->fresh()->getAttributes(), DB::table('ai_conversation_turns')->sole()]);

@@ -9,6 +9,8 @@ use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\AI\Actions\ActionTargetFingerprint;
+use App\Services\AI\Actions\LessonActionRegistry;
+use App\Services\AI\Actions\LessonActionService;
 use App\Services\AI\Actions\ManagementActionPresenter;
 use App\Services\AI\Actions\PlanningActionRegistry;
 use App\Services\AI\Actions\PlanningActionService;
@@ -265,7 +267,7 @@ class SubtaskReminderActionTest extends TestCase
         $agent = new AgentOrchestrator($provider, new ToolRegistry, $executor,
             new AgentLimits(['max_tool_rounds' => 5, 'max_tool_calls' => 8, 'max_context_bytes' => 131072, 'max_tool_result_bytes' => 65536, 'max_turn_seconds' => 180]),
             new TaskActionRegistry, $taskProposals, new SubtaskReminderActionRegistry, $management, $reads,
-            new PlanningActionRegistry, $this->createMock(PlanningActionService::class));
+            new PlanningActionRegistry, $this->createMock(PlanningActionService::class), new LessonActionRegistry, $this->createMock(LessonActionService::class));
         $owner = new User;
         $owner->timezone = 'UTC';
         $this->expectException(AiAgentException::class);

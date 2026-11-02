@@ -1,5 +1,10 @@
 # Stage H3a — confirmed conversational Task actions
 
+Stage 11 extends this same pending-action/decision protocol with four Lesson
+proposals. Legacy Task schemas, receipts, expiry and replay remain unchanged.
+The shared confirmation Service dispatches confirmed Lesson writes to LessonService;
+[Lesson action rules](ai-lesson-actions.md) describe the extension.
+
 H3c adds three planning proposals through this same pending-action lifecycle.
 The four Task definitions and empty-body Task confirmation contract are unchanged.
 One attempted proposal per turn now spans fourteen mutation definitions; private

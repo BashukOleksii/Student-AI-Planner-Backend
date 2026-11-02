@@ -1,5 +1,9 @@
 # Conceptual Domain Model
 
+Stage 11 adds confirmed AI Lesson create/update/cancel/replacement adapters to
+the existing pending-action model. It adds no new domain entity or Lesson fields;
+only the pending-action type CHECK expands. See [Lesson actions](ai-lesson-actions.md).
+
 H3c extends AiPendingAction to three planning operation types. A nullable encrypted
 private payload holds server-owned domain review tokens and their validated UTC
 expiry; public previews and receipts omit it. Existing four action states remain.

@@ -19,9 +19,7 @@ class LessonService
     {
         return DB::transaction(function () use ($user, $values): Lesson {
             $this->lockOwner($user);
-            $candidate = ['teacher_id' => null, 'academic_period_id' => null, 'room' => null,
-                ...$this->manualValues($values)];
-            $this->validateCandidate($user, $candidate, LessonStatus::Active);
+            $candidate = $this->prepare($user, $values, lock: true);
 
             return $user->lessons()->create($candidate)->refresh();
         });
@@ -32,8 +30,7 @@ class LessonService
         return DB::transaction(function () use ($user, $lesson, $values): Lesson {
             $this->lockOwner($user);
             $lesson = $user->lessons()->lockForUpdate()->findOrFail($lesson->getKey());
-            $candidate = array_replace($this->persistedCandidate($lesson), $this->manualValues($values));
-            $this->validateCandidate($user, $candidate, $lesson->status, $lesson);
+            $candidate = $this->prepare($user, $values, $lesson, true);
             try {
                 $lesson->update($candidate);
             } catch (UniqueConstraintViolationException) {
@@ -70,14 +67,7 @@ class LessonService
         return DB::transaction(function () use ($user, $lesson): Lesson {
             $this->lockOwner($user);
             $lesson = $user->lessons()->lockForUpdate()->findOrFail($lesson->getKey());
-            if ($lesson->status !== LessonStatus::Active) {
-                throw ValidationException::withMessages(['status' => ['Only an active lesson can be cancelled.']]);
-            }
-            if ($lesson->replaces_lesson_id !== null) {
-                $this->replacementOriginal($user, $lesson);
-            } elseif ($lesson->replacement()->withTrashed()->whereNull('deleted_at')->lockForUpdate()->first() !== null) {
-                $this->invalidReplacement();
-            }
+            $this->prepareCancel($user, $lesson, true);
             $lesson->update(['status' => LessonStatus::Cancelled]);
 
             return $lesson->refresh();
@@ -89,21 +79,7 @@ class LessonService
         return DB::transaction(function () use ($user, $original, $values): Lesson {
             $this->lockOwner($user);
             $original = $user->lessons()->lockForUpdate()->findOrFail($original->getKey());
-            if ($original->status !== LessonStatus::Active || $original->replaces_lesson_id !== null) {
-                $this->invalidReplacement();
-            }
-            // Search physical history: a deleted row still reserves the unique original ID.
-            $replacement = $original->replacement()->withTrashed()->lockForUpdate()->first();
-            if ($replacement !== null && ($replacement->id === $original->id
-                || $replacement->user_id !== $user->id || ! $replacement->trashed()
-                || ! in_array($replacement->status, [LessonStatus::Active, LessonStatus::Cancelled], true)
-                || $replacement->schedule_import_batch_id !== null || $replacement->import_fingerprint !== null
-                || $replacement->replacement()->withTrashed()->lockForUpdate()->first() !== null)) {
-                $this->invalidReplacement();
-            }
-            $candidate = ['teacher_id' => null, 'academic_period_id' => null, 'room' => null,
-                ...$this->manualValues($values)];
-            $this->validateCandidate($user, $candidate, LessonStatus::Active, null, [$original->id]);
+            ['candidate' => $candidate, 'replacement' => $replacement] = $this->prepareReplacement($user, $original, $values, true);
             if ($replacement === null) {
                 $replacement = $user->lessons()->create([
                     ...$candidate, 'replaces_lesson_id' => $original->id, 'status' => LessonStatus::Active,
@@ -118,14 +94,58 @@ class LessonService
         });
     }
 
-    private function replacementOriginal(User $user, Lesson $replacement): Lesson
+    /** Shared deterministic preflight. It never invokes a writer or saves a speculative model. */
+    public function prepare(User $user, array $values, ?Lesson $lesson = null, bool $lock = false): array
+    {
+        $candidate = array_replace($lesson === null
+            ? ['teacher_id' => null, 'academic_period_id' => null, 'room' => null]
+            : $this->persistedCandidate($lesson), $this->manualValues($values));
+        $this->validateCandidate($user, $candidate, $lesson?->status ?? LessonStatus::Active, $lesson, lock: $lock);
+
+        return $candidate;
+    }
+
+    public function prepareCancel(User $user, Lesson $lesson, bool $lock = false): void
+    {
+        if ($lesson->status !== LessonStatus::Active) {
+            throw ValidationException::withMessages(['status' => ['Only an active lesson can be cancelled.']]);
+        }
+        if ($lesson->replaces_lesson_id !== null) {
+            $this->replacementOriginal($user, $lesson, $lock);
+        } elseif ($lesson->replacement()->withTrashed()->whereNull('deleted_at')->when($lock, fn ($q) => $q->lockForUpdate())->first() !== null) {
+            $this->invalidReplacement();
+        }
+    }
+
+    public function prepareReplacement(User $user, Lesson $original, array $values, bool $lock = false): array
+    {
+        if ($original->status !== LessonStatus::Active || $original->replaces_lesson_id !== null) {
+            $this->invalidReplacement();
+        }
+        // Search physical history: a deleted row still reserves the unique original ID.
+        $replacement = $original->replacement()->withTrashed()->when($lock, fn ($q) => $q->lockForUpdate())->first();
+        if ($replacement !== null && ($replacement->id === $original->id
+            || $replacement->user_id !== $user->id || ! $replacement->trashed()
+            || ! in_array($replacement->status, [LessonStatus::Active, LessonStatus::Cancelled], true)
+            || $replacement->schedule_import_batch_id !== null || $replacement->import_fingerprint !== null
+            || $replacement->replacement()->withTrashed()->when($lock, fn ($q) => $q->lockForUpdate())->first() !== null)) {
+            $this->invalidReplacement();
+        }
+        $candidate = ['teacher_id' => null, 'academic_period_id' => null, 'room' => null,
+            ...$this->manualValues($values)];
+        $this->validateCandidate($user, $candidate, LessonStatus::Active, null, [$original->id], $lock);
+
+        return compact('candidate', 'replacement');
+    }
+
+    private function replacementOriginal(User $user, Lesson $replacement, bool $lock = true): Lesson
     {
         if ($replacement->replaces_lesson_id === $replacement->id
             || ! in_array($replacement->status, [LessonStatus::Active, LessonStatus::Cancelled], true)
-            || $replacement->replacement()->withTrashed()->lockForUpdate()->first() !== null) {
+            || $replacement->replacement()->withTrashed()->when($lock, fn ($q) => $q->lockForUpdate())->first() !== null) {
             $this->invalidReplacement();
         }
-        $original = $user->lessons()->withTrashed()->whereKey($replacement->replaces_lesson_id)->lockForUpdate()->first();
+        $original = $user->lessons()->withTrashed()->whereKey($replacement->replaces_lesson_id)->when($lock, fn ($q) => $q->lockForUpdate())->first();
         if ($original === null || $original->trashed() || $original->status !== LessonStatus::Replaced
             || $original->replaces_lesson_id !== null) {
             $this->invalidReplacement();
@@ -163,13 +183,13 @@ class LessonService
         return $values;
     }
 
-    private function validateCandidate(User $user, array $candidate, LessonStatus $status, ?Lesson $lesson = null, array $excludedIds = []): void
+    private function validateCandidate(User $user, array $candidate, LessonStatus $status, ?Lesson $lesson = null, array $excludedIds = [], bool $lock = true): void
     {
         foreach (['subject_id' => 'subjects', 'teacher_id' => 'teachers', 'academic_period_id' => 'academicPeriods'] as $field => $relation) {
             if ($candidate[$field] === null && $field !== 'subject_id') {
                 continue;
             }
-            if ($user->$relation()->whereKey($candidate[$field])->lockForUpdate()->first() === null) {
+            if ($user->$relation()->whereKey($candidate[$field])->when($lock, fn ($q) => $q->lockForUpdate())->first() === null) {
                 throw ValidationException::withMessages([$field => ['The selected association is invalid.']]);
             }
         }
@@ -187,7 +207,7 @@ class LessonService
                 ->where('starts_at', '<', $candidate['ends_at'])->where('ends_at', '>', $candidate['starts_at'])
                 ->when($lesson !== null, fn ($query) => $query->whereKeyNot($lesson->getKey()))
                 ->whereNotIn('id', $excludedIds)
-                ->lockForUpdate()->first();
+                ->when($lock, fn ($q) => $q->lockForUpdate())->first();
             if ($overlap !== null) {
                 throw ValidationException::withMessages(['schedule' => ['This lesson overlaps an existing active lesson.']]);
             }

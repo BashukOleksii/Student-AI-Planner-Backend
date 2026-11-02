@@ -3,9 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\UsesForwardOnlyMigrations as DatabaseMigrations;
 use Tests\TestCase;
 
 class PlanningMigrationTest extends TestCase
@@ -35,6 +35,7 @@ class PlanningMigrationTest extends TestCase
         }
         $user = User::factory()->create(['timezone' => 'Europe/Kyiv']);
 
+        $domainMigrationCount -= $this->excludeForwardOnlyOverlayFromLegacyRollback();
         $this->artisan('migrate:rollback', ['--step' => $domainMigrationCount])->assertExitCode(0);
 
         $this->assertFalse(Schema::hasColumn('users', 'timezone'));

@@ -1,5 +1,10 @@
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
+Stage 11 adds only a new forward-only migration expanding ai_actions_valid_type
+from fourteen to eighteen values. No existing migration, column, relationship or
+business record changes. Down refuses; use a future forward correction. No shared
+or valuable database was migrated. See [ADR-005](decisions/ADR-005-ai-lesson-confirmation.md).
+
 H3c adds one private encrypted pending-action field and expands the existing type
 CHECK to fourteen. No StudySession, Task, Reminder or planning schema changes are
 needed. Tokens fit one bounded server-only payload; guarded rollback preserves

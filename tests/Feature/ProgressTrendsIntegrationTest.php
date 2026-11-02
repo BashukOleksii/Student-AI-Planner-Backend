@@ -14,6 +14,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Support\TestDatabase;
 use Tests\TestCase;
 
 class ProgressTrendsIntegrationTest extends TestCase
@@ -112,7 +113,7 @@ class ProgressTrendsIntegrationTest extends TestCase
         $this->assertSame('REPEATABLE-READ', DB::selectOne('SELECT @@transaction_isolation AS level')->level);
         config(['database.connections.trends_writer' => config('database.connections.mysql')]);
         $writer = DB::connection('trends_writer');
-        $this->assertSame('student_planner_testing', $writer->selectOne('SELECT DATABASE() AS name')->name);
+        $this->assertSame(TestDatabase::name(), $writer->selectOne('SELECT DATABASE() AS name')->name);
         $changed = false;
         DB::listen(function (QueryExecuted $event) use (&$changed, $writer, $task, $child, $session): void {
             if (! $changed && str_contains($event->sql, 'from `tasks`') && str_contains($event->sql, '`completed_at`')) {

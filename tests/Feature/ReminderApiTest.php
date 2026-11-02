@@ -22,6 +22,7 @@ use Illuminate\Validation\ValidationException;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
+use Tests\Support\TestDatabase;
 use Tests\TestCase;
 use Tests\Unit\ReminderRulesTest;
 
@@ -445,7 +446,7 @@ class ReminderApiTest extends TestCase
 
     private function snapshot(array $except = []): array
     {
-        $tables = array_column(DB::select('SHOW TABLES'), 'Tables_in_student_planner_testing');
+        $tables = array_column(DB::select('SHOW TABLES'), 'Tables_in_'.TestDatabase::name());
         $result = [];
         foreach (array_diff($tables, ['migrations', ...$except]) as $table) {
             $result[$table] = DB::table($table)->orderBy(DB::getSchemaBuilder()->getColumnListing($table)[0])->get()->map(fn ($row) => (array) $row)->all();

@@ -19,14 +19,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\TestDatabase;
 
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 $connection = DB::connection();
 if (! $app->environment('testing') || $connection->getDriverName() !== 'mysql'
-    || $connection->getDatabaseName() !== 'student_planner_testing'
-    || $connection->selectOne('SELECT DATABASE() AS name')->name !== 'student_planner_testing') {
+    || $connection->getDatabaseName() !== TestDatabase::name()
+    || $connection->selectOne('SELECT DATABASE() AS name')->name !== TestDatabase::name()) {
     throw new RuntimeException('Unsafe planning concurrency database.');
 }
 DB::statement('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');

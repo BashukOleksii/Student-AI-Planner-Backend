@@ -4,11 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\AiConversation;
 use App\Models\AiMessage;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\Concerns\AssertsMysqlPersistence;
+use Tests\Concerns\UsesForwardOnlyMigrations as DatabaseMigrations;
 use Tests\TestCase;
 
 class AiChatPersistenceTest extends TestCase
@@ -43,6 +43,7 @@ class AiChatPersistenceTest extends TestCase
         $message = AiMessage::factory()->create(['tool_calls' => ['historical' => ['retained' => true]]])->refresh();
         $conversation = $message->conversation;
         $before = [$conversation->getAttributes(), $message->getAttributes()];
+        $this->assertSame(1, $this->excludeForwardOnlyOverlayFromLegacyRollback());
         $this->artisan('migrate:rollback', ['--step' => 4])->assertExitCode(0);
         $this->assertFalse(Schema::hasTable('ai_pending_actions'));
         $this->assertFalse(Schema::hasTable('ai_conversation_turns'));

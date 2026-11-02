@@ -18,6 +18,7 @@ use RuntimeException;
 use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
 use Tests\Concerns\InteractsWithAiResponses;
+use Tests\Support\TestDatabase;
 use Tests\TestCase;
 
 class AiTaskActionConcurrencyTest extends TestCase
@@ -64,7 +65,7 @@ class AiTaskActionConcurrencyTest extends TestCase
         $config = DB::connection()->getConfig();
         $process = new Process([PHP_BINARY, base_path('tests/Support/ai_task_action_worker.php')], base_path(), [
             'APP_ENV' => 'testing', 'APP_KEY' => config('app.key'), 'DB_URL' => '', 'DB_CONNECTION' => 'mysql',
-            'DB_HOST' => $config['host'], 'DB_PORT' => (string) $config['port'], 'DB_DATABASE' => 'student_planner_testing',
+            'DB_HOST' => $config['host'], 'DB_PORT' => (string) $config['port'], 'DB_DATABASE' => TestDatabase::name(),
             'DB_USERNAME' => $config['username'], 'DB_PASSWORD' => $config['password'], 'DB_SOCKET' => $config['unix_socket'] ?? '',
             'CACHE_STORE' => 'array', 'SESSION_DRIVER' => 'array', 'QUEUE_CONNECTION' => 'sync',
         ], $stream, 20);
@@ -116,7 +117,7 @@ class AiTaskActionConcurrencyTest extends TestCase
                 SELECT COUNT(*) AS total FROM performance_schema.data_lock_waits AS waits
                 JOIN performance_schema.threads AS threads ON waits.REQUESTING_THREAD_ID = threads.THREAD_ID
                 JOIN performance_schema.data_locks AS locks ON waits.REQUESTING_ENGINE_LOCK_ID = locks.ENGINE_LOCK_ID
-                WHERE threads.PROCESSLIST_ID = ? AND locks.OBJECT_SCHEMA = 'student_planner_testing' AND locks.OBJECT_NAME = ?
+                WHERE threads.PROCESSLIST_ID = ? AND locks.OBJECT_SCHEMA = DATABASE() AND locks.OBJECT_NAME = ?
                 SQL, [$connection, $table]);
             if ((int) $wait->total > 0) {
                 $this->assertGreaterThan(0, (int) $wait->total);
