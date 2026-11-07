@@ -31,7 +31,7 @@ class AiLessonActionsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['ai.openai_key' => 'fake-stage11-key', 'ai.model' => 'gpt-5.4-mini', 'ai.requests_per_minute' => 60]);
+        config(['ai.provider' => getenv('AI_TEST_PROVIDER') ?: 'openai', 'ai.gemini_key' => 'offline-gemini-test-key', 'ai.gemini_model' => 'gemini-offline-contract-fixture', 'ai.openai_key' => 'fake-stage11-key', 'ai.model' => 'gpt-5.4-mini', 'ai.requests_per_minute' => 60]);
         Http::preventStrayRequests();
         $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
     }

@@ -34,7 +34,7 @@ class AiManagementActionConcurrencyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['ai.openai_key' => 'fake', 'ai.model' => 'gpt-5.4-mini']);
+        config(['ai.provider' => 'openai', 'ai.openai_key' => 'fake', 'ai.model' => 'gpt-5.4-mini']);
         Http::preventStrayRequests();
         DB::statement('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
         $this->beforeApplicationDestroyed(function (): void {

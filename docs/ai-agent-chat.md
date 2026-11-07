@@ -1,5 +1,13 @@
 # Stage H2 — Authenticated read-only AI chat
 
+The provider-portability milestone makes Gemini 2.5 Flash the configured preferred
+provider and retains OpenAI Responses. The original H2 details below describe the
+OpenAI implementation; current discovery remains 9 reads + 18 proposals.
+See [переносимість AI-провайдерів](ai-provider-portability.md) for Gemini's native
+Function Calling, signed continuation, cross-provider history recovery, model
+availability/cutoff and complete offline verification. No frontend/API change,
+automatic fallback or live paid inference is introduced.
+
 Stage 11 appends four Lesson proposal definitions to the H3 allowlist (27 total:
 9 reads, 18 proposals). The existing successful-turn proposal persistence, action
 resource and explicit REST decision endpoints are reused. The one-proposal limit
@@ -47,7 +55,7 @@ reminder delivery or mutating tool is introduced.
 auth:sanctum -> Form Request / AiConversationPolicy -> AiConversationService
   -> short owned conversation lock + durable lease/idempotency claim
   -> bounded owned history + fresh persisted User timezone
-  -> AgentOrchestrator -> LlmProvider -> OpenAiResponsesProvider -> Responses API
+  -> AgentOrchestrator -> LlmProvider -> configured Gemini/OpenAI adapter
   -> H1 ToolExecutor -> existing deterministic read Services
   -> provider continuation / final answer
   -> short owned conversation lock + lease verification + atomic transcript commit
@@ -57,7 +65,7 @@ auth:sanctum -> Form Request / AiConversationPolicy -> AiConversationService
 `AgentOrchestrator` uses a narrow `LlmProvider` interface, not OpenAI wire shapes.
 History events have `role`, `content`, `calls`, `call_id` and opaque adapter-approved
 `state`. Provider responses have `text`, `calls` (`id`, `name`, parsed `arguments`)
-and `state`. Only the concrete adapter translates this contract to Responses JSON.
+and `state`. Only concrete adapters translate this contract to native provider JSON.
 Laravel's HTTP client is sufficient; no SDK or other dependency was added.
 
 Every tool call, including an unknown name, reaches `ToolExecutor::execute()` after
@@ -80,8 +88,10 @@ the intended development database. Never point automated tests at that database.
 Run `php artisan config:clear` after local configuration changes.
 
 ```dotenv
-AI_PROVIDER=openai
-OPENAI_API_KEY=your-local-secret
+AI_PROVIDER=gemini
+GEMINI_API_KEY=your-local-secret
+GEMINI_MODEL=gemini-2.5-flash
+OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.4-mini
 AI_REQUEST_TIMEOUT=30
 AI_MAX_TOOL_ROUNDS=5
@@ -95,7 +105,8 @@ AI_TURN_LEASE_SECONDS=240
 AI_REQUESTS_PER_MINUTE=10
 ```
 
-Create a project API key in the official [OpenAI API dashboard](https://platform.openai.com/api-keys).
+For Gemini, configure a server-side key from [Google AI Studio](https://aistudio.google.com/api-keys).
+For the optional OpenAI provider, use the [OpenAI API dashboard](https://platform.openai.com/api-keys).
 Supply it through local environment configuration or a deployment secret manager;
 never put it in source, a client request or frontend configuration. The example is
 a placeholder, not a working credential. Missing key/model, an unsupported provider
@@ -114,7 +125,7 @@ Use a shared production cache (the project's database cache or Redis) for the
 per-user message rate limit. Lease/idempotency correctness always uses MySQL and
 does not depend on cache, web-server process affinity or process-local state.
 Keep normal shared Sanctum session, HTTPS, stateful-domain, CORS and CSRF settings;
-see [authentication/profile](auth-profile.md). Provider URL is fixed to
+see [authentication/profile](auth-profile.md). Provider origins are fixed to Google's generateContent API or
 `https://api.openai.com/v1/responses`; redirects are disabled. Neither request fields
 nor environment values can supply a provider URL.
 

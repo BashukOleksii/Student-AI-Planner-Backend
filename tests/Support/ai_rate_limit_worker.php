@@ -21,7 +21,7 @@ if (! $app->environment('testing') || $db->getDriverName() !== 'mysql'
     throw new RuntimeException('Unsafe shared-cache test configuration.');
 }
 $input = json_decode(fgets(STDIN), true, 16, JSON_THROW_ON_ERROR);
-config(['ai.openai_key' => 'offline-worker', 'ai.model' => 'gpt-5.4-mini', 'ai.requests_per_minute' => 1]);
+config(['ai.provider' => 'openai', 'ai.openai_key' => 'offline-worker', 'ai.model' => 'gpt-5.4-mini', 'ai.requests_per_minute' => 1]);
 Http::preventStrayRequests();
 Http::fake(['https://api.openai.com/v1/responses' => Http::response(['status' => 'completed', 'output' => [
     ['type' => 'message', 'role' => 'assistant', 'status' => 'completed', 'content' => [['type' => 'output_text', 'text' => 'Hello.']]],

@@ -1,5 +1,14 @@
 # Backend Architecture
 
+AI provider portability adds `GeminiGenerateContentProvider` as the configured
+preferred adapter while retaining OpenAI Responses. `LlmProvider` and
+`AgentOrchestrator` are unchanged. Container selection, separate schema adapters
+and a small shared portable-history recovery helper keep wire formats and opaque
+state inside the provider boundary. All 27 Tools, domain writers, confirmation,
+REST and persistence contracts remain unchanged; no migration or route is added.
+See [provider portability](ai-provider-portability.md) for signed continuation,
+provider switching, offline parity coverage and the Gemini 2.5 availability cutoff.
+
 Stage 11 adds four confirmed Lesson proposals, bringing discovery to 27 tools
 (9 reads and 18 proposals). It reuses H3 pending actions and explicit decisions;
 all writes remain in LessonService. Shared read-only preflight, complete graph/

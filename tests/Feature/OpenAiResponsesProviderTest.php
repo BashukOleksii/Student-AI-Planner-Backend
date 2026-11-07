@@ -18,7 +18,7 @@ class OpenAiResponsesProviderTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['ai.openai_key' => 'test-key-not-a-secret', 'ai.model' => 'gpt-5.4-mini']);
+        config(['ai.provider' => 'openai', 'ai.openai_key' => 'test-key-not-a-secret', 'ai.model' => 'gpt-5.4-mini']);
         Http::preventStrayRequests();
     }
 
@@ -155,7 +155,7 @@ class OpenAiResponsesProviderTest extends TestCase
             $this->assertSame('provider_error', $exception->errorCode);
         }
         foreach ([['ai.openai_key' => null], ['ai.model' => null], ['ai.provider' => 'unknown']] as $values) {
-            config(['ai.openai_key' => 'fake', 'ai.model' => 'gpt-5.4-mini', 'ai.provider' => 'openai', ...$values]);
+            config(['ai.provider' => 'openai', 'ai.openai_key' => 'fake', 'ai.model' => 'gpt-5.4-mini', ...$values]);
             Http::fake();
             try {
                 $this->respond();

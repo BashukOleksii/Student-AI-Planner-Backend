@@ -30,7 +30,7 @@ class AiTaskActionConcurrencyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['ai.openai_key' => 'fake', 'ai.model' => 'gpt-5.4-mini']);
+        config(['ai.provider' => 'openai', 'ai.openai_key' => 'fake', 'ai.model' => 'gpt-5.4-mini']);
         Http::preventStrayRequests();
         $this->beforeApplicationDestroyed(function (): void {
             foreach ($this->workers as [$process, $stream]) {

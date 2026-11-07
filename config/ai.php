@@ -15,7 +15,9 @@ $integer = static function (string $name, int $default): ?int {
 };
 
 return [
-    'provider' => env('AI_PROVIDER', 'openai'),
+    'provider' => env('AI_PROVIDER', 'gemini'),
+    'gemini_key' => env('GEMINI_API_KEY'),
+    'gemini_model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
     'openai_key' => env('OPENAI_API_KEY'),
     'model' => env('OPENAI_MODEL'),
     'request_timeout' => $integer('AI_REQUEST_TIMEOUT', 30),

@@ -36,7 +36,7 @@ class AiSubtaskReminderActionsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['ai.openai_key' => 'fake-test-key', 'ai.model' => 'gpt-5.4-mini', 'ai.requests_per_minute' => 60]);
+        config(['ai.provider' => getenv('AI_TEST_PROVIDER') ?: 'openai', 'ai.gemini_key' => 'offline-gemini-test-key', 'ai.gemini_model' => 'gemini-offline-contract-fixture', 'ai.openai_key' => 'fake-test-key', 'ai.model' => 'gpt-5.4-mini', 'ai.requests_per_minute' => 60]);
         Http::preventStrayRequests();
         $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
     }
@@ -537,10 +537,10 @@ class AiSubtaskReminderActionsTest extends TestCase
         Http::preventStrayRequests();
         Http::fake(function ($request) use ($f) {
             $this->assertSame(0, DB::transactionLevel());
-            $this->assertCount(27, $request['tools']);
-            $this->assertStringNotContainsString('INJECTION:', $request['instructions']);
-            $this->assertStringContainsString('executed', json_encode($request['input']));
-            $this->assertStringContainsString('"subtask_id":'.$f['child']->id, implode(' ', array_column($request['input'], 'content')));
+            $this->assertCount(27, $request['tools'][0]['functionDeclarations'] ?? $request['tools']);
+            $this->assertStringNotContainsString('INJECTION:', ($request['instructions'] ?? $request['systemInstruction']['parts'][0]['text']));
+            $this->assertStringContainsString('executed', json_encode($this->aiInput($request)));
+            $this->assertStringContainsString('"subtask_id":'.$f['child']->id, implode(' ', array_column($this->aiInput($request), 'content')));
 
             return Http::response($this->aiResponse([$this->aiText('Confirmed outcome recorded.')]));
         });

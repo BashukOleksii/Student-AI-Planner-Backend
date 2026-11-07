@@ -25,7 +25,7 @@ class OpenAiResponsesProvider implements LlmProvider
             throw new AiAgentException('ai_unavailable');
         }
         $input = [];
-        foreach ($history as $event) {
+        foreach (ProviderHistory::forProvider($history, 'openai') as $event) {
             if ($event['role'] === 'assistant' && ($event['state']['provider'] ?? null) === 'openai') {
                 $state = $this->parse($event['state']['items'], $definitions)['state'];
                 array_push($input, ...$state['items']);

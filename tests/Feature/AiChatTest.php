@@ -36,7 +36,7 @@ class AiChatTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['ai.openai_key' => 'fake-test-key', 'ai.model' => 'gpt-5.4-mini']);
+        config(['ai.provider' => 'openai', 'ai.openai_key' => 'fake-test-key', 'ai.model' => 'gpt-5.4-mini']);
         Http::preventStrayRequests();
         $this->travelTo(CarbonImmutable::parse('2026-10-16T22:30:00Z'));
         $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
@@ -333,10 +333,10 @@ class AiChatTest extends TestCase
     public function test_limits_configuration_errors_and_rate_limiting_are_safe(): void
     {
         [, $conversation] = $this->fixture();
-        config(['ai.openai_key' => null]);
+        config(['ai.provider' => 'openai', 'ai.openai_key' => null]);
         $this->send($conversation)->assertStatus(503)->assertJsonPath('code', 'ai_unavailable');
         $this->assertDatabaseCount('ai_messages', 0);
-        config(['ai.openai_key' => 'fake', 'ai.max_tool_rounds' => 1]);
+        config(['ai.provider' => 'openai', 'ai.openai_key' => 'fake', 'ai.max_tool_rounds' => 1]);
         Http::fake(['*' => Http::response($this->aiResponse([$this->aiCall()]))]);
         $this->send($conversation)->assertUnprocessable()->assertJsonPath('code', 'execution_limit_reached');
         $this->assertDatabaseCount('ai_messages', 0);

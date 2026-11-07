@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Exceptions\AiAgentException;
 use App\Policies\DatabaseNotificationPolicy;
 use App\Services\AI\AgentLimits;
+use App\Services\AI\GeminiGenerateContentProvider;
 use App\Services\AI\LlmProvider;
 use App\Services\AI\OpenAiResponsesProvider;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -21,7 +23,11 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(AgentLimits::class, fn () => new AgentLimits(config('ai')));
-        $this->app->bind(LlmProvider::class, OpenAiResponsesProvider::class);
+        $this->app->bind(LlmProvider::class, fn ($app) => match (config('ai.provider')) {
+            'gemini' => $app->make(GeminiGenerateContentProvider::class),
+            'openai' => $app->make(OpenAiResponsesProvider::class),
+            default => throw new AiAgentException('ai_unavailable'),
+        });
     }
 
     /**

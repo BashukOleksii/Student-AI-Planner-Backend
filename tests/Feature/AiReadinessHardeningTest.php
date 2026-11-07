@@ -24,7 +24,7 @@ class AiReadinessHardeningTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['ai.openai_key' => 'h4-private-key', 'ai.model' => 'gpt-5.4-mini']);
+        config(['ai.provider' => 'openai', 'ai.openai_key' => 'h4-private-key', 'ai.model' => 'gpt-5.4-mini']);
         Http::preventStrayRequests();
         $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
     }

@@ -21,7 +21,7 @@ class FrontendApiContractTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['ai.openai_key' => 'h4-secret', 'ai.model' => 'gpt-5.4-mini', 'ai.requests_per_minute' => 60, 'app.debug' => true]);
+        config(['ai.provider' => 'openai', 'ai.openai_key' => 'h4-secret', 'ai.model' => 'gpt-5.4-mini', 'ai.requests_per_minute' => 60, 'app.debug' => true]);
         Http::preventStrayRequests();
         $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
     }

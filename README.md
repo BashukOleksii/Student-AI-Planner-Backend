@@ -27,15 +27,16 @@ absolute/relative Reminders with in-app delivery/inbox; and progress statistics,
 daily trends and period comparisons.
 
 H1–H3c provide cookie-authenticated AI conversations, nine read-only Tools and
-fourteen mutation proposal Tools through the OpenAI Responses adapter. Every AI
+eighteen mutation proposal Tools through Gemini generateContent (preferred) or
+the retained OpenAI Responses adapter. Provider selection is backend configuration. Every AI
 mutation requires explicit authenticated confirmation, deterministic domain
 validation and atomic durable receipt/history persistence. The LLM never writes
 business records directly. H4 adds cross-domain REST verification, safe operational
 boundaries, frontend API documentation and a minimal offline verification workflow.
 
-The independent Vue 3 frontend, production deployment, external notification
-transports, streaming/voice and additional providers are not implemented. Paid
-live-provider testing is opt-in and was not run for H4.
+The Vue 3 frontend is maintained separately. Production deployment, external
+notification transports and streaming/voice are outside this milestone. Paid
+live-provider testing is opt-in and was not run.
 
 Use **PHP 8.4.1+ for the current lock file**, Composer 2 and MySQL 8.4. Root PHP
 ^8.3 is the declared constraint; locked Symfony packages impose the higher actual
@@ -64,6 +65,26 @@ The reproducible offline smoke (guarded disposable MySQL only; no OpenAI key nee
 ```sh
 vendor/bin/phpunit tests/Feature/BackendIntegrationSmokeTest.php
 ```
+
+## AI provider configuration
+
+```dotenv
+AI_PROVIDER=gemini
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_API_KEY=
+OPENAI_MODEL=gpt-5.4-mini
+OPENAI_API_KEY=
+```
+
+Keep credentials server-side. Set `AI_PROVIDER=openai` to use the existing OpenAI
+configuration; rebuild Laravel's config cache after changes. There is no automatic
+fallback or model upgrade. Google now documents restricted/deprecated 2.5 Flash
+access and automatic rerouting from December 1, 2026; the adapter blocks that
+model before network I/O from that date pending explicit model reconfiguration.
+Free-tier access depends on account eligibility, quotas and provider terms.
+Live Gemini/OpenAI inference for this milestone: **NOT RUN**.
+See [provider portability](docs/ai-provider-portability.md) for setup, continuation,
+security, offline parity tests and the current availability limits.
 
 ## Documentation
 

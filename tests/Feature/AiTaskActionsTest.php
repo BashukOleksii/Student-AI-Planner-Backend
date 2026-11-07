@@ -34,7 +34,7 @@ class AiTaskActionsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['ai.openai_key' => 'fake-test-key', 'ai.model' => 'gpt-5.4-mini', 'ai.requests_per_minute' => 60]);
+        config(['ai.provider' => getenv('AI_TEST_PROVIDER') ?: 'openai', 'ai.gemini_key' => 'offline-gemini-test-key', 'ai.gemini_model' => 'gemini-offline-contract-fixture', 'ai.openai_key' => 'fake-test-key', 'ai.model' => 'gpt-5.4-mini', 'ai.requests_per_minute' => 60]);
         Http::preventStrayRequests();
         $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
     }
@@ -445,9 +445,9 @@ class AiTaskActionsTest extends TestCase
         Http::preventStrayRequests();
         Http::fake(function ($request) {
             $this->assertSame(0, DB::transactionLevel());
-            $this->assertStringNotContainsString('INJECTED:', $request['instructions']);
-            $this->assertStringContainsString('Server-recorded action outcome', json_encode($request['input']));
-            $this->assertStringContainsString('executed', json_encode($request['input']));
+            $this->assertStringNotContainsString('INJECTED:', ($request['instructions'] ?? $request['systemInstruction']['parts'][0]['text']));
+            $this->assertStringContainsString('Server-recorded action outcome', json_encode($this->aiInput($request)));
+            $this->assertStringContainsString('executed', json_encode($this->aiInput($request)));
 
             return Http::response($this->aiResponse([$this->aiText('The task is completed.')]));
         });
@@ -529,8 +529,8 @@ class AiTaskActionsTest extends TestCase
         Http::swap(new Factory);
         Http::preventStrayRequests();
         Http::fake(function ($request) use ($turn) {
-            $this->assertStringContainsString($turn['action']['id'], json_encode($request['input']));
-            $this->assertStringContainsString('expired', json_encode($request['input']));
+            $this->assertStringContainsString($turn['action']['id'], json_encode($this->aiInput($request)));
+            $this->assertStringContainsString('expired', json_encode($this->aiInput($request)));
 
             return Http::response($this->aiResponse([$this->aiText('The proposal expired; no task was changed.')]));
         });
