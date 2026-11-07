@@ -48,8 +48,12 @@ class GeminiGenerateContentProvider implements LlmProvider
             'generationConfig' => ['candidateCount' => 1, 'maxOutputTokens' => $this->limits->get('max_output_tokens'),
                 'thinkingConfig' => ['includeThoughts' => false]]];
         $this->limits->json($body);
+        $json = json_encode($body, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (strlen($json) > $this->limits->get('max_context_bytes')) {
+            throw new AiAgentException('execution_limit_reached');
+        }
         try {
-            $response = Http::withHeaders(['x-goog-api-key' => $key])->acceptJson()->asJson()
+            $response = Http::withHeaders(['x-goog-api-key' => $key])->acceptJson()->withBody($json, 'application/json')
                 ->connectTimeout(min(10, $this->limits->get('request_timeout')))->timeout($this->limits->get('request_timeout'))
                 ->withOptions(['allow_redirects' => false, 'decode_content' => false,
                     'on_headers' => static function (ResponseInterface $response): void {
@@ -62,7 +66,7 @@ class GeminiGenerateContentProvider implements LlmProvider
                             throw new AiAgentException('execution_limit_reached');
                         }
                     },
-                ])->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', $body);
+                ])->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent');
         } catch (ConnectionException|TransferException $exception) {
             // Guzzle can wrap an on_headers limit exception. Do not surface transport messages.
             for ($cause = $exception; $cause !== null; $cause = $cause->getPrevious()) {
@@ -172,7 +176,7 @@ class GeminiGenerateContentProvider implements LlmProvider
         if (mb_strlen($text) > 16000 || ($calls === [] && preg_match('/\A[\s\p{Z}\p{C}]*\z/u', $text))) {
             throw new AiAgentException('invalid_provider_response');
         }
-        $state = ['provider' => 'gemini', 'model' => $model, 'content' => $this->limits->json($content), 'call_ids' => array_column($calls, 'id')];
+        $state = ['provider' => 'gemini', 'model' => $model, 'content' => json_encode($content, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'call_ids' => array_column($calls, 'id')];
         $this->limits->json($state);
 
         return ['text' => $text === '' ? null : $text, 'calls' => $calls, 'state' => $state];
@@ -215,7 +219,8 @@ class GeminiGenerateContentProvider implements LlmProvider
                 }
                 $content = json_decode($state['content'], false, 64, JSON_THROW_ON_ERROR);
                 $parsed = $this->parseContent($content, $model, $state['call_ids'] ?? []);
-                if ($this->canonical($parsed['calls']) !== $this->canonical($event['calls'] ?? [])) {
+                // Compare the Laravel-persisted projection; replay uses the original typed signed content.
+                if ($this->persistedCalls($parsed['calls']) !== $this->persistedCalls($event['calls'] ?? [])) {
                     throw new AiAgentException('invalid_provider_response');
                 }
                 $index = 0;
@@ -241,6 +246,11 @@ class GeminiGenerateContentProvider implements LlmProvider
         }
 
         return $contents;
+    }
+
+    private function persistedCalls(array $calls): array
+    {
+        return $this->canonical(json_decode(json_encode($calls, JSON_THROW_ON_ERROR), true, 64, JSON_THROW_ON_ERROR));
     }
 
     /** MySQL JSON objects may reorder keys; comparison must still preserve scalar types. */

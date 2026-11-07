@@ -136,8 +136,8 @@ class GeminiGenerateContentProviderTest extends TestCase
         }
         $history = json_decode(json_encode($history), true);
         $second = $this->respond($history);
-        $input = Http::recorded()[1][0]->data()['contents'];
-        $this->assertSame(json_encode(['role' => 'model', 'parts' => $parts]), json_encode($input[1]));
+        $input = json_decode(Http::recorded()[1][0]->body(), true)['contents'];
+        $this->assertEquals(json_decode(json_encode(['role' => 'model', 'parts' => $parts])), json_decode(Http::recorded()[1][0]->body())->contents[1]);
         $this->assertSame('list_tasks', $input[2]['parts'][0]['functionResponse']['name']);
         $this->assertArrayNotHasKey('id', $input[2]['parts'][0]['functionResponse']);
         $this->assertSame('google_call_2', $input[2]['parts'][1]['functionResponse']['id']);
@@ -145,7 +145,7 @@ class GeminiGenerateContentProviderTest extends TestCase
         $history[] = ['role' => 'tool', 'call_id' => $second['calls'][0]['id'], 'content' => '{"ok":false,"error":{"code":"invalid_arguments"}}'];
         $this->assertSame('Answer.', $this->respond($history)['text']);
         $input = Http::recorded()[2][0]->data()['contents'];
-        $this->assertFalse($input[4]['parts'][0]['functionResponse']['response']->ok);
+        $this->assertFalse($input[4]['parts'][0]['functionResponse']['response']['ok']);
         Http::assertSentCount(3);
     }
 

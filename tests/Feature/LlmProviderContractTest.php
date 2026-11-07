@@ -101,6 +101,30 @@ class LlmProviderContractTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_gemini_invalid_float_argument_remains_float_in_signed_continuation_after_mysql(): void
+    {
+        config(['ai.provider' => 'gemini']);
+        $owner = User::factory()->create();
+        $conversation = AiConversation::factory()->for($owner)->create();
+        $this->actingAs($owner, 'web');
+        $part = ['functionCall' => ['name' => 'list_tasks', 'args' => ['page' => 1.0]],
+            'thoughtSignature' => base64_encode('opaque typed call')];
+        $first = json_encode(['modelVersion' => 'gemini-2.5-flash', 'candidates' => [['finishReason' => 'STOP',
+            'content' => ['role' => 'model', 'parts' => [$part]]]]], JSON_PRESERVE_ZERO_FRACTION);
+        Http::fakeSequence()->push($first)->push($this->aiResponse([$this->aiText('Invalid argument.')]))
+            ->push($this->aiResponse([$this->aiText('Continued.')]));
+        $url = '/api/ai/conversations/'.$conversation->id.'/messages';
+        $this->postJson($url, ['content' => 'Read tasks.'], ['Idempotency-Key' => (string) Str::uuid()])->assertOk()
+            ->assertJsonPath('data.tools.0.ok', false)->assertJsonPath('data.tools.0.error_code', 'invalid_arguments');
+        $this->postJson($url, ['content' => 'Continue.'], ['Idempotency-Key' => (string) Str::uuid()])->assertOk();
+        foreach ([1, 2] as $index) {
+            $wire = json_decode(Http::recorded()[$index][0]->body(), true);
+            $this->assertSame(1.0, $wire['contents'][1]['parts'][0]['functionCall']['args']['page']);
+            $this->assertFalse($wire['contents'][2]['parts'][0]['functionResponse']['response']['ok']);
+        }
+        Http::assertSentCount(3);
+    }
+
     public function test_gemini_signatures_and_generated_ids_survive_real_mysql_and_a_later_request(): void
     {
         config(['ai.provider' => 'gemini']);

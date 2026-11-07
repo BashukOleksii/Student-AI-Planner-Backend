@@ -124,7 +124,10 @@ parts/functionResponse → наступний model output. Паралельні
 
 Приватний `state` містить тільки provider, model, перевірений model content як
 JSON-рядок та відповідність внутрішніх call IDs. JSON-рядок зберігає порожні
-об'єкти й точні parts через Eloquent array casts/MySQL JSON. State повторно
+об'єкти й точні parts через Eloquent array casts/MySQL JSON. State і вихідний
+HTTP JSON використовують `JSON_PRESERVE_ZERO_FRACTION`, щоб початковий невалідний
+аргумент `1.0` не перетворився на integer `1` під час signed replay. Звірка calls
+враховує JSON-проєкцію Laravel persistence; виклики не виконуються повторно. State повторно
 перевіряється перед replay; ключі нормалізованих calls порівнюються без залежності
 від MySQL-порядку, зі збереженням типів скалярів. Сирі HTTP-відповіді, usage,
 safety diagnostics і reasoning не зберігаються. Підписи не потрапляють до REST
