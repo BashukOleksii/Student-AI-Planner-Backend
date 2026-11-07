@@ -449,3 +449,51 @@ tracked files and 12 new files (24 total). No commit or push was made.
 - `tests/Live/OpenAiLiveSmokeTest.php` (new)
 - `tests/Support/ai_rate_limit_worker.php` (new)
 - `tests/Unit/AiEnvironmentConfigurationTest.php` (new)
+
+
+## Password management (Stage 12)
+
+Copy the following server settings from `.env.example` and set deployment secrets:
+
+```dotenv
+FRONTEND_URL=http://localhost:5173
+SESSION_DRIVER=database
+QUEUE_CONNECTION=database
+MAIL_MAILER=smtp
+MAIL_SCHEME=null
+MAIL_HOST=127.0.0.1
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_FROM_ADDRESS=hello@example.com
+MAIL_FROM_NAME="${APP_NAME}"
+```
+
+Use a local SMTP catcher for development; do not point automated tests at a real
+mail service. Production requires an HTTPS frontend origin and provider-appropriate
+SMTP/TLS credentials (for example, `MAIL_SCHEME=smtps` with the provider's port),
+or another configured direct mail transport. Never commit credentials. Reset
+recovery rejects log/array/composite mailers in production, including SMTP-to-log
+failover. SMTP timeout is bounded to 15 seconds.
+
+Run `php artisan queue:work --tries=1 --timeout=60` under the existing process
+supervisor. The default database queue uses the already-present jobs table;
+no new migration is required. Queued recovery jobs are encrypted using APP_KEY
+and contain only an email address; the worker generates the reset token through
+the Broker. Keep APP_KEY stable and restart workers after configuration changes.
+Production recovery rejects sync/deferred/null/failover queue drivers, so missing
+workers cause delayed delivery rather than an account-dependent HTTP response.
+Delivery failure logs only `password.delivery_failed`; resolve the operational
+cause and request a fresh link after the 60-second Broker delay.
+
+Users, sessions and the database Broker must use the same Laravel connection for
+atomic password writes/revocation. The default MySQL configuration meets this.
+Alternative session drivers/cross-connection arrangements return safe 503 errors
+for password writes. Use a shared rate-limit cache and configure trusted proxies
+for real client IPs. Run `php artisan config:cache` and restart workers after
+changing environment values. No reset link or credential is returned by the API.
+
+See [Stage 12 API contract](stage12/password-api-contract.md) and
+[implementation result](stage12/backend-result.md). Existing test database guards
+remain mandatory. New tests use Notification fakes and disposable MySQL only;
+real SMTP delivery is not part of automated verification.

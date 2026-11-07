@@ -26,6 +26,8 @@ trait InteractsWithSpaBrowser
     private function browser(string $method, string $url, array $body = [], array $headers = []): TestResponse
     {
         Auth::forgetGuards();
+        Auth::shouldUse('web');
+        $this->app->forgetInstance('auth.driver');
         $this->app['session']->forgetDrivers();
         $this->app->forgetInstance('session.store');
         $this->withUnencryptedCookies($this->browserCookies);

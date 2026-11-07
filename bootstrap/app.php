@@ -46,6 +46,18 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->dontFlash(['token']);
+        // Password/SMTP/SQL exceptions may contain secrets; only fixed diagnostics are allowed.
+        $exceptions->report(function (Throwable $exception) {
+            if (request()->is('api/profile/password', 'api/auth/forgot-password', 'api/auth/reset-password')) {
+                try {
+                    Log::warning('password.failure');
+                } catch (Throwable) {
+                }
+
+                return false;
+            }
+        });
         // Never let default exception reporting persist AI prompts, SQL bindings or private payloads.
         $exceptions->report(function (Throwable $exception) {
             if (request()->is('api/ai/*')) {
@@ -63,6 +75,14 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
         $exceptions->render(function (Throwable $exception, Request $request) {
+            if ($request->is('api/profile/password', 'api/auth/forgot-password', 'api/auth/reset-password')) {
+                if ($exception instanceof ValidationException || $exception instanceof AuthenticationException
+                    || ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500)) {
+                    return null;
+                }
+
+                return response()->json(['message' => 'Password management is temporarily unavailable.'], 503);
+            }
             if ($request->is('api/ai/*')) {
                 if ($exception instanceof AiAgentException) {
                     return response()->json(['message' => $exception->getMessage(), 'code' => $exception->errorCode], $exception->status());

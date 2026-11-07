@@ -22,6 +22,7 @@ class AuthController extends Controller
 
         Auth::guard('web')->login($user);
         $request->session()->regenerate();
+        $request->session()->put('password_hash_web', Auth::guard('web')->hashPasswordForCookie(Auth::guard('web')->user()->getAuthPassword()));
 
         return (new UserResource($user))->response()->setStatusCode(201);
     }
@@ -35,6 +36,7 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
+        $request->session()->put('password_hash_web', Auth::guard('web')->hashPasswordForCookie(Auth::guard('web')->user()->getAuthPassword()));
 
         return new UserResource(Auth::guard('web')->user());
     }

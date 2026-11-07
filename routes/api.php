@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\EducationInstitutionController;
 use App\Http\Controllers\Api\FreeSlotController;
 use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\PlanningPreferenceController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ProgressComparisonController;
@@ -28,6 +29,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->name('auth.')->group(function (): void {
     Route::post('/register', [AuthController::class, 'register'])->name('register');
+    Route::post('/forgot-password', [PasswordController::class, 'forgot'])->middleware('throttle:password-forgot')->name('forgot-password');
+    Route::post('/reset-password', [PasswordController::class, 'reset'])->middleware('throttle:password-reset')->name('reset-password');
     Route::post('/login', [AuthController::class, 'login'])->name('login');
     Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum')->name('logout');
 });
@@ -58,6 +61,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::patch('/reminders/{reminder}', [ReminderController::class, 'update'])->whereNumber('reminder')->name('reminders.update');
     Route::post('/reminders/{reminder}/cancel', [ReminderController::class, 'cancel'])->whereNumber('reminder')->name('reminders.cancel');
 
+    Route::patch('/profile/password', [PasswordController::class, 'change'])->middleware('throttle:password-change')->name('profile.password');
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 

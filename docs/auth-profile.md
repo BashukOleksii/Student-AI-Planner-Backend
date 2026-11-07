@@ -1,5 +1,12 @@
 # Authentication + User Profile
 
+Stage 12 adds `PATCH /api/profile/password`, `POST /api/auth/forgot-password` and
+`POST /api/auth/reset-password`. Existing routes below retain their response
+contracts. Password updates use the existing Broker/token table and database
+sessions; reset delivery is queued and links use a trusted frontend origin.
+See the [exact password contract](stage12/password-api-contract.md) for JSON,
+CSRF, throttles, session revocation and operational requirements.
+
 H4 verifies the existing backend through cookie/CSRF HTTP workflows and adds strict
 configuration checks, safe AI diagnostics, retry-header CORS exposure and offline CI.
 Domain rules and confirmation transactions remain unchanged. See [backend readiness](backend-integration-readiness.md)

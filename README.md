@@ -86,6 +86,16 @@ Live Gemini/OpenAI inference for this milestone: **NOT RUN**.
 See [provider portability](docs/ai-provider-portability.md) for setup, continuation,
 security, offline parity tests and the current availability limits.
 
+## Password management
+
+Stage 12 adds authenticated password change and public forgotten-password recovery
+through Laravel's existing Password Broker. Reset links target the trusted
+`FRONTEND_URL` origin. Configure SMTP and run `php artisan queue:work`; production
+recovery uses encrypted asynchronous jobs and rejects mail transports that log
+reset links. Database sessions support atomic revocation, while password change
+preserves the current login. See the [exact password API](docs/stage12/password-api-contract.md)
+and [Backend result](docs/stage12/backend-result.md) before Frontend integration.
+
 ## Documentation
 
 - [Backend integration and readiness](docs/backend-integration-readiness.md)
