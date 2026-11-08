@@ -40,7 +40,7 @@ class OpenAiResponsesProviderTest extends TestCase
             $this->assertSame(['reasoning.encrypted_content'], $body['include']);
             $this->assertArrayNotHasKey('previous_response_id', $body);
             $this->assertArrayNotHasKey('conversation', $body);
-            $this->assertCount(7, $body['tools']);
+            $this->assertCount(8, $body['tools']);
             foreach ($body['tools'] as $tool) {
                 $this->assertTrue($tool['strict']);
                 $this->assertSame('function', $tool['type']);

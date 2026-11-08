@@ -1,5 +1,12 @@
 # Backend Architecture
 
+Stage 18A adds the safe `list_study_availability_windows` read Tool through the
+existing provider-independent registry, strict executor and explicit read dispatch.
+Discovery has 28 definitions (10 reads / 18 proposals). Owned recurring local
+windows are paginated, ordered and presented through the existing Resource; no
+writer, pending-action type or migration is added. See [the read contract](stage18/availability-read-tool.md)
+and [future confirmation architecture](stage18/backend-stage18a-result.md).
+
 Stage 17A exposes deterministic read-only workload advice through
 `GET /api/planning/workload-advice`. It derives ordering, allocation limitations,
 exclusions and safe recommendation codes from the unchanged direct planner,

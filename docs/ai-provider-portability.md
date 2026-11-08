@@ -1,5 +1,11 @@
 # Переносимість AI-провайдерів
 
+Stage 18A adds one provider-independent availability read, bringing current
+discovery to 28 definitions (10 reads / 18 proposals). Both existing schema
+adapters support it without provider implementation changes; the preceding 27
+definitions are retained exactly. Historical counts below describe the portability
+milestone. See [the availability contract](stage18/availability-read-tool.md).
+
 Стан реалізації: 7 листопада 2026 року. Основний провайдер — Google Gemini
 Developer API, запитана модель — `gemini-2.5-flash`. OpenAI Responses залишається
 доступним. REST API, незалежний Vue Frontend, детерміновані Services, Policies,

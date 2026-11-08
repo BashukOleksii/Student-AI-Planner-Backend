@@ -423,6 +423,7 @@ class AiToolsIntegrationTest extends TestCase
         return [
             ['get_schedule_for_date', ['date' => '2026-10-20']],
             ['list_tasks', []],
+            ['list_study_availability_windows', []],
             ['find_free_study_slots', $this->period()],
             ['list_study_sessions', $this->period()],
             ['get_progress_statistics', $this->period()],
@@ -481,14 +482,14 @@ class AiToolsIntegrationTest extends TestCase
         Notification::assertNothingSent();
     }
 
-    public function test_empty_data_is_valid_for_all_seven_tools_without_materializing_defaults(): void
+    public function test_empty_data_is_valid_for_all_registered_tools_without_materializing_defaults(): void
     {
         $owner = User::factory()->create(['timezone' => 'UTC']);
         foreach ($this->calls() as [$name, $arguments]) {
             $before = $this->snapshot();
             $data = $this->data($owner, $name, $arguments);
             $this->assertSame($before, $this->snapshot());
-            if (in_array($name, ['get_schedule_for_date', 'list_tasks', 'find_free_study_slots', 'list_study_sessions'], true)) {
+            if (in_array($name, ['get_schedule_for_date', 'list_tasks', 'list_study_availability_windows', 'find_free_study_slots', 'list_study_sessions'], true)) {
                 $this->assertSame([], reset($data));
             }
         }

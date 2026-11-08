@@ -81,7 +81,7 @@ class SubtaskReminderActionTest extends TestCase
         $this->assertNull($registry->find('list_reminders'));
         $this->assertSame($tasks, (new TaskActionRegistry)->definitions());
         $this->assertSame($reads, (new ToolRegistry)->definitions());
-        $this->assertCount(7, $reads);
+        $this->assertCount(8, $reads);
         $this->assertCount(4, $tasks);
     }
 

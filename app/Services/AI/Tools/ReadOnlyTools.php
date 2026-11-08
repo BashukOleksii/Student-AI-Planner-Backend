@@ -3,6 +3,7 @@
 namespace App\Services\AI\Tools;
 
 use App\Http\Resources\FreeSlotResource;
+use App\Http\Resources\StudyAvailabilityWindowResource;
 use App\Http\Resources\StudySessionResource;
 use App\Models\User;
 use App\Services\Planning\FreeTimeService;
@@ -12,9 +13,10 @@ use App\Services\Progress\ProgressStatisticsService;
 use App\Services\Progress\ProgressTrendsService;
 use App\Services\Schedule\ScheduleService;
 use App\Services\Tasks\TaskService;
+use Illuminate\Validation\ValidationException;
 use LogicException;
 
-/** Seven thin read adapters. The match is the complete, server-controlled dispatch allowlist. */
+/** Eight thin read adapters. The match is the complete, server-controlled dispatch allowlist. */
 class ReadOnlyTools
 {
     public function __construct(
@@ -36,6 +38,7 @@ class ReadOnlyTools
         return match ($name) {
             'get_schedule_for_date' => $this->schedule($owner, $arguments),
             'list_tasks' => $this->tasks($owner, $arguments),
+            'list_study_availability_windows' => $this->availabilityWindows($owner, $arguments),
             'find_free_study_slots' => $this->freeSlots($owner, $arguments),
             'list_study_sessions' => $this->sessions($owner, $arguments),
             'get_progress_statistics' => $this->statistics->calculate($owner, $arguments['start_date'], $arguments['end_date']),
@@ -59,6 +62,25 @@ class ReadOnlyTools
 
         return ['tasks' => $page->getCollection()->map(fn ($task) => $this->presenter->task($owner, $task))->all(),
             'meta' => ['current_page' => $page->currentPage(), 'per_page' => $page->perPage(), 'total' => $page->total(), 'last_page' => $page->lastPage()]];
+    }
+
+    private function availabilityWindows(User $owner, array $arguments): array
+    {
+        $page = $arguments['page'] ?? 1;
+        $perPage = $arguments['per_page'] ?? 20;
+        if ($page - 1 > intdiv(PHP_INT_MAX, $perPage)) {
+            throw ValidationException::withMessages(['page' => ['The selected page is too large.']]);
+        }
+
+        $windows = $owner->studyAvailabilityWindows()
+            ->when(isset($arguments['day_of_week']), fn ($query) => $query->where('day_of_week', $arguments['day_of_week']))
+            ->orderBy('day_of_week')->orderBy('starts_at')->orderBy('id')
+            ->paginate($perPage, ['id', 'day_of_week', 'starts_at', 'ends_at'], 'page', $page);
+
+        // This Resource uses no authentication or Request state; preserve local times including 24:00:00.
+        return ['windows' => $windows->getCollection()->map(fn ($window) => (new StudyAvailabilityWindowResource($window))->resolve())->all(),
+            'meta' => ['timezone' => $owner->timezone, 'current_page' => $windows->currentPage(),
+                'per_page' => $windows->perPage(), 'total' => $windows->total(), 'last_page' => $windows->lastPage()]];
     }
 
     private function freeSlots(User $owner, array $arguments): array

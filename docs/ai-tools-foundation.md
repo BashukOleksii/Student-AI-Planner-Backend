@@ -1,5 +1,14 @@
 # Stage H1 — Read-only AI tools foundation
 
+Stage 18A adds `list_study_availability_windows` to the existing strict registry
+and read adapter: eight registry reads, ten total reads and eighteen proposals
+(28 orchestrator definitions). It lists owner-scoped recurring windows with
+20-row default/50-row maximum pagination and exact local clock strings, including
+`24:00:00`. Existing seven read contracts and all proposal contracts are preserved.
+See [the exact Stage 18A contract](stage18/availability-read-tool.md) and
+[results / Stage 18B design](stage18/backend-stage18a-result.md). Historical stage
+counts below describe those milestones.
+
 Stage 11 adds a separate LessonActionRegistry with four proposal tools (27 total
 orchestrator definitions). H1's seven read-only definitions/Executor stay unchanged.
 Lesson creation/update/cancellation/replacement execute only through existing H3

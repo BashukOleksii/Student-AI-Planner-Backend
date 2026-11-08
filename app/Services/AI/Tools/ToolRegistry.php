@@ -24,6 +24,11 @@ class ToolRegistry
                 'page' => $integer,
                 'per_page' => [...$integer, 'maximum' => 50],
             ], []),
+            $this->definition('list_study_availability_windows', 'Read configured recurring weekly study availability windows, not calculated free slots; ordered by weekday, start time and ID with bounded pagination.', [
+                'day_of_week' => [...$integer, 'maximum' => 7],
+                'page' => $integer,
+                'per_page' => [...$integer, 'maximum' => 50],
+            ], []),
             $this->definition('find_free_study_slots', 'Read free UTC intervals over at most 31 inclusive local dates. Free time does not guarantee a feasible study plan.',
                 [...$period, 'min_slot_minutes' => [...$integer, 'maximum' => 65535]], array_keys($period)),
             $this->definition('list_study_sessions', 'Read original study session identities and all historical statuses overlapping at most 31 local dates. Returns at most 100 sessions with explicit truncation metadata.',

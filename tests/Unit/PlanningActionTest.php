@@ -62,7 +62,7 @@ class PlanningActionTest extends TestCase
         $registry = new PlanningActionRegistry;
         $new = $registry->definitions();
         $this->assertSame(PlanningActionRegistry::NAMES, array_column($new, 'name'));
-        $this->assertCount(23, array_unique(array_column([...$old, ...$new], 'name')));
+        $this->assertCount(24, array_unique(array_column([...$old, ...$new], 'name')));
         foreach ((new OpenAiToolSchema)->definitions($new) as $i => $definition) {
             $this->assertFalse($definition['strict']);
             $this->assertSame($new[$i]['parameters'], $definition['parameters']);

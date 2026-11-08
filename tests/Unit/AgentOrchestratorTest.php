@@ -85,7 +85,7 @@ class AgentOrchestratorTest extends TestCase
         $period = ['start_date' => '2026-10-20', 'end_date' => '2026-10-20'];
 
         return [['get_schedule_for_date', ['date' => '2026-10-20']], ['list_tasks', ['status' => 'pending']],
-            ['find_free_study_slots', [...$period, 'min_slot_minutes' => 30]], ['list_study_sessions', $period],
+            ['list_study_availability_windows', []], ['find_free_study_slots', [...$period, 'min_slot_minutes' => 30]], ['list_study_sessions', $period],
             ['get_progress_statistics', $period], ['get_daily_progress_trends', $period],
             ['compare_progress_periods', ['baseline_start_date' => '2026-09-20', 'baseline_end_date' => '2026-09-20',
                 'current_start_date' => '2026-10-20', 'current_end_date' => '2026-10-20']]];

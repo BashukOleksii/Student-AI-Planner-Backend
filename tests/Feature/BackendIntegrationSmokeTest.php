@@ -69,7 +69,7 @@ class BackendIntegrationSmokeTest extends TestCase
                 ...array_column((new SubtaskReminderActionRegistry)->readDefinitions(), 'name'),
                 ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES];
             $this->assertSame($names, array_column($body['tools'], 'name'));
-            $this->assertCount(27, array_unique($names));
+            $this->assertCount(28, array_unique($names));
             foreach ($body['tools'] as $tool) {
                 $this->assertSame('function', $tool['type']);
                 $this->assertFalse($tool['parameters']['additionalProperties']);
