@@ -76,7 +76,7 @@ class TaskPersistenceTest extends TestCase
 
     public function test_enums_match_exact_vocabulary(): void
     {
-        $this->assertSame(['pending', 'completed'], array_column(TaskStatus::cases(), 'value'));
+        $this->assertSame(['pending', 'completed', 'missed'], array_column(TaskStatus::cases(), 'value'));
         $this->assertSame([1, 2, 3], array_column(TaskPriority::cases(), 'value'));
     }
 

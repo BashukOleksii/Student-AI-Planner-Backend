@@ -13,6 +13,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class TaskService
 {
@@ -128,7 +129,7 @@ class TaskService
         return DB::transaction(function () use ($user, $task): Task {
             $this->lockOwner($user);
             $task = $user->tasks()->lockForUpdate()->findOrFail($task->getKey());
-            if ($task->status === TaskStatus::Pending) {
+            if ($task->status->isUnfinished()) {
                 if (! $task->update([
                     'status' => TaskStatus::Completed,
                     'completed_at' => CarbonImmutable::now('UTC')->startOfSecond(),
@@ -147,8 +148,28 @@ class TaskService
         return DB::transaction(function () use ($user, $task): Task {
             $this->lockOwner($user);
             $task = $user->tasks()->lockForUpdate()->findOrFail($task->getKey());
+            if ($task->status !== TaskStatus::Pending) {
+                if (! $task->update(['status' => TaskStatus::Pending, 'completed_at' => null])) {
+                    throw new ReminderIntegrityException;
+                }
+            }
+
+            return $task->refresh();
+        });
+    }
+
+    public function miss(User $user, Task $task): Task
+    {
+        return DB::transaction(function () use ($user, $task): Task {
+            $this->lockOwner($user);
+            $task = $user->tasks()->lockForUpdate()->findOrFail($task->getKey());
             if ($task->status === TaskStatus::Completed) {
-                $task->update(['status' => TaskStatus::Pending, 'completed_at' => null]);
+                throw new ConflictHttpException('A completed task must be reopened before it can be marked missed.');
+            }
+            if ($task->status !== TaskStatus::Missed) {
+                if (! $task->update(['status' => TaskStatus::Missed, 'completed_at' => null])) {
+                    throw new ReminderIntegrityException;
+                }
             }
 
             return $task->refresh();

@@ -67,4 +67,11 @@ class TaskController extends Controller
 
         return new TaskResource($service->reopen($request->user(), $task));
     }
+
+    public function miss(Request $request, Task $task, TaskService $service): TaskResource
+    {
+        Gate::authorize('update', $task);
+
+        return new TaskResource($service->miss($request->user(), $task));
+    }
 }

@@ -75,6 +75,37 @@ class ReminderDeliveryTest extends TestCase
         $this->assertSame($history, $this->snapshot());
     }
 
+    public function test_missed_parent_keeps_task_child_and_session_reminders_eligible_and_preserves_sent_inbox_on_completion(): void
+    {
+        [$owner, $task, $child, $session] = $this->fixture();
+        $service = app(ReminderService::class);
+        $reminders = [];
+        foreach (['task_id' => $task->id, 'subtask_id' => $child->id, 'study_session_id' => $session->id] as $field => $id) {
+            $reminders[] = $service->create($owner, [$field => $id, 'trigger_at' => '2026-10-19T08:00:02Z']);
+        }
+        $this->actingAs($owner, 'web')->postJson('/api/tasks/'.$task->id.'/miss')->assertOk();
+        foreach ($reminders as $reminder) {
+            $this->assertSame(ReminderStatus::Scheduled, $reminder->fresh()->status);
+        }
+        $relative = $service->create($owner, ['task_id' => $task->id, 'anchor' => 'task_deadline', 'offset_minutes' => -15]);
+        // Deadline synchronization must keep, not cancel, a missed Task's eligible target.
+        $this->patchJson('/api/tasks/'.$task->id, ['deadline_at' => '2026-10-22T12:00:00Z'])->assertOk();
+        $this->assertSame(ReminderStatus::Scheduled, $relative->fresh()->status);
+        $this->assertSame('2026-10-22 11:45:00', $relative->fresh()->getRawOriginal('trigger_at'));
+        $this->travelTo(CarbonImmutable::parse('2026-10-19T08:00:03Z'));
+        foreach ($reminders as $reminder) {
+            $this->assertSame(['status' => 'sent'], app(ReminderDeliveryService::class)->process($owner->id, $reminder->id));
+        }
+        $inbox = $owner->notifications()->orderBy('id')->get()->map->getAttributes()->all();
+        $this->assertCount(3, $inbox);
+        $this->postJson('/api/tasks/'.$task->id.'/complete')->assertOk()->assertJsonPath('data.status', 'completed');
+        $this->assertSame(ReminderStatus::Cancelled, $relative->fresh()->status);
+        $this->assertSame($inbox, $owner->notifications()->orderBy('id')->get()->map->getAttributes()->all());
+        foreach ($reminders as $reminder) {
+            $this->assertSame(ReminderStatus::Sent, $reminder->fresh()->status);
+        }
+    }
+
     public static function targetModes(): array
     {
         return [[null, false], ['task_id', false], ['subtask_id', false], ['study_session_id', false],

@@ -683,10 +683,10 @@ FK:
 
 DB-enforced CHECKs:
 
-- `tasks_valid_status`: `status IN ('pending', 'completed')`;
+- `tasks_valid_status`: `status IN ('pending', 'completed', 'missed')` (Stage 16A forward-only migration);
 - `tasks_valid_priority`: `priority BETWEEN 1 AND 3`;
 - `tasks_positive_estimate`: `estimated_minutes IS NULL OR estimated_minutes > 0`;
-- `tasks_completion_consistency`: `(status = 'completed' AND completed_at IS NOT NULL) OR (status = 'pending' AND completed_at IS NULL)`.
+- `tasks_completion_consistency`: `(status = 'completed' AND completed_at IS NOT NULL) OR (status IN ('pending', 'missed') AND completed_at IS NULL)`.
 
 Indexes:
 

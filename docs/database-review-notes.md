@@ -1,5 +1,9 @@
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
+Stage 16A expands only the Task status and completion-consistency CHECKs through
+one forward-only MySQL ALTER. Existing rows/IDs and Subtask CHECKs are preserved;
+downgrade refuses without writes. See [the migration and API contract](stage16/task-status-api-contract.md).
+
 Stage 11 adds only a new forward-only migration expanding ai_actions_valid_type
 from fourteen to eighteen values. No existing migration, column, relationship or
 business record changes. Down refuses; use a future forward correction. No shared

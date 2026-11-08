@@ -29,7 +29,7 @@ class ProgressStatisticsService
             $coverage = $this->context->dateIntervals($startDate, $endDate, $owner->timezone);
             $tasks = $owner->tasks()->getQuery();
             $children = Subtask::query()->whereHas('task', fn ($query) => $query->where('user_id', $owner->getKey()));
-            $taskCurrent = $this->currentMetrics(clone $tasks, $now);
+            $taskCurrent = $this->currentMetrics(clone $tasks, $now, true);
             // Round to tenths; whole values retain the existing JSON round-trip convention.
             $taskCurrent['completion_percent'] = $taskCurrent['total'] === 0
                 ? null : (int) round($taskCurrent['completed'] / $taskCurrent['total'] * 1000) / 10;
@@ -116,12 +116,16 @@ class ProgressStatisticsService
         ];
     }
 
-    private function currentMetrics(Builder $query, CarbonImmutable $now): array
+    private function currentMetrics(Builder $query, CarbonImmutable $now, bool $includeMissed = false): array
     {
+        $missed = $includeMissed
+            ? ', COALESCE(SUM(status = ?), 0) AS missed, COALESCE(SUM(status = ? AND deadline_at IS NOT NULL AND deadline_at < ?), 0) AS overdue_missed'
+            : '';
         $row = $query->selectRaw(
             'COUNT(*) AS total, COALESCE(SUM(status = ?), 0) AS pending, COALESCE(SUM(status = ?), 0) AS completed, '
-            .'COALESCE(SUM(status = ? AND deadline_at IS NOT NULL AND deadline_at < ?), 0) AS overdue_pending',
-            [TaskStatus::Pending->value, TaskStatus::Completed->value, TaskStatus::Pending->value, $now->format('Y-m-d H:i:s.u')],
+            .'COALESCE(SUM(status = ? AND deadline_at IS NOT NULL AND deadline_at < ?), 0) AS overdue_pending'.$missed,
+            [TaskStatus::Pending->value, TaskStatus::Completed->value, TaskStatus::Pending->value, $now->format('Y-m-d H:i:s.u'),
+                ...($includeMissed ? [TaskStatus::Missed->value, TaskStatus::Missed->value, $now->format('Y-m-d H:i:s.u')] : [])],
         )->toBase()->first();
 
         return array_map(fn ($value): int => (int) $value, (array) $row);

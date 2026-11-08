@@ -13,6 +13,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -123,6 +124,9 @@ return Application::configure(basePath: dirname(__DIR__))
             }
             if ($exception instanceof ReminderIntegrityException && $request->is('api/tasks/*')) {
                 return response()->json(['message' => 'The reminder dependencies could not be processed.'], 500);
+            }
+            if ($exception instanceof ConflictHttpException && $request->is('api/tasks/*')) {
+                return response()->json(['message' => $exception->getMessage()], 409);
             }
             if ($request->is('api/reminders', 'api/reminders/*')) {
                 if ($exception instanceof ReminderConflictException) {

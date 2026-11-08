@@ -199,7 +199,8 @@ using the same pure mapping. General reminders have their separate F1 path.
 | --- | --- |
 | `TaskService::update()` changes persisted `deadline_at` | Recalculate scheduled direct `task_deadline` reminders |
 | `SubtaskService::update()` changes persisted `deadline_at` | Recalculate scheduled direct `subtask_deadline` reminders from their own deadline |
-| Task pending -> completed | Cancel scheduled Task, descendant Subtask and related StudySession reminders in either mode |
+| Task pending/missed -> completed | Cancel scheduled Task, descendant Subtask and related StudySession reminders in either mode |
+| Task pending -> missed, or missed -> pending | Preserve eligible scheduled reminders; no delivery or recreation is triggered |
 | Subtask pending -> completed | Cancel scheduled direct Subtask and exact child-attributed StudySession reminders in either mode |
 | Task/Subtask reopen | No resurrection or reminder changes |
 | Task/Subtask soft deletion | Unchanged S3 cancellation of its eligible dependent records |

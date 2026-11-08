@@ -1,5 +1,10 @@
 # Tasks and Subtasks — T1–T3 and S1–S3
 
+Stage 16A adds explicit Task-only `missed`, `POST /api/tasks/{task}/miss`,
+completion from pending/missed and reopening from completed/missed. Missed work
+remains eligible for reminders and existing recovery planning. Subtask status
+vocabulary is unchanged. See the [exact Stage 16B handoff](stage16/task-status-api-contract.md).
+
 H3b exposes four confirmed AI Subtask actions and list_subtasks_for_task, extending
 H3a's existing action endpoints. Shared SubtaskInputRules and read-only candidate
 preparation reuse direct REST/domain validation. Position is assigned only at
@@ -53,6 +58,7 @@ the normal `data` Resource wrapper.
 | DELETE | `/api/tasks/{task}` | `tasks.destroy` | 204 |
 | POST | `/api/tasks/{task}/complete` | `tasks.complete` | 200 |
 | POST | `/api/tasks/{task}/reopen` | `tasks.reopen` | 200 |
+| POST | `/api/tasks/{task}/miss` | `tasks.miss` | 200 |
 | GET | `/api/tasks/{task}/progress` | `tasks.progress` | 200 |
 
 Unauthenticated requests return 401. Missing, soft-deleted and foreign Tasks
@@ -68,7 +74,7 @@ Supplied filters must be non-empty and valid, or the endpoint returns Laravel
 
 | Parameter | Contract |
 |---|---|
-| `status` | `pending` or `completed` |
+| `status` | `pending`, `missed` or `completed` (Task only) |
 | `priority` | 1 low, 2 normal, 3 high |
 | `subject_id` | Positive ID of an existing owned Subject |
 | `deadline_from` | Inclusive UTC lower deadline bound |
@@ -99,7 +105,7 @@ ordinary offset pagination, without snapshot isolation across separate requests
 when data changes.
 
 TaskService queries only the authenticated owner's non-deleted Tasks, including
-both pending and completed records. Subjects are eager loaded in one owned batch
+pending, missed and completed records. Subjects are eager loaded in one owned batch
 query for each non-empty page requiring associations. Legacy foreign Subject links
 serialize as null without loading foreign presentation data or repairing rows.
 TaskResource fields remain unchanged; Subtasks/progress are not exposed.
@@ -133,16 +139,20 @@ Both lifecycle endpoints accept no editable input; unexpected body fields are
 ignored. They authorize with TaskPolicy's existing `update` ability and return
 the unchanged TaskResource representation with HTTP 200.
 
-`complete` transitions pending to completed and records the current application
+`complete` transitions pending or missed to completed and records the current application
 UTC instant, truncated to whole-second precision, as `completed_at`. Deadlines
 in the past or absent do not block completion. Late completion retains its actual
 instant; no overdue status or flag is introduced. Completing an already completed
 Task preserves its original completion instant and performs no UPDATE.
 
-`reopen` transitions completed to pending and clears `completed_at`. Reopening
+`reopen` transitions completed or missed to pending and clears `completed_at`. Reopening
 an already pending Task performs no UPDATE. Idempotent calls leave `updated_at`
 unchanged. Completion after reopening records a new instant; no completion
 history is stored in the current schema.
+
+`miss` transitions pending to missed, preserves null `completed_at`, and returns
+200 without an UPDATE if already missed. Completed to missed returns 409 until
+explicitly reopened. It changes no Subtask, StudySession or Reminder record.
 
 TaskService runs each lifecycle operation in a transaction, locks the owner
 first, then reloads/locks the current owned Task before deciding its transition.
@@ -180,7 +190,7 @@ reminders when the persisted deadline changes; clearing or expiring the trigger
 cancels them with history retained. S1 SubtaskService enforces the reciprocal
 deadline bound under the same owner and parent serialization locks.
 
-Existing MySQL checks preserve pending/completed completion consistency,
+Existing MySQL checks preserve pending/missed/completed Task completion consistency,
 priority 1–3 and positive estimates. Same-owner association and cross-row
 deadline validation are Service responsibilities, not new database constraints.
 Subject deletion retains the existing Academic Context behavior: protected
@@ -231,7 +241,7 @@ values; explicit null clears nullable fields. Internal fields (`id`, `task_id`,
 `position`, `status`, `completed_at`, audit/deletion timestamps and ownership)
 are ignored. Subtasks cannot move between Tasks.
 
-Creation is allowed under pending or completed parents and never changes parent
+Creation is allowed under pending, missed or completed parents and never changes parent
 state. New Subtasks are pending with null completion metadata. After locking the
 owner and current parent, SubtaskService allocates position 1 when no non-deleted
 children exist, otherwise maximum non-deleted position + 1. Deleted history is

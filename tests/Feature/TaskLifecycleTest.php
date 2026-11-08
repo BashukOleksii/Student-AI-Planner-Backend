@@ -31,7 +31,7 @@ class TaskLifecycleTest extends TestCase
 
     public static function operations(): array
     {
-        return [['complete'], ['reopen']];
+        return [['complete'], ['reopen'], ['miss']];
     }
 
     private function taskForOperation(string $operation): Task
@@ -311,10 +311,18 @@ class TaskLifecycleTest extends TestCase
         $this->assertCount(1, $writes);
         $this->assertStringStartsWith('update `tasks`', $writes[0]['sql']);
         $this->assertStringContainsString('`status` =', $writes[0]['sql']);
-        $this->assertStringContainsString('`completed_at` =', $writes[0]['sql']);
+        if ($operation === 'miss') {
+            // Pending already has NULL: Eloquent must not dirty its completion time.
+            $this->assertStringNotContainsString('`completed_at` =', $writes[0]['sql']);
+        } else {
+            $this->assertStringContainsString('`completed_at` =', $writes[0]['sql']);
+        }
         foreach ($queries as $query) {
             $this->assertSame($level + 1, $query['level']);
         }
         $this->assertSame($level, DB::transactionLevel());
+        if ($operation === 'miss') {
+            $this->assertNull($task->fresh()->getRawOriginal('completed_at'));
+        }
     }
 }

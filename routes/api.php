@@ -134,6 +134,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
     Route::post('/tasks/{task}/complete', [TaskController::class, 'complete'])->name('tasks.complete');
     Route::post('/tasks/{task}/reopen', [TaskController::class, 'reopen'])->name('tasks.reopen');
+    Route::post('/tasks/{task}/miss', [TaskController::class, 'miss'])->name('tasks.miss');
 
     Route::scopeBindings()->group(function (): void {
         Route::get('/tasks/{task}/subtasks', [SubtaskController::class, 'index'])->name('tasks.subtasks.index');

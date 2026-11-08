@@ -27,8 +27,8 @@ class TaskActionProposalService
 
             return DB::transaction(function () use ($owner, $name, $arguments, $callId): array {
                 $task = isset($arguments['task_id']) ? $owner->tasks()->findOrFail($arguments['task_id']) : null;
-                if (($name === 'propose_task_complete' && $task->status !== TaskStatus::Pending)
-                    || ($name === 'propose_task_reopen' && $task->status !== TaskStatus::Completed)) {
+                if (($name === 'propose_task_complete' && ! $task->status->isUnfinished())
+                    || ($name === 'propose_task_reopen' && $task->status === TaskStatus::Pending)) {
                     return $this->error($name, 'invalid_arguments');
                 }
                 $values = array_diff_key($arguments, ['task_id' => true]);

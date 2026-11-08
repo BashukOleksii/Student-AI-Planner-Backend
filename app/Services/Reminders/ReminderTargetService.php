@@ -89,7 +89,7 @@ class ReminderTargetService
     {
         ['task' => $task, 'child' => $child, 'session' => $session] = $context;
 
-        return $task === null || (! $task->trashed() && $task->status === TaskStatus::Pending
+        return $task === null || (! $task->trashed() && $task->status->isUnfinished()
             && ($child === null || (! $child->trashed() && $child->status === TaskStatus::Pending))
             && ($session === null || ($session->status === StudySessionStatus::Planned
                 && (! $requireFutureSession || CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $session->getRawOriginal('starts_at'), 'UTC') > CarbonImmutable::now('UTC')))));

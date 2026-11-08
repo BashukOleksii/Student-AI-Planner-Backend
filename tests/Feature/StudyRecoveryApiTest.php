@@ -29,9 +29,15 @@ class StudyRecoveryApiTest extends TestCase
         $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
     }
 
-    public function test_repeated_previews_are_select_only_and_standard_confirmation_creates_new_work_without_retiring_missed_history(): void
+    public static function unfinishedStatuses(): array
     {
-        [$user, $task] = $this->fixture();
+        return [['pending'], ['missed']];
+    }
+
+    #[DataProvider('unfinishedStatuses')]
+    public function test_repeated_previews_are_select_only_and_standard_confirmation_creates_new_work_without_retiring_missed_history(string $status): void
+    {
+        [$user, $task] = $this->fixture(status: $status);
         $user->update(['timezone' => 'Europe/Kyiv']);
         $child = Subtask::factory()->for($task)->create(['estimated_minutes' => 60]);
         $missed = $this->persistedSession($task, ['subtask_id' => $child->id]);
@@ -76,9 +82,10 @@ class StudyRecoveryApiTest extends TestCase
         $this->assertArrayNotHasKey('preview_token', $fresh['study_plan']);
     }
 
-    public function test_completed_actual_credit_and_future_reservations_prevent_duplicate_allocation_even_outside_the_horizon(): void
+    #[DataProvider('unfinishedStatuses')]
+    public function test_completed_actual_credit_and_future_reservations_prevent_duplicate_allocation_even_outside_the_horizon(string $status): void
     {
-        [, $task] = $this->fixture(120);
+        [, $task] = $this->fixture(120, $status);
         $this->persistedSession($task);
         $completed = $this->persistedSession($task, ['status' => 'completed', 'ends_at' => '2026-11-07 10:30:00',
             'completed_at' => '2026-11-07 10:30:00', 'actual_minutes' => 30]);
@@ -99,14 +106,15 @@ class StudyRecoveryApiTest extends TestCase
         $this->assertArrayNotHasKey('preview_token', $satisfied['study_plan']);
     }
 
-    public function test_past_plans_expired_deadlines_and_capacity_are_diagnostic_and_partial_acceptance_remains_explicit(): void
+    #[DataProvider('unfinishedStatuses')]
+    public function test_past_plans_expired_deadlines_and_capacity_are_diagnostic_and_partial_acceptance_remains_explicit(string $status): void
     {
-        [$user, $task] = $this->fixture(240);
+        [$user, $task] = $this->fixture(240, $status);
         PlanningPreference::factory()->for($user)->create(['max_session_minutes' => 60, 'preferred_break_minutes' => 15,
             'max_daily_study_minutes' => 120, 'max_weekly_study_minutes' => 120]);
         $ended = $this->persistedSession($task, ['status' => 'planned']);
         $inProgress = $this->persistedSession($task, ['status' => 'planned', 'starts_at' => '2026-11-08 07:30:00', 'ends_at' => '2026-11-08 08:30:00']);
-        $expired = Task::factory()->for($user)->create(['estimated_minutes' => 60, 'deadline_at' => '2026-11-08 07:00:00']);
+        $expired = Task::factory()->for($user)->create(['estimated_minutes' => 60, 'deadline_at' => '2026-11-08 07:00:00', 'status' => $status]);
         $this->persistedSession($expired);
         $before = $this->snapshot();
         $data = $this->preview();
@@ -190,9 +198,10 @@ class StudyRecoveryApiTest extends TestCase
         $this->assertSame('/api/planning/recovery/preview', route('planning.recovery.preview', [], false));
     }
 
-    public function test_missing_estimates_and_completed_work_are_excluded_and_corrupt_missed_references_fail_closed(): void
+    #[DataProvider('unfinishedStatuses')]
+    public function test_missing_estimates_and_completed_work_are_excluded_and_corrupt_missed_references_fail_closed(string $status): void
     {
-        [, $task] = $this->fixture();
+        [, $task] = $this->fixture(status: $status);
         $this->persistedSession($task);
         $task->update(['estimated_minutes' => null]);
         $this->assertSame(['missing_estimate'], $this->preview()['recovery']['missed_sessions'][0]['work_reason_codes']);
@@ -207,11 +216,11 @@ class StudyRecoveryApiTest extends TestCase
             ->assertExactJson(['message' => 'The study plan could not be processed.']);
     }
 
-    private function fixture(int $estimate = 60): array
+    private function fixture(int $estimate = 60, string $status = 'pending'): array
     {
         $user = User::factory()->create(['timezone' => 'UTC']);
         StudyAvailabilityWindow::factory()->for($user)->create(['day_of_week' => 1, 'starts_at' => '09:00:00', 'ends_at' => '12:00:00']);
-        $task = Task::factory()->for($user)->create(['estimated_minutes' => $estimate]);
+        $task = Task::factory()->for($user)->create(['estimated_minutes' => $estimate, 'status' => $status]);
         $this->actingAs($user, 'web');
 
         return [$user, $task];

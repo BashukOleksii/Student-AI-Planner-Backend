@@ -25,8 +25,8 @@ class TaskActionRegistry
         return [
             $this->definition(self::NAMES[0], 'Propose creating one task. Required explicit confirmation; no task is created. Never invent Subject IDs or ambiguous deadlines.', $fields, ['title']),
             $this->definition(self::NAMES[1], 'Propose editing one task. Include at least one editable field. Omit unchanged fields; null explicitly clears nullable fields. Requires confirmation.', [...$target, ...$fields], ['task_id']),
-            $this->definition(self::NAMES[2], 'Propose completing one pending task, cancelling dependent scheduled reminders. Subtasks and study sessions retain their statuses. Requires confirmation.', $target, ['task_id']),
-            $this->definition(self::NAMES[3], 'Propose reopening one completed task. Does not recreate reminders or retired sessions. Requires confirmation.', $target, ['task_id']),
+            $this->definition(self::NAMES[2], 'Propose completing one pending or missed task, cancelling dependent scheduled reminders. Subtasks and study sessions retain their statuses. Requires confirmation.', $target, ['task_id']),
+            $this->definition(self::NAMES[3], 'Propose returning one completed or missed task to pending. Does not recreate reminders or retired sessions. Requires confirmation.', $target, ['task_id']),
         ];
     }
 

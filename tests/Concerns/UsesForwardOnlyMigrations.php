@@ -22,12 +22,12 @@ trait UsesForwardOnlyMigrations
         });
     }
 
-    /** Keep prior down/up coverage without pretending to downgrade the Stage 11 overlay. */
+    /** Keep legacy down/up coverage without downgrading forward-only overlays. */
     protected function excludeForwardOnlyOverlayFromLegacyRollback(): int
     {
-        // Only this guarded disposable test schema is involved. The legacy down resets
-        // the underlying CHECK/table; migrate then executes the Stage 11 up again.
+        // Only this guarded disposable test schema is involved. Legacy down resets
+        // the underlying CHECK/table; migrate then reapplies both overlays.
         return DB::table('migrations')
-            ->where('migration', '2026_11_02_000001_add_ai_lesson_actions')->delete();
+            ->whereIn('migration', ['2026_11_02_000001_add_ai_lesson_actions', '2026_11_08_000001_add_missed_task_status'])->delete();
     }
 }

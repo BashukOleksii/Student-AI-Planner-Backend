@@ -1,5 +1,12 @@
 # Read-only progress statistics — G1 and Stage 13
 
+Stage 16A adds integer `tasks.current.missed` and `overdue_missed` (zero when
+empty). Existing `pending`/`overdue_pending` remain exact-pending counts; missed
+Tasks move to their own buckets. Total includes all three states and completion
+percentage remains completed / total. Subtask counts, period completions, trends,
+comparisons and subject workloads keep their definitions. See the
+[current Task-status contract](stage16/task-status-api-contract.md).
+
 G1 implements deterministic, owner-scoped progress statistics from existing Tasks,
 Subtasks and StudySessions. It preserves BR-STAT-001–005. No migration, statistics
 entity, stored counter, cache, report file, AI analysis/tool, forecasting
@@ -63,7 +70,7 @@ comparisons is visible. Stored domain DATETIME fields remain whole-second UTC.
       "session_attribution": "starts_at"
     },
     "tasks": {
-      "current": {"total": 0, "pending": 0, "completed": 0, "overdue_pending": 0, "completion_percent": null},
+      "current": {"total": 0, "pending": 0, "completed": 0, "overdue_pending": 0, "missed": 0, "overdue_missed": 0, "completion_percent": null},
       "completed_in_period": {"total": 0, "on_time": 0, "late": 0, "without_deadline": 0}
     },
     "subtasks": {

@@ -469,6 +469,38 @@ class AiTaskActionsTest extends TestCase
         $this->assertDatabaseCount('ai_pending_actions', 0);
     }
 
+    #[DataProvider('missedActions')]
+    public function test_existing_task_actions_support_missed_work_and_replay_safe_receipts(string $operation, string $status): void
+    {
+        [$owner, $conversation] = $this->fixture();
+        $task = Task::factory()->for($owner)->create(['status' => 'missed']);
+        $turn = $this->propose($conversation, 'propose_task_'.$operation, ['task_id' => $task->id]);
+        $this->assertSame('missed', $turn['action']['preview']['before']['status']);
+        $url = $this->url($conversation, $turn['action']['id']).'/confirm';
+        $response = $this->postAction($url)->assertOk()->assertJsonPath('data.receipt.task.status', $status);
+        $receipt = $response->json('data.receipt');
+        $this->postAction($url)->assertOk()->assertJsonPath('data.receipt', $receipt);
+        $this->assertSame($status, $task->fresh()->status->value);
+    }
+
+    public static function missedActions(): array
+    {
+        return [['complete', 'completed'], ['reopen', 'pending']];
+    }
+
+    public function test_marking_reviewed_task_missed_makes_existing_ai_proposal_stale_without_receipt(): void
+    {
+        [$owner, $conversation] = $this->fixture();
+        $task = Task::factory()->for($owner)->create();
+        $turn = $this->propose($conversation, 'propose_task_complete', ['task_id' => $task->id]);
+        $this->postJson('/api/tasks/'.$task->id.'/miss')->assertOk();
+        $this->postAction($this->url($conversation, $turn['action']['id']).'/confirm')->assertConflict()
+            ->assertJsonPath('code', 'action_stale');
+        $this->assertSame('missed', $task->fresh()->status->value);
+        $this->assertNull(AiPendingAction::sole()->receipt);
+        $this->assertSame('pending', AiPendingAction::sole()->status);
+    }
+
     public function test_cancelled_reopen_save_cannot_produce_a_successful_receipt(): void
     {
         [$owner, $conversation] = $this->fixture();
