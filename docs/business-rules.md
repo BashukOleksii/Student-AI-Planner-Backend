@@ -326,6 +326,12 @@ Scheduled start/end define planned duration. `completed_at` is present exactly w
 
 ## 9. Rescheduling rules
 
+Stage 14A provides [unfinished work recovery previews](stage14/recovery-api-contract.md)
+through existing Stage A/B/C allocation and explicit confirmation. Missed sessions
+remain terminal history; past planned sessions receive lifecycle diagnostics and
+are never silently marked missed. Remaining effort, deadlines, reservations and
+atomic confirmation rules below are unchanged. No unattended relocation occurs.
+
 Stage E1 adds read-only adaptive detection/proposals under these same rule IDs.
 Only eligible strictly future planned reservations can be proposed for relocation;
 valid sources remain protected. Identity-based self-exclusion removes the candidate

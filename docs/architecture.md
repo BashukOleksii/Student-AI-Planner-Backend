@@ -124,6 +124,13 @@ See [reminders.md](reminders.md).
 
 ## 1. Architectural goals
 
+Stage 14A adds `POST /api/planning/recovery/preview` through a thin Controller,
+inherited study-plan Form Request, `StudyRecoveryPreviewService` and Resource.
+It composes the unchanged Stage C persistence preview with owner-scoped missed /
+past-planned diagnostics in one read-only snapshot. Lifecycle hints reuse Stage D
+rules; explicit saving uses the unchanged study-plan confirmation endpoint, never
+adaptive source retirement. See [the recovery contract](stage14/recovery-api-contract.md).
+
 Stage G1 adds `GET /api/statistics/progress` through a thin
 `ProgressStatisticsController`, strict `ProgressStatisticsRequest`, deterministic
 `ProgressStatisticsService` under `Services/Progress`, and a stable Resource.

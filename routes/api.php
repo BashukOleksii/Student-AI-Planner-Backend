@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\ScheduleImportController;
 use App\Http\Controllers\Api\StudyAvailabilityWindowController;
 use App\Http\Controllers\Api\StudyPlanController;
+use App\Http\Controllers\Api\StudyRecoveryController;
 use App\Http\Controllers\Api\StudyReplanningController;
 use App\Http\Controllers\Api\StudySessionController;
 use App\Http\Controllers\Api\SubjectController;
@@ -67,6 +68,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::get('/planning/free-slots', [FreeSlotController::class, 'index'])->name('planning.free-slots.index');
     Route::post('/planning/study-plans/preview', [StudyPlanController::class, 'preview'])->name('planning.study-plans.preview');
+    Route::post('/planning/recovery/preview', [StudyRecoveryController::class, 'preview'])->name('planning.recovery.preview');
     Route::post('/planning/replanning/preview', [StudyReplanningController::class, 'preview'])->name('planning.replanning.preview');
     Route::post('/planning/replanning/confirm', [StudyReplanningController::class, 'confirm'])->name('planning.replanning.confirm');
     Route::post('/planning/study-plans/confirm', [StudyPlanController::class, 'confirm'])->name('planning.study-plans.confirm');
