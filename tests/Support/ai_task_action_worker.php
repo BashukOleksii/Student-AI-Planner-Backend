@@ -3,6 +3,7 @@
 // Independent test HTTP process: guarded MySQL only, no migrations and no upstream requests.
 use App\Models\AiPendingAction;
 use App\Models\Lesson;
+use App\Models\StudyAvailabilityWindow;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\AI\LlmProvider;
@@ -48,6 +49,10 @@ if (($input['gate_on'] ?? null) === 'task_written') {
 } elseif (($input['gate_on'] ?? null) === 'lesson_written') {
     Lesson::created(fn () => $gate('lesson_written'));
     Lesson::updated(fn () => $gate('lesson_written'));
+} elseif (($input['gate_on'] ?? null) === 'availability_written') {
+    StudyAvailabilityWindow::created(fn () => $gate('availability_written'));
+    StudyAvailabilityWindow::updated(fn () => $gate('availability_written'));
+    StudyAvailabilityWindow::deleted(fn () => $gate('availability_written'));
 } elseif (($input['gate_on'] ?? null) === 'action_saved') {
     AiPendingAction::updated(fn () => $gate('action_saved'));
 }
@@ -80,15 +85,18 @@ $operation = $input['operation'];
 $path = match ($operation) {
     'confirm', 'reject' => '/api/ai/conversations/'.$input['conversation_id'].'/actions/'.$input['action_id'].'/'.$operation,
     'chat' => '/api/ai/conversations/'.$input['conversation_id'].'/messages',
+    'availability_update' => '/api/study-availability-windows/'.$input['availability_window_id'],
+    'availability_create' => '/api/study-availability-windows',
     'lesson_update' => '/api/lessons/'.$input['lesson_id'],
     'task_update' => '/api/tasks/'.$input['task_id'],
     'task_complete' => '/api/tasks/'.$input['task_id'].'/complete',
     'task_reopen' => '/api/tasks/'.$input['task_id'].'/reopen',
 };
 $body = match ($operation) {
+    'availability_update', 'availability_create' => $input['values'],
     'chat' => ['content' => 'Independent question.'], 'task_update' => ['title' => 'Direct concurrent edit'], 'lesson_update' => ['room' => 'Direct concurrent edit'], default => (object) [],
 };
-$request = Request::create($path, in_array($operation, ['task_update', 'lesson_update'], true) ? 'PATCH' : 'POST', [], [], [], [
+$request = Request::create($path, in_array($operation, ['task_update', 'lesson_update', 'availability_update'], true) ? 'PATCH' : 'POST', [], [], [], [
     'CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json',
     'HTTP_IDEMPOTENCY_KEY' => $input['request_id'] ?? '',
 ], json_encode($body, JSON_THROW_ON_ERROR));

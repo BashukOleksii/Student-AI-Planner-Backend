@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\AI\Actions\AvailabilityActionRegistry;
 use App\Services\AI\Actions\LessonActionRegistry;
 use App\Services\AI\Actions\PlanningActionRegistry;
 use App\Services\AI\Actions\SubtaskReminderActionRegistry;
@@ -49,12 +50,12 @@ class BackendIntegrationSmokeTest extends TestCase
             'estimated_minutes' => 60, 'deadline_at' => $utc(22)])->assertCreated()->json('data');
         $this->browser('PUT', '/api/planning-preferences', ['min_session_minutes' => null, 'max_session_minutes' => null,
             'preferred_break_minutes' => null, 'max_daily_study_minutes' => null, 'max_weekly_study_minutes' => null])->assertOk();
-        $this->browser('POST', '/api/study-availability-windows', ['day_of_week' => $day->isoWeekday(),
-            'starts_at' => '09:00:00', 'ends_at' => '18:00:00'])->assertCreated();
+        $availability = $this->browser('POST', '/api/study-availability-windows', ['day_of_week' => $day->isoWeekday(),
+            'starts_at' => '09:00:00', 'ends_at' => '18:00:00'])->assertCreated()->json('data');
         $conversation = $this->browser('POST', '/api/ai/conversations')->assertCreated()->json('data');
         $base = '/api/ai/conversations/'.$conversation['id'];
 
-        return compact('student', 'day', 'utc', 'subject', 'lesson', 'task', 'child', 'conversation', 'base');
+        return compact('student', 'day', 'utc', 'subject', 'lesson', 'task', 'child', 'conversation', 'base', 'availability');
     }
 
     private function scripted(array $rounds): void
@@ -67,9 +68,9 @@ class BackendIntegrationSmokeTest extends TestCase
             $body = $request->data();
             $names = [...array_column((new ToolRegistry)->definitions(), 'name'), ...array_column((new TaskActionRegistry)->definitions(), 'name'),
                 ...array_column((new SubtaskReminderActionRegistry)->readDefinitions(), 'name'),
-                ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES];
+                ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES, ...AvailabilityActionRegistry::NAMES];
             $this->assertSame($names, array_column($body['tools'], 'name'));
-            $this->assertCount(28, array_unique($names));
+            $this->assertCount(31, array_unique($names));
             foreach ($body['tools'] as $tool) {
                 $this->assertSame('function', $tool['type']);
                 $this->assertFalse($tool['parameters']['additionalProperties']);
@@ -97,7 +98,7 @@ class BackendIntegrationSmokeTest extends TestCase
     public static function mutations(): array
     {
         $names = [...array_column((new TaskActionRegistry)->definitions(), 'name'),
-            ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES];
+            ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES, ...AvailabilityActionRegistry::NAMES];
 
         return [...array_map(fn ($name) => [$name, false], $names), ['propose_reminder_create', true], ['propose_study_plan_create', true]];
     }
@@ -130,7 +131,11 @@ class BackendIntegrationSmokeTest extends TestCase
         if ($name === 'propose_study_plan_create' && $variant) {
             $this->browser('PATCH', $childPath, ['estimated_minutes' => 600])->assertOk();
         }
+        $isAvailability = str_starts_with($name, 'propose_availability_');
         $arguments = match ($name) {
+            'propose_availability_create' => ['day_of_week' => $f['day']->isoWeekday(), 'starts_at' => '18:00:00', 'ends_at' => '24:00:00'],
+            'propose_availability_update' => ['availability_window_id' => $f['availability']['id'], 'starts_at' => '10:00:00'],
+            'propose_availability_delete' => ['availability_window_id' => $f['availability']['id']],
             'propose_lesson_create', 'propose_lesson_replacement' => [
                 ...($name === 'propose_lesson_replacement' ? ['lesson_id' => $f['lesson']['id']] : []),
                 'subject_id' => $f['subject']['id'], 'type' => 'lecture', 'starts_at' => ($f['utc'])(14), 'ends_at' => ($f['utc'])(15)],
@@ -150,7 +155,8 @@ class BackendIntegrationSmokeTest extends TestCase
             'propose_session_reschedule' => ['study_session_id' => $source['id'], 'starts_at' => ($f['utc'])(14), 'ends_at' => ($f['utc'])(15)],
         };
         $this->scripted([[$this->aiCall('list_tasks', '{}', 'discover_tasks'),
-            $this->aiCall('list_subtasks_for_task', json_encode(['task_id' => $f['task']['id']]), 'discover_children')],
+            $this->aiCall('list_subtasks_for_task', json_encode(['task_id' => $f['task']['id']]), 'discover_children'),
+            ...($isAvailability ? [$this->aiCall('list_study_availability_windows', '{}', 'discover_windows')] : [])],
             [$this->aiCall($name, json_encode($arguments), 'propose')], [$this->aiText('Already executed all changes.')]]);
         $before = $this->snapshot();
         $key = (string) Str::uuid();
@@ -177,16 +183,34 @@ class BackendIntegrationSmokeTest extends TestCase
         }
         Http::assertSentCount(3);
         $receipt = $this->browser('POST', $actionPath.'/confirm', $consent)->assertOk()->assertJsonPath('data.status', 'executed')->json('data.receipt');
-        $row = $receipt['lesson'] ?? $receipt['task'] ?? $receipt['subtask'] ?? $receipt['reminder'] ?? $receipt['sessions'][0] ?? $receipt['replacement_sessions'][0] ?? $receipt['replacement'];
-        $readPath = match (true) {
-            isset($receipt['lesson']) => '/api/lessons/'.$row['id'],
-            isset($receipt['task']) => '/api/tasks/'.$row['id'],
-            isset($receipt['subtask']) => '/api/tasks/'.$row['task_id'].'/subtasks/'.$row['id'],
-            isset($receipt['reminder']) => '/api/reminders/'.$row['id'],
-            default => '/api/study-sessions/'.$row['id'],
-        };
-        $expectedRow = isset($receipt['lesson']) ? array_diff_key($row, ['subject' => true, 'teacher' => true, 'academic_period' => true]) : $row;
-        $this->browser('GET', $readPath)->assertOk()->assertExactJson(['data' => $expectedRow]);
+        if ($isAvailability) {
+            $windows = $this->browser('GET', '/api/study-availability-windows')->assertOk()->json('data');
+            if ($name === 'propose_availability_delete') {
+                $this->assertNotContains($f['availability']['id'], array_column($windows, 'id'));
+                $expectedWindow = $f['availability'];
+                $actualWindow = $receipt['deleted_window'];
+                $this->assertNull($receipt['window']);
+            } else {
+                $expectedWindow = $receipt['window'];
+                $actualWindow = collect($windows)->firstWhere('id', $expectedWindow['id']);
+                $this->assertNotNull($actualWindow);
+            }
+            ksort($expectedWindow);
+            ksort($actualWindow);
+            $this->assertSame($expectedWindow, $actualWindow);
+            $this->assertSame($f['student']['timezone'], $receipt['timezone']);
+        } else {
+            $row = $receipt['lesson'] ?? $receipt['task'] ?? $receipt['subtask'] ?? $receipt['reminder'] ?? $receipt['sessions'][0] ?? $receipt['replacement_sessions'][0] ?? $receipt['replacement'];
+            $readPath = match (true) {
+                isset($receipt['lesson']) => '/api/lessons/'.$row['id'],
+                isset($receipt['task']) => '/api/tasks/'.$row['id'],
+                isset($receipt['subtask']) => '/api/tasks/'.$row['task_id'].'/subtasks/'.$row['id'],
+                isset($receipt['reminder']) => '/api/reminders/'.$row['id'],
+                default => '/api/study-sessions/'.$row['id'],
+            };
+            $expectedRow = isset($receipt['lesson']) ? array_diff_key($row, ['subject' => true, 'teacher' => true, 'academic_period' => true]) : $row;
+            $this->browser('GET', $readPath)->assertOk()->assertExactJson(['data' => $expectedRow]);
+        }
         if ($name === 'propose_lesson_replacement') {
             $this->browser('GET', '/api/lessons/'.$f['lesson']['id'])->assertOk()->assertJsonPath('data.status', 'replaced');
         }
@@ -200,6 +224,11 @@ class BackendIntegrationSmokeTest extends TestCase
         }
         $this->browser('GET', '/api/notifications')->assertOk()->assertJsonCount(0, 'data');
         $after = $this->snapshot();
+        if ($isAvailability) {
+            foreach (array_diff(array_keys($before), ['study_availability_windows']) as $table) {
+                $this->assertSame($before[$table], $after[$table], $table);
+            }
+        }
         $this->browser('POST', $actionPath.'/confirm', $consent)->assertOk()->assertJsonPath('replayed', true)->assertJsonPath('data.receipt', $receipt);
         $this->browser('GET', $actionPath)->assertOk()->assertJsonPath('data.receipt', $receipt);
         $this->browser('POST', $f['base'].'/messages', ['content' => 'Review this change for my study work.'], ['Idempotency-Key' => $key])
@@ -220,7 +249,7 @@ class BackendIntegrationSmokeTest extends TestCase
         $this->browser('POST', $actionPath.'/confirm')->assertUnauthorized();
     }
 
-    public function test_all_nine_reads_use_native_provider_calls_and_match_ordinary_owned_rest_reads_without_business_writes(): void
+    public function test_all_ten_reads_use_native_provider_calls_and_match_ordinary_owned_rest_reads_without_business_writes(): void
     {
         $f = $this->fixture();
         $date = $f['day']->toDateString();
@@ -231,12 +260,13 @@ class BackendIntegrationSmokeTest extends TestCase
             ['find_free_study_slots', $period], ['list_study_sessions', $period], ['get_progress_statistics', $period],
             ['get_daily_progress_trends', $period], ['compare_progress_periods', ['baseline_start_date' => $baseline,
                 'baseline_end_date' => $baseline, 'current_start_date' => $date, 'current_end_date' => $date]],
+            ['list_study_availability_windows', []],
             ['list_subtasks_for_task', ['task_id' => $f['task']['id']]], ['list_reminders', ['status' => 'scheduled', 'page' => 1, 'per_page' => 20]],
         ];
         $before = $this->snapshot();
         $results = [];
         foreach (array_chunk($calls, 5) as $batch) {
-            $this->scripted([array_map(fn ($call) => $this->aiCall($call[0], json_encode($call[1]), $call[0]), $batch), [$this->aiText('Read complete.')]]);
+            $this->scripted([array_map(fn ($call) => $this->aiCall($call[0], json_encode((object) $call[1]), $call[0]), $batch), [$this->aiText('Read complete.')]]);
             $turn = $this->browser('POST', $f['base'].'/messages', ['content' => 'Read my schedule and learning context.'], ['Idempotency-Key' => (string) Str::uuid()])
                 ->assertOk()->json('data');
             $this->assertArrayNotHasKey('action', $turn);
@@ -252,7 +282,8 @@ class BackendIntegrationSmokeTest extends TestCase
                 }
             }
         }
-        $this->assertCount(9, $results);
+        $this->assertCount(10, $results);
+        $this->assertSame($this->browser('GET', '/api/study-availability-windows')->assertOk()->json('data'), $results['list_study_availability_windows']['windows']);
         $this->assertSame($this->browser('GET', '/api/schedule/date/'.$date)->assertOk()->json('data'), $results['get_schedule_for_date']['lessons']);
         $this->assertSame($this->browser('GET', '/api/tasks')->assertOk()->json('data'), $results['list_tasks']['tasks']);
         $this->assertSame($this->browser('GET', '/api/tasks/'.$f['task']['id'].'/subtasks')->assertOk()->json('data'), $results['list_subtasks_for_task']['subtasks']);

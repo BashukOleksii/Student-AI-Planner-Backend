@@ -1,5 +1,11 @@
 # Переносимість AI-провайдерів
 
+Stage 18B discovery contains 31 definitions (10 reads / 21 proposals), adding
+three availability actions after the unchanged preceding 28 definitions. Existing
+Gemini/OpenAI adapters preserve the new proposal schemas and genuine omitted
+update fields; no provider implementation changes. See
+[availability actions](stage18/availability-action-contract.md).
+
 Stage 18A adds one provider-independent availability read, bringing current
 discovery to 28 definitions (10 reads / 18 proposals). Both existing schema
 adapters support it without provider implementation changes; the preceding 27

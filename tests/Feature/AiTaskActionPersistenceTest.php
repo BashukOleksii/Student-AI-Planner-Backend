@@ -62,7 +62,7 @@ class AiTaskActionPersistenceTest extends TestCase
         $message = $conversation->messages()->create(['role' => 'user', 'content' => 'Preserved'])->refresh();
         DB::table('ai_pending_actions')->insert($values);
         $before = [$conversation->getAttributes(), $message->getAttributes(), DB::table('ai_conversation_turns')->sole()];
-        $this->assertSame(2, $this->excludeForwardOnlyOverlayFromLegacyRollback());
+        $this->assertSame(3, $this->excludeForwardOnlyOverlayFromLegacyRollback());
         $this->artisan('migrate:rollback', ['--step' => 3])->assertExitCode(0);
         $this->assertFalse(Schema::hasTable('ai_pending_actions'));
         $this->assertEquals($before, [$conversation->fresh()->getAttributes(), $message->fresh()->getAttributes(), DB::table('ai_conversation_turns')->sole()]);

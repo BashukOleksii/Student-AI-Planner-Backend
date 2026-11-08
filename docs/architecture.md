@@ -1,5 +1,13 @@
 # Backend Architecture
 
+Stage 18B adds three confirmed recurring availability proposals, bringing current
+discovery to 31 definitions (10 reads / 21 proposals). Shared field rules and
+StudyAvailabilityService preflight preserve a single mutation engine. Existing H3
+confirmation rechecks the complete owned weekly configuration/timezone fingerprint
+and material review, then commits the Service write, receipt and history together.
+One forward-only migration expands only the action-type CHECK from 18 to 21.
+See [the exact action contract](stage18/availability-action-contract.md).
+
 Stage 18A adds the safe `list_study_availability_windows` read Tool through the
 existing provider-independent registry, strict executor and explicit read dispatch.
 Discovery has 28 definitions (10 reads / 18 proposals). Owned recurring local

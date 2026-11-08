@@ -6,18 +6,33 @@ use App\Models\StudyAvailabilityWindow;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class StudyAvailabilityService
 {
+    /** Read-only preflight. Never acquires row locks or calls a writer. */
+    public function prepare(User $user, array $values, ?StudyAvailabilityWindow $window = null): array
+    {
+        if ($window !== null) {
+            $window = $user->studyAvailabilityWindows()->findOrFail($window->getKey());
+        }
+
+        return $this->candidate($user, $values, $window, false);
+    }
+
     public function create(User $user, array $values): StudyAvailabilityWindow
     {
         return DB::transaction(function () use ($user, $values): StudyAvailabilityWindow {
             $this->lockOwner($user);
-            $candidate = Arr::only($values, ['day_of_week', 'starts_at', 'ends_at']);
-            $this->validateInterval($user, $candidate);
+            $candidate = $this->candidate($user, $values, null, true);
+            $window = $user->studyAvailabilityWindows()->create($candidate);
+            if (! $window->exists || $window->getKey() === null) {
+                throw new RuntimeException('Availability creation failed.');
+            }
 
-            return $user->studyAvailabilityWindows()->create($candidate)->refresh();
+            return $window->refresh();
         });
     }
 
@@ -27,12 +42,10 @@ class StudyAvailabilityService
             $this->lockOwner($user);
             // Re-read after locking so PATCH merges with the latest owned state.
             $window = $user->studyAvailabilityWindows()->lockForUpdate()->findOrFail($window->getKey());
-            $candidate = array_replace(
-                $window->only(['day_of_week', 'starts_at', 'ends_at']),
-                Arr::only($values, ['day_of_week', 'starts_at', 'ends_at']),
-            );
-            $this->validateInterval($user, $candidate, $window->getKey());
-            $window->update($candidate);
+            $candidate = $this->candidate($user, $values, $window, true);
+            if (! $window->update($candidate)) {
+                throw new RuntimeException('Availability update failed.');
+            }
 
             return $window->refresh();
         });
@@ -42,7 +55,9 @@ class StudyAvailabilityService
     {
         DB::transaction(function () use ($user, $window): void {
             $this->lockOwner($user);
-            $user->studyAvailabilityWindows()->findOrFail($window->getKey())->delete();
+            if (! $user->studyAvailabilityWindows()->findOrFail($window->getKey())->delete()) {
+                throw new RuntimeException('Availability deletion failed.');
+            }
         });
     }
 
@@ -52,7 +67,19 @@ class StudyAvailabilityService
         User::whereKey($user->getKey())->lockForUpdate()->firstOrFail();
     }
 
-    private function validateInterval(User $user, array $candidate, ?int $excludeId = null): void
+    private function candidate(User $user, array $values, ?StudyAvailabilityWindow $window, bool $lock): array
+    {
+        $candidate = array_replace(
+            $window?->only(['day_of_week', 'starts_at', 'ends_at']) ?? [],
+            Arr::only($values, ['day_of_week', 'starts_at', 'ends_at']),
+        );
+        Validator::make($candidate, StudyAvailabilityInputRules::rules(true))->validate();
+        $this->validateInterval($user, $candidate, $window?->getKey(), $lock);
+
+        return $candidate;
+    }
+
+    private function validateInterval(User $user, array $candidate, ?int $excludeId, bool $lock): void
     {
         if ($candidate['starts_at'] >= $candidate['ends_at']) {
             throw ValidationException::withMessages([
@@ -65,7 +92,7 @@ class StudyAvailabilityService
             ->where('starts_at', '<', $candidate['ends_at'])
             ->where('ends_at', '>', $candidate['starts_at'])
             ->when($excludeId !== null, fn ($query) => $query->whereKeyNot($excludeId))
-            ->lockForUpdate()
+            ->when($lock, fn ($query) => $query->lockForUpdate())
             ->first() !== null;
 
         if ($overlaps) {

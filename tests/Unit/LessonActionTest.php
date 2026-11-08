@@ -4,6 +4,8 @@ namespace Tests\Unit;
 
 use App\Exceptions\AiAgentException;
 use App\Models\User;
+use App\Services\AI\Actions\AvailabilityActionRegistry;
+use App\Services\AI\Actions\AvailabilityActionService;
 use App\Services\AI\Actions\LessonActionArgumentValidator;
 use App\Services\AI\Actions\LessonActionRegistry;
 use App\Services\AI\Actions\LessonActionService;
@@ -122,7 +124,7 @@ class LessonActionTest extends TestCase
             new AgentLimits(['max_tool_rounds' => 5, 'max_tool_calls' => 8, 'max_context_bytes' => 131072, 'max_tool_result_bytes' => 65536, 'max_turn_seconds' => 180]),
             new TaskActionRegistry, $this->createMock(TaskActionProposalService::class), new SubtaskReminderActionRegistry,
             $this->createMock(SubtaskReminderActionService::class), $this->createMock(ManagementReadTools::class),
-            new PlanningActionRegistry, $this->createMock(PlanningActionService::class), new LessonActionRegistry, $lessons);
+            new PlanningActionRegistry, $this->createMock(PlanningActionService::class), new LessonActionRegistry, $lessons, new AvailabilityActionRegistry, $this->createMock(AvailabilityActionService::class));
         $owner = new User;
         $owner->timezone = 'UTC';
         $this->expectException(AiAgentException::class);

@@ -1,5 +1,12 @@
 # Planning Preferences + Study Availability Windows
 
+Stage 18B shares exact weekday/clock rules through StudyAvailabilityInputRules
+and complete-candidate, overlap and read-only preflight through the existing
+StudyAvailabilityService. REST contracts remain unchanged; confirmed AI actions
+use the same three transactional writers and owner serialization. Cancelled
+model writes fail rather than reporting successful persistence. See
+[the AI action contract](stage18/availability-action-contract.md).
+
 Implemented on the existing MySQL schema, under `/api`, using Sanctum's existing
 first-party SPA session/cookie contract. Every route requires `auth:sanctum`;
 see [authentication integration](auth-profile.md) for credentials and CSRF setup.

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Exceptions\AiAgentException;
+use App\Services\AI\Actions\AvailabilityActionRegistry;
 use App\Services\AI\Actions\LessonActionRegistry;
 use App\Services\AI\Actions\PlanningActionRegistry;
 use App\Services\AI\Actions\SubtaskReminderActionRegistry;
@@ -36,7 +37,7 @@ class GeminiGenerateContentProviderTest extends TestCase
     {
         return [...app(ToolRegistry::class)->definitions(), ...app(TaskActionRegistry::class)->definitions(),
             ...app(SubtaskReminderActionRegistry::class)->readDefinitions(), ...app(SubtaskReminderActionRegistry::class)->definitions(),
-            ...app(PlanningActionRegistry::class)->definitions(), ...app(LessonActionRegistry::class)->definitions()];
+            ...app(PlanningActionRegistry::class)->definitions(), ...app(LessonActionRegistry::class)->definitions(), ...app(AvailabilityActionRegistry::class)->definitions()];
     }
 
     private function respond(array $history = []): array
@@ -76,7 +77,7 @@ class GeminiGenerateContentProviderTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_request_has_official_authentication_model_budgets_and_all_28_schemas(): void
+    public function test_request_has_official_authentication_model_budgets_and_all_31_schemas(): void
     {
         config(['ai.openai_key' => 'must-not-send-openai-key', 'ai.model' => 'must-not-send-openai-model']);
         Http::fake(function ($request, $options) {
@@ -96,8 +97,8 @@ class GeminiGenerateContentProviderTest extends TestCase
                 $this->assertIsCallable($options[$callback]);
             }
             $declarations = $body['tools'][0]['functionDeclarations'];
-            $this->assertCount(28, $declarations);
-            $this->assertCount(18, array_filter($declarations, fn ($tool) => str_starts_with($tool['name'], 'propose_')));
+            $this->assertCount(31, $declarations);
+            $this->assertCount(21, array_filter($declarations, fn ($tool) => str_starts_with($tool['name'], 'propose_')));
             foreach ($declarations as $index => $declaration) {
                 $definition = $this->definitions()[$index];
                 $this->assertSame($definition['parameters'], $declaration['parametersJsonSchema']);

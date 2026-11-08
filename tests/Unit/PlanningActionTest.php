@@ -8,6 +8,8 @@ use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\AI\Actions\ActionTargetFingerprint;
+use App\Services\AI\Actions\AvailabilityActionRegistry;
+use App\Services\AI\Actions\AvailabilityActionService;
 use App\Services\AI\Actions\LessonActionRegistry;
 use App\Services\AI\Actions\LessonActionService;
 use App\Services\AI\Actions\PlanningActionArgumentValidator;
@@ -168,7 +170,7 @@ class PlanningActionTest extends TestCase
         $reads = $this->createMock(ToolExecutor::class);
         $reads->expects($this->never())->method('execute');
         $agent = new AgentOrchestrator($provider, new ToolRegistry, $reads, $this->limits(), new TaskActionRegistry, $tasks,
-            new SubtaskReminderActionRegistry, $management, $this->createMock(ManagementReadTools::class), new PlanningActionRegistry, $planning, new LessonActionRegistry, $this->createMock(LessonActionService::class));
+            new SubtaskReminderActionRegistry, $management, $this->createMock(ManagementReadTools::class), new PlanningActionRegistry, $planning, new LessonActionRegistry, $this->createMock(LessonActionService::class), new AvailabilityActionRegistry, $this->createMock(AvailabilityActionService::class));
         $owner = new User;
         $owner->timezone = 'UTC';
         $this->expectException(AiAgentException::class);

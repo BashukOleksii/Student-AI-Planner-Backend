@@ -1,5 +1,11 @@
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
+Stage 18B adds one forward-only migration expanding `ai_actions_valid_type` from
+18 to 21 values for single-window availability create/update/delete proposals.
+No columns, indexes, FKs, old migrations or other CHECKs change, and rollback
+refuses without writes. Existing action/receipt history is preserved. See
+[the migration contract](stage18/availability-action-contract.md#migration-and-deployment).
+
 Stage 16A expands only the Task status and completion-consistency CHECKs through
 one forward-only MySQL ALTER. Existing rows/IDs and Subtask CHECKs are preserved;
 downgrade refuses without writes. See [the migration and API contract](stage16/task-status-api-contract.md).

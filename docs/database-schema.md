@@ -1,5 +1,12 @@
 # Physical Database Schema
 
+Stage 18B migration `2026_11_08_000002_add_ai_availability_actions.php` expands
+`ai_pending_actions.ai_actions_valid_type` from 18 to 21 allowed proposal names,
+adding recurring availability create/update/delete. Existing VARCHAR(32), JSON,
+hash, status, receipt/resolution CHECKs, FKs and indexes are unchanged; all prior
+rows/receipts are preserved. `down()` always refuses; use a compatible new forward
+migration. See [the exact action/migration contract](stage18/availability-action-contract.md).
+
 H3c migration `2026_10_19_000002_add_ai_planning_actions.php` expands the action-type
 CHECK from eleven to fourteen and adds nullable LONGTEXT `protected_payload` to
 ai_pending_actions. It uses Laravel encrypted:array casting plus Hidden, bounded

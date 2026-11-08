@@ -1,5 +1,11 @@
 # Stage H1 — Read-only AI tools foundation
 
+Stage 18B appends `propose_availability_create`, `propose_availability_update` and
+`propose_availability_delete` through the existing proposal/confirmation path.
+Current discovery has 31 definitions (10 reads / 21 proposals); the preceding 28
+contracts are unchanged. The read-only executor remains read-only. See
+[availability actions and Stage 18C handoff](stage18/availability-action-contract.md).
+
 Stage 18A adds `list_study_availability_windows` to the existing strict registry
 and read adapter: eight registry reads, ten total reads and eighteen proposals
 (28 orchestrator definitions). It lists owner-scoped recurring windows with

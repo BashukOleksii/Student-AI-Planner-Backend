@@ -2,8 +2,9 @@
 
 `list_study_availability_windows` reads the authenticated student's configured
 recurring weekly availability. It does not calculate free time or change anything.
-R22 is incrementally supported for discovery only; availability proposals remain
-Stage 18B work. Discovery now contains 28 Tools: 10 reads and 18 existing proposals.
+At Stage 18A discovery contained 28 Tools: 10 reads and 18 proposals. Stage 18B
+now adds [three confirmed availability proposals](availability-action-contract.md)
+for 31 total definitions; this read Tool and its contract are unchanged.
 
 ## Exact provider-independent definition
 

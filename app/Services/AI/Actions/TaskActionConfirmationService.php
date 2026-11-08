@@ -17,7 +17,8 @@ class TaskActionConfirmationService
         private TaskActionState $states, private TaskService $tasks,
         private SubtaskReminderActionRegistry $additional, private SubtaskReminderActionService $management,
         private PlanningActionRegistry $planningRegistry, private PlanningActionService $planning,
-        private LessonActionRegistry $lessonRegistry, private LessonActionService $lessons) {}
+        private LessonActionRegistry $lessonRegistry, private LessonActionService $lessons,
+        private AvailabilityActionRegistry $availabilityRegistry, private AvailabilityActionService $availability) {}
 
     public function query(User $owner, string $conversation)
     {
@@ -78,6 +79,8 @@ class TaskActionConfirmationService
                     }
                 } elseif ($this->lessonRegistry->find($action->type) !== null) {
                     $receipt = $this->lessons->execute($owner, $action);
+                } elseif ($this->availabilityRegistry->find($action->type) !== null) {
+                    $receipt = $this->availability->execute($owner, $action);
                 } elseif ($this->additional->find($action->type) !== null) {
                     $receipt = $this->management->execute($owner, $action);
                 } else {
@@ -161,7 +164,8 @@ class TaskActionConfirmationService
         if (! str_starts_with($action->type, 'propose_task_')) {
             $domain = $this->planningRegistry->find($action->type) !== null ? 'Planning'
                 : ($this->lessonRegistry->find($action->type) !== null ? 'Lesson'
-                    : (str_starts_with($action->type, 'propose_subtask_') ? 'Subtask' : 'Reminder'));
+                    : ($this->availabilityRegistry->find($action->type) !== null ? 'Availability'
+                        : (str_starts_with($action->type, 'propose_subtask_') ? 'Subtask' : 'Reminder')));
             $content = $domain.' action '.$action->status.'.'.($action->status === 'executed' ? '' : ' No business data was changed.');
         }
         $message = $conversation->messages()->create(['role' => 'assistant', 'content' => $content,
