@@ -30,8 +30,12 @@ class ProgressStatisticsService
             $tasks = $owner->tasks()->getQuery();
             $children = Subtask::query()->whereHas('task', fn ($query) => $query->where('user_id', $owner->getKey()));
             $taskCurrent = $this->currentMetrics(clone $tasks, $now);
+            // Round to tenths; whole values retain the existing JSON round-trip convention.
+            $taskCurrent['completion_percent'] = $taskCurrent['total'] === 0
+                ? null : (int) round($taskCurrent['completed'] / $taskCurrent['total'] * 1000) / 10;
             $childCurrent = $this->currentMetrics(clone $children, $now);
-            $metrics = $this->activityMetrics($this->loadActivity($owner, $coverage), $coverage);
+            $activity = $this->loadActivity($owner, $coverage);
+            $metrics = $this->activityMetrics($activity, $coverage);
 
             return [
                 'as_of_utc' => $now->format('Y-m-d\TH:i:s.u\Z'),
@@ -40,8 +44,52 @@ class ProgressStatisticsService
                 'tasks' => ['current' => $taskCurrent, 'completed_in_period' => $metrics['tasks_completed']],
                 'subtasks' => ['current' => $childCurrent, 'completed_in_period' => $metrics['subtasks_completed']],
                 'study_sessions' => ['started_in_period' => $metrics['study_sessions']],
+                'subject_workload_in_period' => $this->subjectWorkload($owner, $activity['study_sessions'], $coverage),
             ];
         });
+    }
+
+    /** C9 active scheduled workload, grouped by the Task's current owned Subject. */
+    private function subjectWorkload(User $owner, array $sessions, array $coverage): array
+    {
+        $active = collect($sessions)->filter(fn ($session) => in_array($session['status'], [
+            StudySessionStatus::Planned->value, StudySessionStatus::Completed->value,
+        ], true));
+        if ($active->isEmpty()) {
+            return [];
+        }
+
+        // Batch current associations, retaining compatible soft-deleted Task history.
+        // Scope presentation data before loading it, even for corrupt foreign references.
+        $tasks = $owner->tasks()->withTrashed()->whereKey($active->pluck('task_id')->unique()->all())
+            ->with(['subject' => fn ($query) => $query->where('user_id', $owner->getKey())->select(['id', 'name'])])
+            ->get(['id', 'subject_id'])->keyBy('id');
+        foreach ($tasks as $task) {
+            if ($task->subject_id !== null && $task->subject === null) {
+                throw new UnexpectedValueException('Invalid statistics source relationships.');
+            }
+        }
+
+        $result = [];
+        foreach ($active->groupBy(fn ($session) => $tasks[$session['task_id']]->subject_id ?? 'unassigned') as $records) {
+            $task = $tasks[$records->first()['task_id']];
+            $metrics = $this->sessionMetrics($records, $coverage);
+            $result[] = [
+                'subject_id' => $task->subject_id,
+                'subject_name' => $task->subject?->name ?? 'Без предмета',
+                'scheduled_seconds' => $this->add($metrics['planned']['scheduled_seconds'], $metrics['completed']['scheduled_seconds']),
+                'completed_actual_minutes' => $metrics['completed_actual_minutes'],
+                'completed_with_actual_minutes' => $metrics['completed_with_actual_minutes'],
+                'completed_without_actual_minutes' => $metrics['completed_without_actual_minutes'],
+                'session_count' => $this->add($metrics['planned']['count'], $metrics['completed']['count']),
+            ];
+        }
+        // Equal workloads use numeric Subject ID ascending, with unassigned last.
+        usort($result, fn ($a, $b) => ($b['scheduled_seconds'] <=> $a['scheduled_seconds'])
+            ?: (($a['subject_id'] === null) <=> ($b['subject_id'] === null))
+            ?: ($a['subject_id'] <=> $b['subject_id']));
+
+        return $result;
     }
 
     /** Shared G1/G2a bounded sources; caller supplies the fresh owner and read transaction. */

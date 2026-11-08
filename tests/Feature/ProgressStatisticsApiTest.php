@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Reminder;
 use App\Models\StudySession;
+use App\Models\Subject;
 use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\User;
@@ -56,9 +57,10 @@ class ProgressStatisticsApiTest extends TestCase
         $this->getJson($this->url(['start_date' => $start, 'end_date' => $end]))->assertOk()->assertExactJson(['data' => [
             'as_of_utc' => '2026-10-15T12:00:00.123456Z', 'timezone' => 'Europe/Kyiv',
             'period' => ['start_date' => $start, 'end_date' => $end, 'session_attribution' => 'starts_at'],
-            'tasks' => ['current' => $zeroCurrent, 'completed_in_period' => $zeroCompleted],
+            'tasks' => ['current' => $zeroCurrent + ['completion_percent' => null], 'completed_in_period' => $zeroCompleted],
             'subtasks' => ['current' => $zeroCurrent, 'completed_in_period' => $zeroCompleted],
             'study_sessions' => ['started_in_period' => $sessions],
+            'subject_workload_in_period' => [],
         ]]);
     }
 
@@ -114,13 +116,70 @@ class ProgressStatisticsApiTest extends TestCase
         Subtask::factory()->for($completed)->create(['deadline_at' => '2026-10-15 12:00:00']);
         Subtask::factory()->for($pending)->create(['status' => 'completed', 'completed_at' => '2026-10-10 00:00:00']);
         $this->actingAs($user, 'web')->getJson($this->url())->assertOk()
-            ->assertJsonPath('data.tasks.current', ['total' => 5, 'pending' => 4, 'completed' => 1, 'overdue_pending' => 2])
+            ->assertJsonPath('data.tasks.current', ['total' => 5, 'pending' => 4, 'completed' => 1, 'overdue_pending' => 2, 'completion_percent' => 20])
             ->assertJsonPath('data.tasks.completed_in_period.total', 0)
             ->assertJsonPath('data.subtasks.current', ['total' => 3, 'pending' => 2, 'completed' => 1, 'overdue_pending' => 1])
             ->assertJsonPath('data.subtasks.completed_in_period.without_deadline', 1);
         $this->travelTo(CarbonImmutable::parse('2026-10-15T12:00:00Z'));
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.tasks.current.overdue_pending', 1)
             ->assertJsonPath('data.subtasks.current.overdue_pending', 0);
+    }
+
+    #[DataProvider('completionPercentages')]
+    public function test_completion_percentage_uses_only_current_owned_active_tasks_across_all_dates(int $completed, float $percent): void
+    {
+        $user = User::factory()->create();
+        $tasks = Task::factory()->for($user)->count(3)->create();
+        foreach ($tasks->take($completed) as $task) {
+            $task->update(['status' => 'completed', 'completed_at' => '2025-01-01 00:00:00']);
+        }
+        Subtask::factory()->for($tasks->first())->count(5)->create(['status' => 'completed', 'completed_at' => '2026-10-10 00:00:00']);
+        Task::factory()->for($user)->create(['status' => 'completed', 'completed_at' => '2026-10-10 00:00:00'])->delete();
+        Task::factory()->create(['status' => 'completed', 'completed_at' => '2026-10-10 00:00:00']);
+
+        $this->actingAs($user, 'web');
+        foreach ([[], ['start_date' => '2025-01-01', 'end_date' => '2025-01-01']] as $range) {
+            $response = $this->getJson($this->url($range))->assertOk()->assertJsonPath('data.tasks.current.total', 3)
+                ->assertJsonPath('data.tasks.current.completed', $completed);
+            $this->assertSame($percent, (float) $response->json('data.tasks.current.completion_percent'));
+        }
+    }
+
+    public static function completionPercentages(): array
+    {
+        return [[0, 0.0], [1, 33.3], [2, 66.7], [3, 100.0]];
+    }
+
+    public function test_subject_workload_aggregates_current_associations_known_and_unknown_actual_time_and_stable_order(): void
+    {
+        $user = User::factory()->create();
+        $first = Subject::factory()->for($user)->create(['name' => 'Математика']);
+        $second = Subject::factory()->for($user)->create(['name' => 'Алгоритми']);
+        Subject::factory()->for($user)->create(['name' => 'Без занять']);
+        $firstTask = Task::factory()->for($user)->for($first)->create();
+        $anotherTask = Task::factory()->for($user)->for($first)->create();
+        $secondTask = Task::factory()->for($user)->for($second)->create();
+        $unassigned = Task::factory()->for($user)->create();
+        $child = Subtask::factory()->for($firstTask)->create();
+
+        StudySession::factory()->for($firstTask)->create(['subtask_id' => $child->id]);
+        StudySession::factory()->for($anotherTask)->create();
+        foreach ([25, null] as $actual) {
+            StudySession::factory()->for($firstTask)->create(['status' => 'completed', 'actual_minutes' => $actual,
+                'completed_at' => '2026-11-02 00:00:00', 'ends_at' => '2026-10-05 09:30:00']);
+        }
+        StudySession::factory()->for($secondTask)->create(['ends_at' => '2026-10-05 12:00:00']);
+        StudySession::factory()->for($unassigned)->create(['status' => 'completed', 'actual_minutes' => null,
+            'completed_at' => '2026-10-05 11:00:00', 'ends_at' => '2026-10-05 11:00:00']);
+
+        $this->actingAs($user, 'web')->getJson($this->url())->assertOk()->assertJsonPath('data.subject_workload_in_period', [
+            ['subject_id' => $first->id, 'subject_name' => 'Математика', 'scheduled_seconds' => 10800,
+                'completed_actual_minutes' => 25, 'completed_with_actual_minutes' => 1, 'completed_without_actual_minutes' => 1, 'session_count' => 4],
+            ['subject_id' => $second->id, 'subject_name' => 'Алгоритми', 'scheduled_seconds' => 10800,
+                'completed_actual_minutes' => 0, 'completed_with_actual_minutes' => 0, 'completed_without_actual_minutes' => 0, 'session_count' => 1],
+            ['subject_id' => null, 'subject_name' => 'Без предмета', 'scheduled_seconds' => 7200,
+                'completed_actual_minutes' => 0, 'completed_with_actual_minutes' => 0, 'completed_without_actual_minutes' => 1, 'session_count' => 1],
+        ]);
     }
 
     public function test_period_completions_use_own_deadlines_exact_equality_and_never_updated_at(): void
@@ -157,7 +216,9 @@ class ProgressStatisticsApiTest extends TestCase
         $task->delete(); // Deliberately leave an active child under a deleted parent.
         $this->actingAs($user, 'web')->getJson($this->url())->assertOk()->assertJsonPath('data.tasks.current.total', 1)
             ->assertJsonPath('data.tasks.completed_in_period.total', 0)->assertJsonPath('data.subtasks.current.total', 0)
-            ->assertJsonPath('data.subtasks.completed_in_period.total', 0)->assertJsonPath('data.study_sessions.started_in_period.completed.count', 1);
+            ->assertJsonPath('data.subtasks.completed_in_period.total', 0)->assertJsonPath('data.study_sessions.started_in_period.completed.count', 1)
+            ->assertJsonPath('data.tasks.current.completion_percent', 0)
+            ->assertJsonPath('data.subject_workload_in_period.0.completed_actual_minutes', 25);
         $child->delete();
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.study_sessions.started_in_period.completed_actual_minutes', 25);
     }
@@ -191,10 +252,14 @@ class ProgressStatisticsApiTest extends TestCase
         Subtask::factory()->for($task)->create(['status' => 'completed', 'completed_at' => $instant]);
         StudySession::factory()->for($task)->create(['starts_at' => $instant,
             'ends_at' => CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $instant, 'UTC')->addSeconds(61)->format('Y-m-d H:i:s')]);
-        $this->actingAs($user, 'web')->getJson($this->url(['start_date' => $date, 'end_date' => $date]))->assertOk()
+        $response = $this->actingAs($user, 'web')->getJson($this->url(['start_date' => $date, 'end_date' => $date]))->assertOk()
             ->assertJsonPath('data.tasks.completed_in_period.total', (int) $included)
             ->assertJsonPath('data.subtasks.completed_in_period.total', (int) $included)
-            ->assertJsonPath('data.study_sessions.started_in_period.planned', ['count' => (int) $included, 'scheduled_seconds' => $included ? 61 : 0]);
+            ->assertJsonPath('data.study_sessions.started_in_period.planned', ['count' => (int) $included, 'scheduled_seconds' => $included ? 61 : 0])
+            ->assertJsonCount($included ? 1 : 0, 'data.subject_workload_in_period');
+        if ($included) {
+            $response->assertJsonPath('data.subject_workload_in_period.0.scheduled_seconds', 61);
+        }
     }
 
     public static function calendarMembership(): array
@@ -227,10 +292,12 @@ class ProgressStatisticsApiTest extends TestCase
     public function test_all_session_statuses_actual_unknowns_and_cross_midnight_start_attribution(): void
     {
         $task = Task::factory()->create();
+        $sessions = [];
         foreach (['planned', 'completed', 'missed', 'rescheduled', 'cancelled'] as $status) {
-            StudySession::factory()->for($task)->create(['status' => $status, 'starts_at' => '2026-10-31 23:59:59',
+            $sessions[$status] = StudySession::factory()->for($task)->create(['status' => $status, 'starts_at' => '2026-10-31 23:59:59',
                 'ends_at' => '2026-11-01 01:00:00', 'completed_at' => $status === 'completed' ? '2026-11-02 00:00:00' : null]);
         }
+        $sessions['planned']->update(['rescheduled_from_session_id' => $sessions['rescheduled']->id]);
         StudySession::factory()->for($task)->create(['status' => 'completed', 'actual_minutes' => 45,
             'starts_at' => '2026-10-01 00:00:00', 'ends_at' => '2026-10-01 01:00:00', 'completed_at' => '2026-10-03 12:00:00']);
         StudySession::factory()->for($task)->create(['starts_at' => '2026-09-30 23:59:59', 'ends_at' => '2026-10-01 01:00:00']);
@@ -243,7 +310,12 @@ class ProgressStatisticsApiTest extends TestCase
             ->assertJsonPath('data.study_sessions.started_in_period.completed_actual_minutes', 45)
             ->assertJsonPath('data.study_sessions.started_in_period.completed_with_actual_minutes', 1)
             ->assertJsonPath('data.study_sessions.started_in_period.completed_without_actual_minutes', 1)
-            ->assertJsonPath('data.tasks.current.pending', 1)->assertJsonPath('data.tasks.completed_in_period.total', 0);
+            ->assertJsonPath('data.tasks.current.pending', 1)->assertJsonPath('data.tasks.completed_in_period.total', 0)
+            ->assertJsonPath('data.subject_workload_in_period.0', [
+                'subject_id' => null, 'subject_name' => 'Без предмета', 'scheduled_seconds' => 10802,
+                'completed_actual_minutes' => 45, 'completed_with_actual_minutes' => 1,
+                'completed_without_actual_minutes' => 1, 'session_count' => 3,
+            ]);
     }
 
     public function test_owner_isolation_and_fresh_persisted_timezone_ignore_cached_relations_and_attributes(): void
@@ -263,7 +335,28 @@ class ProgressStatisticsApiTest extends TestCase
         $this->assertSame(1, $result['tasks']['completed_in_period']['total']);
         $this->assertSame(1, $result['subtasks']['current']['total']);
         $this->assertSame(1, $result['study_sessions']['started_in_period']['planned']['count']);
+        $this->assertCount(1, $result['subject_workload_in_period']);
+        $this->assertSame(1, $result['subject_workload_in_period'][0]['session_count']);
         $this->actingAs($user, 'web')->getJson($this->url(['user_id' => $foreign->user_id]))->assertUnprocessable();
+    }
+
+    public function test_retired_and_missed_sessions_create_no_group_and_replacement_uses_its_own_start(): void
+    {
+        $task = Task::factory()->create();
+        $predecessor = StudySession::factory()->for($task)->create(['status' => 'rescheduled']);
+        foreach (['cancelled', 'missed'] as $status) {
+            StudySession::factory()->for($task)->create(['status' => $status]);
+        }
+        StudySession::factory()->for($task)->create(['rescheduled_from_session_id' => $predecessor->id,
+            'starts_at' => '2026-11-01 00:00:00', 'ends_at' => '2026-11-01 01:00:00']);
+        $this->actingAs($task->user, 'web')->getJson($this->url())->assertOk()
+            ->assertJsonPath('data.subject_workload_in_period', [])
+            ->assertJsonPath('data.study_sessions.started_in_period.rescheduled.count', 1)
+            ->assertJsonPath('data.study_sessions.started_in_period.cancelled.count', 1)
+            ->assertJsonPath('data.study_sessions.started_in_period.missed.count', 1);
+        $this->getJson($this->url(['start_date' => '2026-11-01', 'end_date' => '2026-11-01']))->assertOk()
+            ->assertJsonPath('data.subject_workload_in_period.0.session_count', 1)
+            ->assertJsonPath('data.subject_workload_in_period.0.scheduled_seconds', 3600);
     }
 
     #[DataProvider('elapsedDstDays')]
@@ -324,6 +417,16 @@ class ProgressStatisticsApiTest extends TestCase
         return [['foreign_task'], ['foreign_child'], ['wrong_owned_parent']];
     }
 
+    public function test_foreign_subject_reference_fails_closed_without_loading_its_name(): void
+    {
+        config(['app.debug' => true]);
+        $foreign = Subject::factory()->create(['name' => 'Private subject']);
+        $task = Task::factory()->create(['subject_id' => $foreign->id]);
+        StudySession::factory()->for($task)->create();
+        $this->actingAs($task->user, 'web')->getJson($this->url())->assertStatus(500)
+            ->assertExactJson(['message' => 'The progress statistics could not be processed.']);
+    }
+
     public function test_corruption_outside_requested_period_does_not_scan_lifetime_session_history(): void
     {
         $owner = User::factory()->create();
@@ -337,6 +440,7 @@ class ProgressStatisticsApiTest extends TestCase
         Notification::fake();
         Http::fake();
         $task = Task::factory()->create();
+        $task->update(['subject_id' => Subject::factory()->for($task->user)->create()->id]);
         $child = Subtask::factory()->for($task)->create();
         StudySession::factory()->for($task)->create(['subtask_id' => $child->id]);
         Reminder::factory()->for($task->user)->create(['task_id' => $task->id, 'trigger_at' => '2026-10-01 00:00:00']);
@@ -349,7 +453,7 @@ class ProgressStatisticsApiTest extends TestCase
         DB::disableQueryLog();
         $this->assertSame($first, $this->getJson($this->url())->assertOk()->json());
         $this->assertSame($before, $this->snapshot());
-        $this->assertCount(8, $queries);
+        $this->assertCount(10, $queries);
         foreach ($queries as $query) {
             $this->assertStringStartsWith('select ', strtolower($query['query']));
             $this->assertStringNotContainsString('for update', strtolower($query['query']));
@@ -362,9 +466,12 @@ class ProgressStatisticsApiTest extends TestCase
         $this->assertStringContainsString('`starts_at` < ?', $sessionQuery['query']);
         $this->assertStringNotContainsString('`ends_at` >', $sessionQuery['query']);
         $this->assertSame([$task->user_id, '2026-10-01 00:00:00', '2026-11-01 00:00:00'], $sessionQuery['bindings']);
-        Task::factory()->count(20)->for($task->user)->create();
+        foreach (Task::factory()->count(20)->for($task->user)->create() as $anotherTask) {
+            $anotherTask->update(['subject_id' => Subject::factory()->for($task->user)->create()->id]);
+            StudySession::factory()->for($anotherTask)->create();
+        }
         Subtask::factory()->count(40)->for($task)->create();
-        StudySession::factory()->count(40)->for($task)->create(['subtask_id' => $child->id]);
+        StudySession::factory()->count(20)->for($task)->create(['subtask_id' => $child->id]);
         DB::enableQueryLog();
         DB::flushQueryLog();
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.tasks.current.total', 21)

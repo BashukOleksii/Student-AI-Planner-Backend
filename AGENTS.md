@@ -405,6 +405,10 @@ Do not implement the entire deployment pipeline unless explicitly requested.
 
 ## Development workflow
 
+Work exclusively on `main`. Do not create feature branches, worktrees or Pull
+Requests, and do not switch to another development branch. Preserve existing
+changes and commit completed implementation directly to `main`.
+
 Before modifying code:
 
 1. inspect the relevant existing implementation;

@@ -16,6 +16,7 @@ class ProgressStatisticsResource extends JsonResource
             'tasks' => $this->resource['tasks'],
             'subtasks' => $this->resource['subtasks'],
             'study_sessions' => $this->resource['study_sessions'],
+            'subject_workload_in_period' => $this->resource['subject_workload_in_period'],
         ];
     }
 }

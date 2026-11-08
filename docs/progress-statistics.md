@@ -1,9 +1,14 @@
-# Stage G1 — Read-only progress statistics
+# Read-only progress statistics — G1 and Stage 13
 
 G1 implements deterministic, owner-scoped progress statistics from existing Tasks,
 Subtasks and StudySessions. It preserves BR-STAT-001–005. No migration, statistics
-entity, stored counter, percentage, cache, report file, AI analysis/tool, forecasting
+entity, stored counter, cache, report file, AI analysis/tool, forecasting
 or frontend is introduced.
+
+Stage 13 implements R35 (current overall Task completion percentage) and R37
+(period workload by Subject) as additive fields on this endpoint. The complete
+Frontend contract, types, Ukrainian labels and representative populated JSON are
+in [stage13/statistics-api-contract.md](stage13/statistics-api-contract.md).
 
 ## API and validation
 
@@ -58,7 +63,7 @@ comparisons is visible. Stored domain DATETIME fields remain whole-second UTC.
       "session_attribution": "starts_at"
     },
     "tasks": {
-      "current": {"total": 0, "pending": 0, "completed": 0, "overdue_pending": 0},
+      "current": {"total": 0, "pending": 0, "completed": 0, "overdue_pending": 0, "completion_percent": null},
       "completed_in_period": {"total": 0, "on_time": 0, "late": 0, "without_deadline": 0}
     },
     "subtasks": {
@@ -76,7 +81,8 @@ comparisons is visible. Stored domain DATETIME fields remain whole-second UTC.
         "completed_with_actual_minutes": 0,
         "completed_without_actual_minutes": 0
       }
-    }
+    },
+    "subject_workload_in_period": []
   }
 }
 ```
@@ -105,6 +111,13 @@ clock is not overdue. When the clock is a fraction past a whole-second stored
 deadline, that deadline is earlier and the pending record is overdue. These are
 current snapshot counts; the requested period does not filter them or reconstruct
 what their statuses were on an earlier day.
+
+`tasks.current.completion_percent` is `round(completed / total * 100, 1)`, or
+`null` when the current Task total is zero. It is a JSON number when defined
+(integral values may serialize without `.0`). Its denominator is the same active,
+owned lifetime Task population, independent of the requested dates. Subtasks are
+never included and receive no new percentage field. This is current state, not a
+historical period completion rate.
 
 `completed_in_period` selects currently completed records in the same active
 population whose persisted `completed_at` is in the requested local-date membership.
@@ -176,6 +189,38 @@ scheduled workload also retains its existing rules. Neither is presented as actu
 study time by G1. [Stage C](study-plan-persistence.md), [Stage D](study-session-lifecycle.md)
 and [E2](adaptive-replanning.md) writers are unchanged.
 
+## Subject workload in the period (Stage 13 / R37)
+
+`subject_workload_in_period` groups the already selected, reference-validated
+sessions by their Task's **current** Subject. Only persisted `planned` and
+`completed` sessions count, matching C9 active scheduled workload. `missed`,
+`rescheduled` predecessors and `cancelled` records are excluded from both the
+group count and duration; their existing status-specific summary buckets remain
+unchanged. A replacement contributes once, only if its own status and `starts_at`
+qualify. There is no recursive graph reconstruction or clock-based status inference.
+
+Each group returns `subject_id`, `subject_name`, `scheduled_seconds`,
+`completed_actual_minutes`, `completed_with_actual_minutes`,
+`completed_without_actual_minutes` and `session_count`. Duration and actual metrics
+reuse `sessionMetrics()` and checked integer sums: full elapsed UTC duration for
+planned/completed sessions, known minutes only for completed sessions, and explicit
+counts of completed sessions with/without actual minutes. A null duration is never
+estimated or interpreted as zero recorded effort. An all-unknown group has a
+known-minute sum of zero and a positive unknown count.
+
+Task-level and Subtask-linked sessions both use the Task's Subject, counting each
+session once. Compatible soft-deleted Task/Subtask history remains included.
+No Subject gives one group with `subject_id: null` and `subject_name: "Без предмета"`.
+Only groups with qualifying sessions appear; otherwise the array is empty.
+Order is scheduled seconds descending, numeric Subject ID ascending for ties,
+and unassigned last among equal workloads. Names are not grouping keys.
+
+Current associations and names are read in owner-scoped batches within the same
+snapshot. A selected active Task pointing to a foreign Subject fails the report
+with the existing generic error, without loading foreign presentation data. Later
+Task reassignment, Subject renaming/deletion or session changes can change an old
+period's breakdown; it is not a historical Subject snapshot or forecast.
+
 ## Timezone, UTC membership and snapshot
 
 The Service reloads the trusted User's persisted `id` and IANA timezone, ignoring
@@ -228,11 +273,14 @@ they are directly unit tested without Laravel/database bootstrap. This retains t
 existing UTC parser and batch historical-reference implementation instead of adding
 another SQL-specific source-validation policy.
 
-The report uses **6 SELECTs with empty session data and at most 8 SELECTs** with
+The original G1 report used **6 SELECTs with empty session data and at most 8 SELECTs** with
 valid session history: fresh owner, two current aggregates, two period completion
 queries, one period session query, and up to two batch historical-reference queries.
-There are no per-record queries. Tests measure eight SELECTs with one Task / one
-session and with 21 Tasks / 41 sessions. Transaction control adds no application
+Stage 13 adds at most two batch queries for referenced Tasks and owned Subjects
+when active workload exists, for **at most 10 SELECTs**. There are no per-record
+queries. Tests measure ten SELECTs with one Task / one session and with 21 Tasks /
+41 sessions across 21 Subjects. Trends/comparisons keep the original shared loader
+and their existing query counts. Transaction control adds no application
 data writes. No new schema/index/cache is required.
 
 Date-bounded queries do not load unbounded lifetime activity histories. Their
@@ -275,8 +323,9 @@ checked signed differences and factual directions/unknown-duration flags. It nev
 uses G1 lifetime current counts as historical populations. The G1 contract and
 original checkpoint verification below remain unchanged.
 
-G1 itself provides no daily/weekly chart series, period comparisons, trend/forecast engine,
-subject breakdown, immutable historical snapshots, CSV/PDF/Excel export, scheduled
+Stage 13 adds the current completion percentage and subject breakdown described
+above. G1 itself provides no daily/weekly chart series, period comparisons, trend/forecast engine,
+immutable historical snapshots, CSV/PDF/Excel export, scheduled
 report, AI summary/tool or notification analytics. G2b explicitly defines
 attribution/history limitations and does not treat current-state work counts as
 past snapshots. Reports cannot infer actual minutes for null records or reconstruct
@@ -284,6 +333,9 @@ hard-purged session history. All present metrics derive from the current authori
 persisted snapshot.
 
 ## Verification
+
+The following is the historical G1 checkpoint. Stage 13 verification is recorded
+in [stage13/implementation-report.md](stage13/implementation-report.md).
 
 Starting and ending HEAD: `264eb53bd01dbdf6d388e2781303f92f9fbab808`.
 The initial tree was clean. The resulting tree contains seven modified tracked

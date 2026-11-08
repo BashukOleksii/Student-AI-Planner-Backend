@@ -165,7 +165,7 @@ class ProgressStatisticsIntegrationTest extends TestCase
             $result = app(ProgressStatisticsService::class)->calculate($user, '2026-10-19', '2026-10-19');
             $this->assertTrue($changed);
             $this->assertSame('2026-10-19T08:00:00.500000Z', $result['as_of_utc']);
-            $this->assertSame(['total' => 1, 'pending' => 1, 'completed' => 0, 'overdue_pending' => 0], $result['tasks']['current']);
+            $this->assertSame(['total' => 1, 'pending' => 1, 'completed' => 0, 'overdue_pending' => 0, 'completion_percent' => 0], $result['tasks']['current']);
             $this->assertSame(0, $result['tasks']['completed_in_period']['total']);
             $this->assertSame(1, app(ProgressStatisticsService::class)->calculate($user, '2026-10-19', '2026-10-19')['tasks']['completed_in_period']['total']);
         } finally {
