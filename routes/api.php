@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\SubjectController;
 use App\Http\Controllers\Api\SubtaskController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TeacherController;
+use App\Http\Controllers\Api\WorkloadAdviceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->name('auth.')->group(function (): void {
@@ -67,6 +68,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
     Route::get('/planning/free-slots', [FreeSlotController::class, 'index'])->name('planning.free-slots.index');
+    Route::get('/planning/workload-advice', [WorkloadAdviceController::class, 'index'])->name('planning.workload-advice');
     Route::post('/planning/study-plans/preview', [StudyPlanController::class, 'preview'])->name('planning.study-plans.preview');
     Route::post('/planning/recovery/preview', [StudyRecoveryController::class, 'preview'])->name('planning.recovery.preview');
     Route::post('/planning/replanning/preview', [StudyReplanningController::class, 'preview'])->name('planning.replanning.preview');

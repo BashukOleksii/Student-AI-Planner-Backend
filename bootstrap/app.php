@@ -34,7 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'deadline_at',
             fn (Request $request) => $request->is('api/lessons', 'api/lessons/*'),
             fn (Request $request) => $request->isMethod('GET') && $request->is('api/tasks'),
-            fn (Request $request) => $request->isMethod('GET') && $request->is('api/planning/free-slots'),
+            fn (Request $request) => $request->isMethod('GET') && $request->is('api/planning/free-slots', 'api/planning/workload-advice'),
             fn (Request $request) => $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/planning/recovery/*', 'api/study-sessions', 'api/study-sessions/*'),
         ]);
         // Subject color and Task deadlines distinguish null from an invalid empty string.
@@ -76,6 +76,16 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
         $exceptions->render(function (Throwable $exception, Request $request) {
+            if ($request->is('api/planning/workload-advice')) {
+                if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
+                    return null;
+                }
+                if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                }
+
+                return response()->json(['message' => 'The workload advice could not be processed.'], 500);
+            }
             if ($request->is('api/profile/password', 'api/auth/forgot-password', 'api/auth/reset-password')) {
                 if ($exception instanceof ValidationException || $exception instanceof AuthenticationException
                     || ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500)) {

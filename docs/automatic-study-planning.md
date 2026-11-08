@@ -1,5 +1,11 @@
 # Stage B — Deterministic Automatic Study Planning
 
+Stage 17A adds a separate [read-only workload advice API](stage17/workload-advice-api-contract.md)
+derived from this unchanged planner result. It preserves the greedy work order,
+distinguishes excluded work and observed allocation reasons, and separately
+measures persisted scheduled-workload violations through C7. Advice creates no
+session or confirmation token and never treats greedy failure as an impossibility proof.
+
 Stage B generates advisory StudySession proposals entirely in memory. It uses
 Stage A's approved A1–A6 work accounting/order and the existing PF1/PF2/C9
 policies. It is independent of an LLM. There is no schema change, endpoint,

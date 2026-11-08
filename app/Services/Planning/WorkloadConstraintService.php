@@ -60,6 +60,32 @@ class WorkloadConstraintService
         ];
     }
 
+    /** Actual selected workload only: the range seeds calendar labels but contributes no seconds. */
+    public function existingViolations(array $range, array $existingSessions, string $timezone, mixed $maxDailyMinutes = null, mixed $maxWeeklyMinutes = null): array
+    {
+        $zone = $this->validateInputs($range, $existingSessions, $timezone, $maxDailyMinutes, $maxWeeklyMinutes);
+        if ($maxDailyMinutes === null && $maxWeeklyMinutes === null) {
+            return [];
+        }
+        [$days, $weeks] = $this->periodTotals($range, $existingSessions, $zone, false);
+        $result = [];
+        foreach ([['day', $days, $maxDailyMinutes, 'daily_study_limit_exceeded'],
+            ['iso_week', $weeks, $maxWeeklyMinutes, 'weekly_study_limit_exceeded']] as [$kind, $totals, $minutes, $code]) {
+            if ($minutes === null) {
+                continue;
+            }
+            ksort($totals);
+            foreach ($totals as $period => $seconds) {
+                if ($seconds > $minutes * 60) {
+                    $result[] = ['code' => $code, 'period_kind' => $kind, 'period' => $period,
+                        'scheduled_seconds' => $seconds, 'limit_seconds' => $minutes * 60, 'excess_seconds' => $seconds - $minutes * 60];
+                }
+            }
+        }
+
+        return $result;
+    }
+
     private function validateInputs(array $range, array $existingSessions, string $timezone, mixed $maxDailyMinutes, mixed $maxWeeklyMinutes): DateTimeZone
     {
         $total = $this->intervals->durationSeconds($range);

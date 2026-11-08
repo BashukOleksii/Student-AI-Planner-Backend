@@ -1,5 +1,12 @@
 # Backend Architecture
 
+Stage 17A exposes deterministic read-only workload advice through
+`GET /api/planning/workload-advice`. It derives ordering, allocation limitations,
+exclusions and safe recommendation codes from the unchanged direct planner,
+without a preview token. A small C7 extension measures persisted scheduled
+daily/weekly violations separately, under the same read snapshot. No migration,
+writer, AI Tool or provider change is introduced. See [the exact advice contract](stage17/workload-advice-api-contract.md).
+
 AI provider portability adds `GeminiGenerateContentProvider` as the configured
 preferred adapter while retaining OpenAI Responses. `LlmProvider` and
 `AgentOrchestrator` are unchanged. Container selection, separate schema adapters
