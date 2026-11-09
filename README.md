@@ -45,6 +45,10 @@ for dependencies, database guards, configuration, CI and known limitations.
 See [the frontend REST contract](docs/frontend-api-contract.md) for Sanctum/CSRF,
 conversations, action review/consent, errors and domain refresh endpoints.
 
+Stage 20B.16B adds a disabled-by-default Lightsail Backend deployment job. See
+[setup, permission checks, migration gates and recovery](docs/lightsail-backend-deployment.md)
+before any production enablement.
+
 Useful feature contracts:
 
 - [Authentication + User Profile](docs/auth-profile.md)

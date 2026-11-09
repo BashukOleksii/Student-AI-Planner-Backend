@@ -1,0 +1,26 @@
+#!/bin/bash
+# Reviewed copy must be root:root 0755, outside the ubuntu-writable checkout.
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+[[ $# == 1 ]] || exit 2
+case "$1" in
+    stop-fpm) /usr/bin/systemctl stop php8.4-fpm.service ;;
+    start-fpm) /usr/bin/systemctl start php8.4-fpm.service ;;
+    stop-queue) /usr/bin/systemctl stop student-ai-planner-queue.service ;;
+    start-queue) /usr/bin/systemctl start student-ai-planner-queue.service ;;
+    stop-scheduler)
+        /usr/bin/systemctl stop student-ai-planner-scheduler.timer
+        /usr/bin/systemctl stop student-ai-planner-scheduler.service
+        ;;
+    start-scheduler) /usr/bin/systemctl start student-ai-planner-scheduler.timer ;;
+    health)
+        /usr/bin/systemctl is-active --quiet php8.4-fpm.service
+        /usr/bin/systemctl is-active --quiet student-ai-planner-queue.service
+        /usr/bin/systemctl is-active --quiet student-ai-planner-scheduler.timer
+        ;;
+    audit)
+        cd /
+        /usr/sbin/runuser -u www-data -- /usr/bin/python3 -I /usr/local/libexec/student-planner-backend-permissions.py
+        ;;
+    *) exit 2 ;;
+esac

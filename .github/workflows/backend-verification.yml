@@ -50,6 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: shivammathur/setup-php@v2
         with:
@@ -74,6 +75,8 @@ jobs:
         env:
           DISPOSABLE_CI_MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
         run: php .github/scripts/verify-ci-migrations.php
+      - name: Verify deployment safety without network or production access
+        run: python3 -m unittest discover -s tests/Deployment -v
       - name: Verify formatting
         run: |
           vendor/bin/pint --test
@@ -94,3 +97,48 @@ jobs:
             phpunit-gemini-actions.xml
           if-no-files-found: error
           retention-days: 7
+
+  deploy:
+    needs: verify
+    if: >-
+      ${{ needs.verify.result == 'success' && github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          github.repository == 'BashukOleksii/Student-AI-Planner-Backend' &&
+          vars.LIGHTSAIL_BACKEND_DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment:
+      name: production
+      url: https://student-ai-planner.duckdns.org
+    concurrency:
+      group: lightsail-backend-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Deploy the verified Backend commit
+        id: deployment
+        env:
+          DEPLOY_ENABLED: ${{ vars.LIGHTSAIL_BACKEND_DEPLOY_ENABLED }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          LIGHTSAIL_BACKEND_SSH_PRIVATE_KEY: ${{ secrets.LIGHTSAIL_BACKEND_SSH_PRIVATE_KEY }}
+          LIGHTSAIL_BACKEND_KNOWN_HOSTS: ${{ secrets.LIGHTSAIL_BACKEND_KNOWN_HOSTS }}
+        run: bash .github/scripts/deploy-lightsail.sh
+      - name: Report deployment outcome
+        if: ${{ always() }}
+        env:
+          DEPLOY_OUTCOME: ${{ steps.deployment.outcome }}
+          TESTED_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo "Tested SHA: $TESTED_SHA"
+            echo "Deployment step: $DEPLOY_OUTCOME"
+            if [ "$DEPLOY_OUTCOME" = success ]; then
+              echo "Deployed SHA: $TESTED_SHA"
+              echo 'Smoke checks: internal 200, public profile 401, CSRF 204; PHP-FPM, queue and scheduler timer active.'
+            else
+              echo 'Deployment/health not confirmed. See server phase, checkout SHA and smoke results in the deployment log; interrupted SSH may require operator inspection.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
