@@ -30,10 +30,10 @@ use App\Http\Controllers\Api\WorkloadAdviceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->name('auth.')->group(function (): void {
-    Route::post('/register', [AuthController::class, 'register'])->name('register');
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth-register')->name('register');
     Route::post('/forgot-password', [PasswordController::class, 'forgot'])->middleware('throttle:password-forgot')->name('forgot-password');
     Route::post('/reset-password', [PasswordController::class, 'reset'])->middleware('throttle:password-reset')->name('reset-password');
-    Route::post('/login', [AuthController::class, 'login'])->name('login');
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth-login')->name('login');
     Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum')->name('logout');
 });
 
