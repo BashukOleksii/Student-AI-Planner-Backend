@@ -38,6 +38,16 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         ResetPassword::createUrlUsing(fn ($user, $token) => app(PasswordManagementService::class)->resetUrl($user, $token));
+        RateLimiter::for('auth-login', function (Request $request): array {
+            $email = $request->input('email');
+            $identity = hash('sha256', is_string($email) ? mb_strtolower(trim($email)) : '');
+
+            return [
+                Limit::perMinute(5)->by('auth:login:identity:'.$identity.':ip:'.$request->ip()),
+                Limit::perMinute(30)->by('auth:login:ip:'.$request->ip()),
+            ];
+        });
+        RateLimiter::for('auth-register', fn (Request $request) => Limit::perHour(10)->by('auth:register:ip:'.$request->ip()));
         RateLimiter::for('password-forgot', fn (Request $request) => Limit::perMinute(5)->by('forgot:'.$request->ip()));
         RateLimiter::for('password-reset', fn (Request $request) => Limit::perMinute(10)->by('reset:'.$request->ip()));
         RateLimiter::for('password-change', fn (Request $request) => Limit::perMinute(5)->by('change:'.$request->user()->id));

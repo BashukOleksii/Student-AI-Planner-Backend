@@ -59,6 +59,66 @@ shape and 422 status. Private endpoints return 401 for unauthenticated requests.
 Logout returns an empty 204, invalidates the current session, and regenerates the
 CSRF token. Password reset/change and email verification are deferred.
 
+## Authentication throttles and trusted proxy deployment
+
+Stage 20B.15A attaches named Laravel limiters to the existing public SPA endpoints:
+
+| Endpoint | Limiter | Limits |
+| --- | --- | --- |
+| `POST /api/auth/login` | `auth-login` | 5 requests/minute per normalized email + client IP, and 30 requests/minute per client IP |
+| `POST /api/auth/register` | `auth-register` | 10 requests/hour per client IP |
+
+Every request reaching the throttle counts, including successful authentication
+and validation failures. Login identities use trimmed, lowercase email only for
+the limiter; credential validation and authentication remain unchanged. SHA-256
+replaces the email in the identity key. Explicit `auth:login:identity:`,
+`auth:login:ip:` and `auth:register:ip:` prefixes keep buckets separate; Laravel
+also namespaces/hashes named-limiter cache keys. Malformed non-string emails use
+an empty identity for throttling and still receive normal validation errors.
+Changing identities cannot bypass the aggregate login IP limit. These are
+temporary request limits, not persistent account locks.
+
+Exceeded limits use Laravel's normal 429 response and `Retry-After`,
+`X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` headers.
+The existing CORS configuration exposes retry/rate headers for browser clients.
+Production `CACHE_STORE=database` shares counters between PHP workers using the
+existing cache table. No migration is needed. Password-recovery and AI limiters
+retain their existing definitions.
+
+`bootstrap/app.php` trusts only the immediate proxy address `127.0.0.1` and only
+`X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Port`.
+Laravel/Symfony derives the real client IP and external HTTPS URL from that
+trusted peer. Other peers, including other loopback addresses and `::1`, cannot
+override their IP, scheme, host or port using forwarded headers. RFC `Forwarded`
+and forwarded-prefix headers are outside this trust configuration.
+
+For the Lightsail topology, keep the internal Nginx listener bound to
+`127.0.0.1:8080`. The public TLS Nginx must overwrite incoming forwarded headers
+with values established by that Nginx, for both `/api/*` and `/sanctum/*`:
+
+```nginx
+proxy_set_header Host $host;
+proxy_set_header X-Forwarded-For $remote_addr;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Forwarded-Host $host;
+proxy_set_header X-Forwarded-Port $server_port;
+```
+
+Restrict the public virtual host to the intended domain. The internal Nginx must
+preserve these external forwarded values through FastCGI instead of replacing
+the scheme/port with its internal HTTP values. PHP's `REMOTE_ADDR` must remain
+the immediate local proxy address; review any Nginx real-IP rewriting before
+deployment. Header trust depends on the public proxy sanitizing client input.
+No Nginx configuration is changed by this backend patch.
+
+Keep HTTPS secure cookies, stateful domains, CORS origins and `APP_URL` aligned
+with `https://student-ai-planner.duckdns.org` in the deployment environment.
+Refresh Laravel's configuration/route caches and reload long-running application
+workers as part of the normal reviewed deployment. Verify a complete CSRF cookie,
+login, profile and logout cycle through the public TLS endpoint, including 429
+retry headers and separate client-IP buckets. Do not log credentials or cookies.
+This change does not modify `.env`, deploy to AWS, or alter migrations.
+
 ## Local Vue integration
 
 Use backend `http://localhost:8000` and frontend `http://localhost:5173`:
