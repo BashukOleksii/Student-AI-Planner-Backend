@@ -1,5 +1,7 @@
 # Physical Database Schema
 
+Stage 3 migration `2026_11_10_000002_create_semester_schedule_imports.php` adds an owned revision/review/receipt table and nullable recurring-rule provenance/key/baseline columns, without backfill. See [the physical additions and constraints](semester-schedule-import.md#persistence-and-consistency) and [ADR-007](decisions/ADR-007-semester-schedule-import.md).
+
 The additive migration `2026_11_10_000001_create_semester_schedule_foundation.php` adds four semester schedule tables and four parent candidate keys for composite ownership FKs. Legacy rows, columns and FKs remain unchanged. See [the exact new schema and constraints](semester-schedule-foundation.md#persistence-and-enforcement-boundaries).
 
 Stage 18B migration `2026_11_08_000002_add_ai_availability_actions.php` expands

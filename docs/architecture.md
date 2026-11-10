@@ -1,5 +1,7 @@
 # Backend Architecture
 
+Stage 3 adds a separate confirmed [recurring semester import](semester-schedule-import.md), with persisted revisions, owner-locked stale checks and atomic reconciliation. Legacy import and planning/AI consumers remain separate; see [ADR-007](decisions/ADR-007-semester-schedule-import.md).
+
 Stage 2 exposes read-only semester schedule list/detail/date/week APIs, reusing the foundation calculator with one consistent batched week read. See [the API contract](semester-schedule-read-api.md). Legacy schedule, planning, import and AI consumers remain separate.
 
 An additive semester schedule foundation now provides owned recurring rules, frozen date snapshots and a deterministic read service. Legacy REST, import, planning and AI consumers remain on concrete Lessons. See [the foundation contract](semester-schedule-foundation.md) and [ADR-006](decisions/ADR-006-semester-schedule-foundation.md).

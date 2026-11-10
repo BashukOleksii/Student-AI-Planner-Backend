@@ -24,6 +24,11 @@ class User extends Authenticatable
         return $this->hasMany(SemesterSchedule::class);
     }
 
+    public function semesterScheduleImports(): HasMany
+    {
+        return $this->hasMany(SemesterScheduleImport::class);
+    }
+
     public function planningPreference(): HasOne
     {
         return $this->hasOne(PlanningPreference::class);

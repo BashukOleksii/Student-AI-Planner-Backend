@@ -1,5 +1,7 @@
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
+The Stage 3 [semester import](semester-schedule-import.md) cannot reuse legacy `source_import_batch_id`, which references concrete Lesson import history. Its additive table and separate nullable provenance preserve that FK contract and existing data; retained import-history downgrade refuses.
+
 The new [semester foundation](semester-schedule-foundation.md#persistence-and-enforcement-boundaries) adds composite ownership FKs only for its new graph. Legacy simple FKs and nullable period institutions are preserved. No historical SQL file or inferred recurring-data migration is applied.
 
 Stage 18B adds one forward-only migration expanding `ai_actions_valid_type` from

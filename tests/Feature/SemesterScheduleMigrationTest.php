@@ -17,6 +17,9 @@ class SemesterScheduleMigrationTest extends TestCase
     public function test_additive_upgrade_preserves_legacy_rows_and_refuses_destructive_downgrade(): void
     {
         $migration = require database_path('migrations/2026_11_10_000001_create_semester_schedule_foundation.php');
+        // Remove the later FK overlay before testing the original foundation in isolation.
+        $overlay = require database_path('migrations/2026_11_10_000002_create_semester_schedule_imports.php');
+        $overlay->down();
         $migration->down();
         $lesson = Lesson::factory()->create();
         $before = $lesson->fresh()->getRawOriginal();
@@ -31,6 +34,7 @@ class SemesterScheduleMigrationTest extends TestCase
             AND TABLE_NAME IN ('semester_schedules', 'weekly_lesson_rules', 'schedule_date_exceptions', 'schedule_date_exception_lessons')");
         $this->assertCount(10, $checks);
         $this->assertSame(['YES'], array_values(array_unique(array_column($checks, 'enforced'))));
+        $overlay->up();
         $period = $lesson->user->academicPeriods()->create(['name' => 'Legacy period without institution',
             'starts_on' => '2026-09-01', 'ends_on' => '2026-12-31']);
         $schedule = SemesterSchedule::create(['user_id' => $lesson->user_id, 'academic_period_id' => $period->id,

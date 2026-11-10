@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\ReminderController;
 use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\ScheduleImportController;
 use App\Http\Controllers\Api\SemesterScheduleController;
+use App\Http\Controllers\Api\SemesterScheduleImportController;
 use App\Http\Controllers\Api\StudyAvailabilityWindowController;
 use App\Http\Controllers\Api\StudyPlanController;
 use App\Http\Controllers\Api\StudyRecoveryController;
@@ -125,6 +126,13 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/{semesterSchedule}', [SemesterScheduleController::class, 'show'])->whereNumber('semesterSchedule')->name('show');
         Route::get('/{semesterSchedule}/date/{date}', [SemesterScheduleController::class, 'date'])->whereNumber('semesterSchedule')->where('date', '.*')->name('date');
         Route::get('/{semesterSchedule}/week/{date}', [SemesterScheduleController::class, 'week'])->whereNumber('semesterSchedule')->where('date', '.*')->name('week');
+    });
+
+    Route::prefix('semester-schedule-imports')->name('semester-schedule-imports.')->group(function (): void {
+        Route::post('/', [SemesterScheduleImportController::class, 'store'])->name('store');
+        Route::get('/{semesterScheduleImport}', [SemesterScheduleImportController::class, 'show'])->whereNumber('semesterScheduleImport')->name('show');
+        Route::post('/{semesterScheduleImport}/revalidate', [SemesterScheduleImportController::class, 'revalidate'])->whereNumber('semesterScheduleImport')->name('revalidate');
+        Route::post('/{semesterScheduleImport}/commit', [SemesterScheduleImportController::class, 'commit'])->whereNumber('semesterScheduleImport')->name('commit');
     });
 
     Route::get('/schedule/today', [ScheduleController::class, 'today'])->name('schedule.today');

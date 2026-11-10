@@ -21,6 +21,11 @@ class AcademicPeriod extends Model
         return $this->hasOne(SemesterSchedule::class);
     }
 
+    public function semesterScheduleImports(): HasMany
+    {
+        return $this->hasMany(SemesterScheduleImport::class);
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

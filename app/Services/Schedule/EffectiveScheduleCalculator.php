@@ -27,6 +27,47 @@ class EffectiveScheduleCalculator
     }
 
     /**
+     * Validate an entire semester without expanding/storing every ordinary date.
+     * Ordinary offsets need two weekly cycles; every offset transition and saved
+     * exception is checked separately through the same occurrence calculator.
+     */
+    public function validateSemester(array $schedule, array $rules, array $snapshots, string $timezone): void
+    {
+        $start = $this->calendarDate($schedule['starts_on']);
+        $end = $this->calendarDate($schedule['ends_on']);
+        $this->calculate($schedule, $rules, $snapshots[$schedule['starts_on']] ?? null, $schedule['starts_on'], $timezone);
+        $dates = [];
+        for ($day = $start, $i = 0; $i < 14 && $day <= $end; $i++, $day = $day->modify('+1 day')) {
+            $dates[$day->format('Y-m-d')] = true;
+        }
+        $dates[$end->format('Y-m-d')] = true;
+        $zone = new DateTimeZone($timezone);
+        $transitions = $zone->getTransitions($start->getTimestamp() - 172800, $end->getTimestamp() + 172800) ?: [];
+        $previous = $transitions[0]['offset'] ?? 0;
+        foreach (array_slice($transitions, 1) as $transition) {
+            $before = (new DateTimeImmutable('@'.($transition['ts'] + $previous)))->setTimezone(new DateTimeZone('UTC'));
+            $after = (new DateTimeImmutable('@'.($transition['ts'] + $transition['offset'])))->setTimezone(new DateTimeZone('UTC'));
+            $low = min($before->format('Y-m-d'), $after->format('Y-m-d'));
+            $high = max($before->format('Y-m-d'), $after->format('Y-m-d'));
+            for ($day = $this->calendarDate($low); $day->format('Y-m-d') <= $high; $day = $day->modify('+1 day')) {
+                if ($day >= $start && $day <= $end) {
+                    $dates[$day->format('Y-m-d')] = true;
+                }
+            }
+            $previous = $transition['offset'];
+        }
+        foreach ($snapshots as $date => $snapshot) {
+            if ($date < $schedule['starts_on'] || $date > $schedule['ends_on']) {
+                throw new InvalidArgumentException('A saved exception is outside its academic period.');
+            }
+            $dates[$date] = true;
+        }
+        foreach (array_keys($dates) as $date) {
+            $this->calculate($schedule, $rules, $snapshots[$date] ?? null, $date, $timezone);
+        }
+    }
+
+    /**
      * Dates are nominal calendar labels, never UTC durations. A non-null snapshot
      * replaces the entire date, including when its lessons list is empty.
      *

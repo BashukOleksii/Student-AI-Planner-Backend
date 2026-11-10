@@ -44,7 +44,8 @@ class AcademicPeriodService
         DB::transaction(function () use ($user, $period): void {
             $this->lockOwner($user);
             $period = $user->academicPeriods()->lockForUpdate()->findOrFail($period->getKey());
-            if ($period->scheduleImportBatches()->lockForUpdate()->first() !== null
+            if ($period->semesterScheduleImports()->lockForUpdate()->first() !== null
+                || $period->scheduleImportBatches()->lockForUpdate()->first() !== null
                 || $period->lessons()->withTrashed()->lockForUpdate()->first() !== null) {
                 throw ValidationException::withMessages([
                     'academic_period' => ['An academic period with schedule or import history cannot be deleted.'],

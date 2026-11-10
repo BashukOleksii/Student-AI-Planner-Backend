@@ -1,5 +1,7 @@
 # Stage 2: Semester Schedule Read API
 
+Stage 3 can populate these existing read endpoints through the separate [semester Excel import](semester-schedule-import.md). This read API contract and its legacy separation remain unchanged.
+
 Baseline: `e25754c3b22f8b50c152b91fa3de0595efdef058` on `main`, verified against
 GitHub before implementation. The [foundation rules](semester-schedule-foundation.md)
 and [ADR-006](decisions/ADR-006-semester-schedule-foundation.md) remain authoritative.

@@ -78,14 +78,14 @@ class ScheduleOccurrenceResolver
      *
      * @return array{subjects: array<string, array{id: ?int, errors: list<string>}>, teachers: array<string, array{id: ?int, errors: list<string>}>}
      */
-    public function resolveNames(User $user, array $subjectNames, array $teacherNames): array
+    public function resolveNames(User $user, array $subjectNames, array $teacherNames, bool $lock = false): array
     {
         $subjectNames = array_values(array_unique($subjectNames, SORT_STRING));
         $teacherNames = array_values(array_unique($teacherNames, SORT_STRING));
         $subjects = [];
         $teachers = [];
         if ($subjectNames !== []) {
-            foreach ($user->subjects()->whereIn('name', $subjectNames)->get(['id', 'name']) as $subject) {
+            foreach ($user->subjects()->whereIn('name', $subjectNames)->when($lock, fn ($q) => $q->lockForUpdate())->get(['id', 'name']) as $subject) {
                 // MySQL collation may return similar names; PHP equality decides the match.
                 if (in_array($subject->name, $subjectNames, true)) {
                     $subjects[$subject->name] = $subject->getKey();
@@ -93,7 +93,7 @@ class ScheduleOccurrenceResolver
             }
         }
         if ($teacherNames !== []) {
-            foreach ($user->teachers()->whereIn('name', $teacherNames)->get(['id', 'name']) as $teacher) {
+            foreach ($user->teachers()->whereIn('name', $teacherNames)->when($lock, fn ($q) => $q->lockForUpdate())->get(['id', 'name']) as $teacher) {
                 if (in_array($teacher->name, $teacherNames, true)) {
                     $teachers[$teacher->name][] = $teacher->getKey();
                 }
