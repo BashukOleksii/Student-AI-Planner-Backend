@@ -83,6 +83,19 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
         $exceptions->render(function (Throwable $exception, Request $request) {
+            if ($request->is('api/semester-schedules', 'api/semester-schedules/*')) {
+                if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
+                    return null;
+                }
+                if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                }
+                if ($exception instanceof InvalidArgumentException) {
+                    return response()->json(['message' => 'The saved semester schedule configuration is inconsistent.'], 409);
+                }
+
+                return response()->json(['message' => 'The semester schedule could not be processed.'], 500);
+            }
             if ($request->is('api/planning/workload-advice')) {
                 if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
                     return null;

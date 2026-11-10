@@ -1,6 +1,8 @@
 # Backend Architecture
 
-An additive semester schedule foundation now provides owned recurring rules, frozen date snapshots and a deterministic read service. Current REST, import, planning and AI consumers remain on concrete Lessons. See [the foundation contract](semester-schedule-foundation.md) and [ADR-006](decisions/ADR-006-semester-schedule-foundation.md).
+Stage 2 exposes read-only semester schedule list/detail/date/week APIs, reusing the foundation calculator with one consistent batched week read. See [the API contract](semester-schedule-read-api.md). Legacy schedule, planning, import and AI consumers remain separate.
+
+An additive semester schedule foundation now provides owned recurring rules, frozen date snapshots and a deterministic read service. Legacy REST, import, planning and AI consumers remain on concrete Lessons. See [the foundation contract](semester-schedule-foundation.md) and [ADR-006](decisions/ADR-006-semester-schedule-foundation.md).
 
 Stage 18B adds three confirmed recurring availability proposals, bringing current
 discovery to 31 definitions (10 reads / 21 proposals). Shared field rules and

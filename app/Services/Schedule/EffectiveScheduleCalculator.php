@@ -14,6 +14,18 @@ class EffectiveScheduleCalculator
         $this->calendarDate($date);
     }
 
+    /** Inclusive Monday-Sunday labels, independent of locale and timezone offsets. */
+    public function weekDates(string $date): array
+    {
+        $day = $this->calendarDate($date);
+        $start = $day->modify('-'.((int) $day->format('N') - 1).' days')->format('Y-m-d');
+        $end = $day->modify('+'.(7 - (int) $day->format('N')).' days')->format('Y-m-d');
+        $this->calendarDate($start);
+        $this->calendarDate($end);
+
+        return [$start, $end];
+    }
+
     /**
      * Dates are nominal calendar labels, never UTC durations. A non-null snapshot
      * replaces the entire date, including when its lessons list is empty.

@@ -1,5 +1,7 @@
 # Business Rules
 
+Stage 2 publishes the semester foundation through [owned read-only endpoints](semester-schedule-read-api.md). Calendar, parity, frozen snapshot and DST rules are unchanged; invalid saved graphs fail with a controlled response.
+
 The additive semester domain uses explicit anchored parity, whole-day frozen overrides, isolated working Saturdays, half-open conflicts and strict DST endpoint validation. These rules supplement the legacy Lesson/import rules below without changing their consumers. See [the foundation rules and enforcement boundary](semester-schedule-foundation.md).
 
 Stage 11 extends the existing one-proposal/explicit-confirmation rules to Lesson

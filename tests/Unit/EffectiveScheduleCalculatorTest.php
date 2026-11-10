@@ -10,6 +10,36 @@ use PHPUnit\Framework\TestCase;
 
 class EffectiveScheduleCalculatorTest extends TestCase
 {
+    #[DataProvider('isoWeeks')]
+    public function test_iso_week_labels_use_monday_and_nominal_calendar_dates(string $date, array $expected): void
+    {
+        $this->assertSame($expected, (new EffectiveScheduleCalculator)->weekDates($date));
+    }
+
+    public static function isoWeeks(): array
+    {
+        return [
+            ['2026-09-07', ['2026-09-07', '2026-09-13']],
+            ['2026-09-13', ['2026-09-07', '2026-09-13']],
+            ['2026-09-14', ['2026-09-14', '2026-09-20']],
+            ['2027-01-01', ['2026-12-28', '2027-01-03']],
+            ['2026-03-29', ['2026-03-23', '2026-03-29']],
+            ['2026-10-25', ['2026-10-19', '2026-10-25']],
+        ];
+    }
+
+    #[DataProvider('unsupportedWeeks')]
+    public function test_invalid_or_unrepresentable_week_labels_fail_explicitly(string $date): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        (new EffectiveScheduleCalculator)->weekDates($date);
+    }
+
+    public static function unsupportedWeeks(): array
+    {
+        return [['2026-02-30'], ['2026-9-08'], ['0000-01-01'], ['9999-12-31']];
+    }
+
     private function config(array $changes = []): array
     {
         return array_replace(['id' => 1, 'starts_on' => '2026-09-07', 'ends_on' => '2026-09-20',

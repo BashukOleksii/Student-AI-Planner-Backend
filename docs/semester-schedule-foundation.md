@@ -1,5 +1,7 @@
 # Semester schedule foundation
 
+Stage 2 now exposes the foundation through a separate [read-only semester API](semester-schedule-read-api.md), with batched consistent week reads. The scope statements below describe the original foundation stage; its domain decisions remain unchanged.
+
 Implemented on 2026-11-10 against backend main
 `5b7d138480c77a87219939930c2d3dcccf40d4c4`, verified with `git ls-remote`.
 The initial local HEAD `f1fc757…` was fast-forwarded to this commit; the only

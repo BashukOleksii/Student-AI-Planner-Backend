@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\ProgressTrendsController;
 use App\Http\Controllers\Api\ReminderController;
 use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\ScheduleImportController;
+use App\Http\Controllers\Api\SemesterScheduleController;
 use App\Http\Controllers\Api\StudyAvailabilityWindowController;
 use App\Http\Controllers\Api\StudyPlanController;
 use App\Http\Controllers\Api\StudyRecoveryController;
@@ -118,6 +119,13 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::delete('/lessons/{lesson}', [LessonController::class, 'destroy'])->name('lessons.destroy');
     Route::post('/lessons/{lesson}/cancel', [LessonController::class, 'cancel'])->name('lessons.cancel');
     Route::post('/lessons/{lesson}/replacement', [LessonController::class, 'replacement'])->name('lessons.replacement.store');
+
+    Route::prefix('semester-schedules')->name('semester-schedules.')->group(function (): void {
+        Route::get('/', [SemesterScheduleController::class, 'index'])->name('index');
+        Route::get('/{semesterSchedule}', [SemesterScheduleController::class, 'show'])->whereNumber('semesterSchedule')->name('show');
+        Route::get('/{semesterSchedule}/date/{date}', [SemesterScheduleController::class, 'date'])->whereNumber('semesterSchedule')->where('date', '.*')->name('date');
+        Route::get('/{semesterSchedule}/week/{date}', [SemesterScheduleController::class, 'week'])->whereNumber('semesterSchedule')->where('date', '.*')->name('week');
+    });
 
     Route::get('/schedule/today', [ScheduleController::class, 'today'])->name('schedule.today');
     Route::get('/schedule/date/{date}', [ScheduleController::class, 'date'])->where('date', '.*')->name('schedule.date');

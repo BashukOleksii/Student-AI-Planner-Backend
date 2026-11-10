@@ -1,5 +1,7 @@
 # Conceptual Domain Model
 
+The new semester domain now has a separate [read-only REST API](semester-schedule-read-api.md) for owned list/detail and effective date/week occurrences. No mutation or legacy schedule source policy changes.
+
 The additional implemented entities are `SemesterSchedule`, `WeeklyLessonRule`, `ScheduleDateException` and `ScheduleDateExceptionLesson`. They model recurring semester rules and independent complete-day snapshots; existing Lesson consumers remain unchanged. See [the foundation contract](semester-schedule-foundation.md).
 
 Stage 11 adds confirmed AI Lesson create/update/cancel/replacement adapters to
