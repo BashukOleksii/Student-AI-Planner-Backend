@@ -1,5 +1,7 @@
 # Physical Database Schema
 
+The additive migration `2026_11_10_000001_create_semester_schedule_foundation.php` adds four semester schedule tables and four parent candidate keys for composite ownership FKs. Legacy rows, columns and FKs remain unchanged. See [the exact new schema and constraints](semester-schedule-foundation.md#persistence-and-enforcement-boundaries).
+
 Stage 18B migration `2026_11_08_000002_add_ai_availability_actions.php` expands
 `ai_pending_actions.ai_actions_valid_type` from 18 to 21 allowed proposal names,
 adding recurring availability create/update/delete. Existing VARCHAR(32), JSON,

@@ -19,6 +19,11 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
+    public function semesterSchedules(): HasMany
+    {
+        return $this->hasMany(SemesterSchedule::class);
+    }
+
     public function planningPreference(): HasOne
     {
         return $this->hasOne(PlanningPreference::class);

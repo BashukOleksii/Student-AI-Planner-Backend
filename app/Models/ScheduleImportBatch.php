@@ -16,6 +16,11 @@ class ScheduleImportBatch extends Model
     /** @use HasFactory<ScheduleImportBatchFactory> */
     use HasFactory;
 
+    public function weeklyLessonRules(): HasMany
+    {
+        return $this->hasMany(WeeklyLessonRule::class, 'source_import_batch_id');
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

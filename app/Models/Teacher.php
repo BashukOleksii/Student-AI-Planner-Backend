@@ -15,6 +15,16 @@ class Teacher extends Model
     /** @use HasFactory<TeacherFactory> */
     use HasFactory;
 
+    public function scheduleDateExceptionLessons(): HasMany
+    {
+        return $this->hasMany(ScheduleDateExceptionLesson::class);
+    }
+
+    public function weeklyLessonRules(): HasMany
+    {
+        return $this->hasMany(WeeklyLessonRule::class);
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

@@ -8,12 +8,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['user_id', 'education_institution_id', 'name', 'starts_on', 'ends_on'])]
 class AcademicPeriod extends Model
 {
     /** @use HasFactory<AcademicPeriodFactory> */
     use HasFactory;
+
+    public function semesterSchedule(): HasOne
+    {
+        return $this->hasOne(SemesterSchedule::class);
+    }
 
     public function user(): BelongsTo
     {

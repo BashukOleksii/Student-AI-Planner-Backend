@@ -1,5 +1,7 @@
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
+The new [semester foundation](semester-schedule-foundation.md#persistence-and-enforcement-boundaries) adds composite ownership FKs only for its new graph. Legacy simple FKs and nullable period institutions are preserved. No historical SQL file or inferred recurring-data migration is applied.
+
 Stage 18B adds one forward-only migration expanding `ai_actions_valid_type` from
 18 to 21 values for single-window availability create/update/delete proposals.
 No columns, indexes, FKs, old migrations or other CHECKs change, and rollback

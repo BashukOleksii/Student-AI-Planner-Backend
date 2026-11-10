@@ -44,7 +44,9 @@ class AiChatPersistenceTest extends TestCase
         $conversation = $message->conversation;
         $before = [$conversation->getAttributes(), $message->getAttributes()];
         $this->assertSame(3, $this->excludeForwardOnlyOverlayFromLegacyRollback());
-        $this->artisan('migrate:rollback', ['--step' => 4])->assertExitCode(0);
+        // Later additive migrations must not shift this test's rollback boundary.
+        $steps = DB::table('migrations')->where('migration', '>=', '2026_10_16_000001_create_ai_conversation_turns_table')->count();
+        $this->artisan('migrate:rollback', ['--step' => $steps])->assertExitCode(0);
         $this->assertFalse(Schema::hasTable('ai_pending_actions'));
         $this->assertFalse(Schema::hasTable('ai_conversation_turns'));
         $this->assertSame($before, [$conversation->fresh()->getAttributes(), $message->fresh()->getAttributes()]);

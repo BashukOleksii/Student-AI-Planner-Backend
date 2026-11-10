@@ -1,5 +1,7 @@
 # Lesson and Schedule API
 
+A separate [semester schedule foundation](semester-schedule-foundation.md) now implements recurring rules and frozen date exceptions internally. The routes, Resources and concrete Lesson/import contracts documented below are unchanged and do not consume that foundation yet.
+
 Stage 05 implements manual Lessons, cancellation/replacement lifecycle, and bounded schedule views. Every endpoint requires first-party Sanctum session/cookie authentication; see [auth/profile](auth-profile.md). Ownership and the presentation timezone come exclusively from the authenticated user.
 
 ## Routes and status codes

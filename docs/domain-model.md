@@ -1,5 +1,7 @@
 # Conceptual Domain Model
 
+The additional implemented entities are `SemesterSchedule`, `WeeklyLessonRule`, `ScheduleDateException` and `ScheduleDateExceptionLesson`. They model recurring semester rules and independent complete-day snapshots; existing Lesson consumers remain unchanged. See [the foundation contract](semester-schedule-foundation.md).
+
 Stage 11 adds confirmed AI Lesson create/update/cancel/replacement adapters to
 the existing pending-action model. It adds no new domain entity or Lesson fields;
 only the pending-action type CHECK expands. See [Lesson actions](ai-lesson-actions.md).
