@@ -114,3 +114,7 @@ and [Backend result](docs/stage12/backend-result.md) before Frontend integration
 - [ADR-001: Backend architecture decision](docs/decisions/ADR-001-backend-architecture.md)
 
 [AGENTS.md](AGENTS.md) is the primary instruction file for repository work.
+
+## Production deployment
+
+The Laravel Backend is deployed to AWS Lightsail through GitHub Actions after successful verification of commits pushed to main. Deployment requires the production environment and the LIGHTSAIL_BACKEND_DEPLOY_ENABLED repository variable.
