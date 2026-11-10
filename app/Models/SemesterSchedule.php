@@ -30,10 +30,16 @@ class SemesterSchedule extends Model
         return $this->hasMany(ScheduleDateException::class);
     }
 
+    public function suppressedSlots(): HasMany
+    {
+        return $this->hasMany(SemesterScheduleSuppressedSlot::class);
+    }
+
     protected function casts(): array
     {
         return [
             'parity_anchor_on' => 'immutable_date',
+            'management_revision' => 'integer',
         ];
     }
 }

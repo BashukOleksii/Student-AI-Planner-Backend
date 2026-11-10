@@ -3,11 +3,10 @@
 namespace App\Services\Imports;
 
 use App\Exceptions\ScheduleWorkbookParserException;
-use App\Models\AcademicPeriod;
-use App\Models\ScheduleDateExceptionLesson;
 use App\Models\SemesterScheduleImport;
 use App\Models\User;
 use App\Services\Schedule\EffectiveScheduleCalculator;
+use App\Services\Schedule\SemesterScheduleStateService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -22,11 +21,12 @@ class SemesterScheduleImportService
         private ScheduleOccurrenceResolver $resolver,
         private SemesterScheduleImportPlanner $planner,
         private EffectiveScheduleCalculator $calculator,
+        private SemesterScheduleStateService $state,
     ) {}
 
     public function create(User $user, array $options, UploadedFile $file): SemesterScheduleImport
     {
-        $this->period($user, $options['academic_period_id']);
+        $this->state->period($user, $options['academic_period_id']);
         $template = null;
         $error = null;
         try {
@@ -43,7 +43,7 @@ class SemesterScheduleImportService
 
         return DB::transaction(function () use ($user, $options, $template, $error, $hash, $filename): SemesterScheduleImport {
             $owner = $this->owner($user);
-            $this->period($owner, $options['academic_period_id'], true);
+            $this->state->period($owner, $options['academic_period_id'], true);
             $import = $owner->semesterScheduleImports()->create([
                 'academic_period_id' => $options['academic_period_id'], 'parity_anchor_on' => $options['parity_anchor_on'],
                 'first_week_parity' => $options['first_week_parity'], 'original_filename' => $filename, 'file_hash' => $hash,
@@ -92,7 +92,7 @@ class SemesterScheduleImportService
                 $this->invalid('This import preview is not ready to commit.');
             }
             [$review, $context, $graph] = $this->buildReview($owner, $import);
-            if (! hash_equals($import->context_hash, $context) || $this->hash($import->review) !== $this->hash($review)) {
+            if (! hash_equals($import->context_hash, $context) || $this->state->hash($import->review) !== $this->state->hash($review)) {
                 $this->saveReview($import, $review, $context);
 
                 return ['import' => $import, 'changed' => true];
@@ -131,6 +131,11 @@ class SemesterScheduleImportService
                     $this->check($graph['rules']->find($operation['rule_id'])->update($fields));
                 }
             }
+            if ($graph['schedule'] !== null && ($review['impact']['schedule']['before'] !== $values
+                || $review['counts']['create'] + $review['counts']['update'] + $review['counts']['delete'] > 0)) {
+                $schedule->management_revision++;
+                $this->check($schedule->save());
+            }
             $now = CarbonImmutable::now('UTC');
             $receipt = ['semester_schedule_id' => $schedule->id, 'counts' => $review['counts'],
                 'rule_ids' => $schedule->weeklyLessonRules()->orderBy('id')->pluck('id')->all(),
@@ -143,61 +148,10 @@ class SemesterScheduleImportService
 
     private function buildReview(User $owner, SemesterScheduleImport $import): array
     {
-        $period = $this->period($owner, $import->academic_period_id, true);
-        $subjects = $owner->subjects()->orderBy('id')->lockForUpdate()->get();
-        $teachers = $owner->teachers()->orderBy('id')->lockForUpdate()->get();
-        $schedule = $owner->semesterSchedules()->where('academic_period_id', $period->id)->lockForUpdate()->first();
-        $rules = $schedule?->weeklyLessonRules()->orderBy('id')->lockForUpdate()->get() ?? collect();
-        $exceptions = $schedule?->dateExceptions()->orderBy('id')->lockForUpdate()->get() ?? collect();
-        foreach ($exceptions as $exception) {
-            if ($exception->user_id !== $owner->id) {
-                $this->invalidGraph();
-            }
-        }
-        $lessons = ScheduleDateExceptionLesson::whereIn('schedule_date_exception_id', $exceptions->pluck('id'))
-            ->orderBy('id')->lockForUpdate()->get();
-        foreach ($rules->concat($lessons) as $rule) {
-            if ($rule->user_id !== $owner->id || $rule->semester_schedule_id !== $schedule->id
-                || ! $subjects->contains('id', $rule->subject_id)
-                || ($rule->teacher_id !== null && ! $teachers->contains('id', $rule->teacher_id))) {
-                $this->invalidGraph();
-            }
-        }
-        $provenance = [];
-        $sources = $owner->semesterScheduleImports()->whereIn('id', $rules->pluck('semester_schedule_import_id')->filter())
-            ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-        $legacySources = $owner->scheduleImportBatches()->whereIn('id', $rules->pluck('source_import_batch_id')->filter())
-            ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-        foreach ($rules as $rule) {
-            if ($rule->semester_schedule_import_id !== null) {
-                $source = $sources->get($rule->semester_schedule_import_id);
-                if ($source === null || $source->academic_period_id !== $period->id || $source->status !== 'committed'
-                    || ! is_array($rule->import_baseline) || count($rule->import_baseline) !== count(SemesterScheduleImportPlanner::FIELDS)
-                    || array_diff(array_keys($rule->import_baseline), SemesterScheduleImportPlanner::FIELDS) !== []
-                    || $rule->import_key !== $this->planner->key($rule->import_baseline)) {
-                    $this->invalidGraph();
-                }
-                $provenance[$source->id] = [$source->id, $source->academic_period_id, $source->status];
-            }
-            if ($rule->source_import_batch_id !== null) {
-                $source = $legacySources->get($rule->source_import_batch_id);
-                if ($source === null || $source->academic_period_id !== $period->id) {
-                    $this->invalidGraph();
-                }
-            }
-        }
-        $snapshots = [];
-        foreach ($exceptions as $exception) {
-            $children = $lessons->where('schedule_date_exception_id', $exception->id);
-            foreach ($children as $lesson) {
-                if ($lesson->source_weekly_rule_id !== null && ! $rules->contains('id', $lesson->source_weekly_rule_id)) {
-                    $this->invalidGraph();
-                }
-            }
-            $date = $exception->occurs_on->format('Y-m-d');
-            $snapshots[$date] = ['id' => $exception->id, 'occurs_on' => $date, 'kind' => $exception->kind,
-                'copied_weekday' => $exception->copied_weekday, 'lessons' => $children->map->attributesToArray()->values()->all()];
-        }
+        $graph = $this->state->load($owner, $import->academic_period_id, true);
+        ['period' => $period, 'subjects' => $subjects, 'teachers' => $teachers, 'schedule' => $schedule,
+            'rules' => $rules, 'exceptions' => $exceptions, 'lessons' => $lessons, 'snapshots' => $snapshots,
+            'suppressions' => $suppressions] = $graph;
         $template = $import->template;
         if (! is_array($template) || ! is_string($template['group'] ?? null) || ! is_array($template['rules'] ?? null)) {
             $this->invalidGraph();
@@ -222,7 +176,7 @@ class SemesterScheduleImportService
                 'subject' => $subjects->find($subject['id'])?->only(['id', 'name', 'code', 'color']),
                 'teacher' => $teachers->find($teacher['id'])?->only(['id', 'name']), 'errors' => $errors];
         }
-        $plan = $this->planner->plan($incoming, $rules->map->attributesToArray()->all());
+        $plan = $this->planner->plan($incoming, $rules->map->attributesToArray()->all(), $suppressions->map->attributesToArray()->all());
         if (mb_strlen($template['group']) > 255) {
             $plan['errors']['group_name'] = ['The group name must not exceed 255 characters.'];
         }
@@ -243,12 +197,10 @@ class SemesterScheduleImportService
         $review = ['rows' => $plan['rows'], 'operations' => $plan['operations'], 'counts' => $plan['counts'], 'errors' => $plan['errors'],
             'impact' => ['schedule' => ['id' => $schedule?->id, 'before' => $before, 'after' => $after],
                 'preserved_rule_ids' => $rules->filter(fn ($rule) => ! $this->planner->managed($rule->attributesToArray()))->pluck('id')->values()->all(),
-                'preserved_exception_dates' => array_keys($snapshots), 'detached_snapshot_references' => $detach]];
-        $context = $this->hash(['template' => $template, 'options' => $after, 'timezone' => $owner->timezone,
-            'period' => $period->getAttributes(), 'institution' => $period->educationInstitution->getAttributes(),
-            'subjects' => $subjects->map->getAttributes()->all(), 'teachers' => $teachers->map->getAttributes()->all(),
-            'schedule' => $schedule?->getAttributes(), 'rules' => $rules->map->getAttributes()->all(),
-            'exceptions' => $exceptions->map->getAttributes()->all(), 'lessons' => $lessons->map->getAttributes()->all(), 'provenance' => $provenance]);
+                'preserved_exception_dates' => array_keys($snapshots),
+                'suppressed_slots' => $suppressions->map->only(['id', 'weekday', 'pair_number', 'week_pattern'])->all(), 'detached_snapshot_references' => $detach]];
+        $context = $this->state->hash(['template' => $template, 'options' => $after,
+            'graph' => $this->state->fingerprint($owner, $graph)]);
 
         return [$review, $context, compact('schedule', 'rules', 'lessons')];
     }
@@ -267,36 +219,6 @@ class SemesterScheduleImportService
     private function owner(User $user): User
     {
         return User::whereKey($user->id)->lockForUpdate()->firstOrFail();
-    }
-
-    private function period(User $owner, int $id, bool $lock = false): AcademicPeriod
-    {
-        $period = $owner->academicPeriods()->whereKey($id)->when($lock, fn ($q) => $q->lockForUpdate())->first();
-        $institution = $period === null ? null : $owner->educationInstitutions()->whereKey($period->education_institution_id)
-            ->when($lock, fn ($q) => $q->lockForUpdate())->first();
-        if ($period === null || $institution === null) {
-            throw ValidationException::withMessages(['academic_period_id' => ['The selected period must belong to you and have an owned education institution.']]);
-        }
-        $period->setRelation('educationInstitution', $institution);
-
-        return $period;
-    }
-
-    private function hash(mixed $value): string
-    {
-        $canonical = function (mixed $item) use (&$canonical): mixed {
-            if (! is_array($item)) {
-                return $item;
-            }
-            $item = array_map($canonical, $item);
-            if (! array_is_list($item)) {
-                ksort($item, SORT_STRING);
-            }
-
-            return $item;
-        };
-
-        return hash('sha256', json_encode($canonical($value), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
     private function check(bool $success): void

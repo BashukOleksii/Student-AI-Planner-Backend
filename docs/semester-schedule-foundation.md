@@ -1,5 +1,7 @@
 # Semester schedule foundation
 
+Stage 4 now writes this foundation through the [semester management API](semester-schedule-management.md). Original foundation-only scope statements below are historical. ADR-006 parity/snapshot rules remain authoritative; ADR-008 adds optimistic writes and explicit import protections.
+
 Stage 3 now provides the separate [confirmed recurring import workflow](semester-schedule-import.md). Original foundation scope statements below are historical; parity/snapshot decisions remain unchanged, with additive import provenance defined in ADR-007.
 
 Stage 2 now exposes the foundation through a separate [read-only semester API](semester-schedule-read-api.md), with batched consistent week reads. The scope statements below describe the original foundation stage; its domain decisions remain unchanged.

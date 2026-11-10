@@ -60,10 +60,13 @@ class SemesterScheduleImportPersistenceTest extends TestCase
     public function test_additive_migration_preserves_legacy_data_and_refuses_history_downgrade(): void
     {
         $migration = require database_path('migrations/2026_11_10_000002_create_semester_schedule_imports.php');
+        $management = require database_path('migrations/2026_11_10_000003_add_semester_schedule_management_protections.php');
+        $management->down();
         $migration->down();
         $lesson = Lesson::factory()->create();
         $before = $lesson->fresh()->getRawOriginal();
         $migration->up();
+        $management->up();
         $this->assertSame($before, $lesson->fresh()->getRawOriginal());
         $this->assertTrue(Schema::hasColumn('weekly_lesson_rules', 'import_baseline'));
         $this->assertDatabaseCount('semester_schedule_imports', 0);

@@ -1,5 +1,7 @@
 # Lesson and Schedule API
 
+Stage 4 now provides [recurring semester management](semester-schedule-management.md): manual rules, full-day replacements/cancellations, independent working Saturdays and protected-deletion resolution. The legacy Lesson/schedule/Excel workflows described below retain their contracts.
+
 Stage 3 introduces a separate [complete semester Excel import](semester-schedule-import.md) into recurring weekly rules, with preview/revalidation and explicit atomic commit. The concrete Lesson import contracts below are unchanged.
 
 Stage 2 adds four separate [semester schedule read endpoints](semester-schedule-read-api.md). The legacy Lesson routes, Resources and import contracts below remain unchanged.

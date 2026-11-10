@@ -1,5 +1,7 @@
 # Backend Architecture
 
+Stage 4 adds owner-serialized [semester management](semester-schedule-management.md), shared import/management graph loading, optimistic graph tokens with a monotonic revision, frozen snapshot writers and explicit suppressed-slot release. See [ADR-008](decisions/ADR-008-semester-schedule-management.md); legacy consumers remain unchanged.
+
 Stage 3 adds a separate confirmed [recurring semester import](semester-schedule-import.md), with persisted revisions, owner-locked stale checks and atomic reconciliation. Legacy import and planning/AI consumers remain separate; see [ADR-007](decisions/ADR-007-semester-schedule-import.md).
 
 Stage 2 exposes read-only semester schedule list/detail/date/week APIs, reusing the foundation calculator with one consistent batched week read. See [the API contract](semester-schedule-read-api.md). Legacy schedule, planning, import and AI consumers remain separate.

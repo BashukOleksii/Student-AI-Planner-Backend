@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\ScheduleImportController;
 use App\Http\Controllers\Api\SemesterScheduleController;
 use App\Http\Controllers\Api\SemesterScheduleImportController;
+use App\Http\Controllers\Api\SemesterScheduleManagementController;
 use App\Http\Controllers\Api\StudyAvailabilityWindowController;
 use App\Http\Controllers\Api\StudyPlanController;
 use App\Http\Controllers\Api\StudyRecoveryController;
@@ -122,6 +123,23 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/lessons/{lesson}/replacement', [LessonController::class, 'replacement'])->name('lessons.replacement.store');
 
     Route::prefix('semester-schedules')->name('semester-schedules.')->group(function (): void {
+        Route::post('/', [SemesterScheduleManagementController::class, 'store'])->name('store');
+        Route::patch('/{semesterSchedule}', [SemesterScheduleManagementController::class, 'update'])->whereNumber('semesterSchedule')->name('update');
+        Route::delete('/{semesterSchedule}', [SemesterScheduleManagementController::class, 'destroy'])->whereNumber('semesterSchedule')->name('destroy');
+        Route::get('/{semesterSchedule}/management', [SemesterScheduleManagementController::class, 'show'])->whereNumber('semesterSchedule')->name('management');
+        Route::get('/{semesterSchedule}/weekly-rules', [SemesterScheduleManagementController::class, 'rules'])->whereNumber('semesterSchedule')->name('rules.index');
+        Route::get('/{semesterSchedule}/weekly-rules/{weeklyRule}', [SemesterScheduleManagementController::class, 'rule'])->whereNumber(['semesterSchedule', 'weeklyRule'])->name('rules.show');
+        Route::post('/{semesterSchedule}/weekly-rules', [SemesterScheduleManagementController::class, 'storeRule'])->whereNumber('semesterSchedule')->name('rules.store');
+        Route::patch('/{semesterSchedule}/weekly-rules/{weeklyRule}', [SemesterScheduleManagementController::class, 'updateRule'])->whereNumber(['semesterSchedule', 'weeklyRule'])->name('rules.update');
+        Route::delete('/{semesterSchedule}/weekly-rules/{weeklyRule}', [SemesterScheduleManagementController::class, 'destroyRule'])->whereNumber(['semesterSchedule', 'weeklyRule'])->name('rules.destroy');
+        Route::get('/{semesterSchedule}/date-exceptions', [SemesterScheduleManagementController::class, 'exceptions'])->whereNumber('semesterSchedule')->name('exceptions.index');
+        Route::get('/{semesterSchedule}/date-exceptions/{date}', [SemesterScheduleManagementController::class, 'exception'])->whereNumber('semesterSchedule')->where('date', '.*')->name('exceptions.show');
+        Route::put('/{semesterSchedule}/date-exceptions/{date}', [SemesterScheduleManagementController::class, 'replaceDate'])->whereNumber('semesterSchedule')->where('date', '.*')->name('exceptions.replace');
+        Route::delete('/{semesterSchedule}/date-exceptions/{date}', [SemesterScheduleManagementController::class, 'destroyException'])->whereNumber('semesterSchedule')->where('date', '.*')->name('exceptions.destroy');
+        Route::post('/{semesterSchedule}/working-saturdays', [SemesterScheduleManagementController::class, 'storeSaturday'])->whereNumber('semesterSchedule')->name('saturdays.store');
+        Route::get('/{semesterSchedule}/suppressed-slots', [SemesterScheduleManagementController::class, 'suppressions'])->whereNumber('semesterSchedule')->name('suppressions.index');
+        Route::delete('/{semesterSchedule}/suppressed-slots/{suppressedSlot}', [SemesterScheduleManagementController::class, 'destroySuppression'])->whereNumber(['semesterSchedule', 'suppressedSlot'])->name('suppressions.destroy');
+
         Route::get('/', [SemesterScheduleController::class, 'index'])->name('index');
         Route::get('/{semesterSchedule}', [SemesterScheduleController::class, 'show'])->whereNumber('semesterSchedule')->name('show');
         Route::get('/{semesterSchedule}/date/{date}', [SemesterScheduleController::class, 'date'])->whereNumber('semesterSchedule')->where('date', '.*')->name('date');

@@ -1,5 +1,7 @@
 # Stage 2: Semester Schedule Read API
 
+Stage 4 adds separate [management endpoints](semester-schedule-management.md). These original Stage 2 list/detail/date/week JSON contracts remain unchanged; new management responses supply the graph token needed for writes.
+
 Stage 3 can populate these existing read endpoints through the separate [semester Excel import](semester-schedule-import.md). This read API contract and its legacy separation remain unchanged.
 
 Baseline: `e25754c3b22f8b50c152b91fa3de0595efdef058` on `main`, verified against

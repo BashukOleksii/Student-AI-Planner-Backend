@@ -19,6 +19,8 @@ class SemesterScheduleMigrationTest extends TestCase
         $migration = require database_path('migrations/2026_11_10_000001_create_semester_schedule_foundation.php');
         // Remove the later FK overlay before testing the original foundation in isolation.
         $overlay = require database_path('migrations/2026_11_10_000002_create_semester_schedule_imports.php');
+        $management = require database_path('migrations/2026_11_10_000003_add_semester_schedule_management_protections.php');
+        $management->down();
         $overlay->down();
         $migration->down();
         $lesson = Lesson::factory()->create();
@@ -35,6 +37,7 @@ class SemesterScheduleMigrationTest extends TestCase
         $this->assertCount(10, $checks);
         $this->assertSame(['YES'], array_values(array_unique(array_column($checks, 'enforced'))));
         $overlay->up();
+        $management->up();
         $period = $lesson->user->academicPeriods()->create(['name' => 'Legacy period without institution',
             'starts_on' => '2026-09-01', 'ends_on' => '2026-12-31']);
         $schedule = SemesterSchedule::create(['user_id' => $lesson->user_id, 'academic_period_id' => $period->id,

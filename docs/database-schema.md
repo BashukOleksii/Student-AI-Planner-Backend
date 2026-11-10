@@ -1,5 +1,7 @@
 # Physical Database Schema
 
+Stage 4 adds `semester_schedules.management_revision` (BIGINT UNSIGNED, default 0), `weekly_lesson_rules.is_manually_managed` (BOOLEAN, default false, CHECK 0/1), and `semester_schedule_suppressed_slots` (id, owned schedule, weekday, pair, pattern, timestamps) with a composite schedule/owner restrictive FK, unique slot and scalar CHECKs. See [management persistence and deployment](semester-schedule-management.md#schedule-deletion-deployment-and-limits) and ADR-008.
+
 Stage 3 migration `2026_11_10_000002_create_semester_schedule_imports.php` adds an owned revision/review/receipt table and nullable recurring-rule provenance/key/baseline columns, without backfill. See [the physical additions and constraints](semester-schedule-import.md#persistence-and-consistency) and [ADR-007](decisions/ADR-007-semester-schedule-import.md).
 
 The additive migration `2026_11_10_000001_create_semester_schedule_foundation.php` adds four semester schedule tables and four parent candidate keys for composite ownership FKs. Legacy rows, columns and FKs remain unchanged. See [the exact new schema and constraints](semester-schedule-foundation.md#persistence-and-enforcement-boundaries).

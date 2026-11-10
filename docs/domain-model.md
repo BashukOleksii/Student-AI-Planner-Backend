@@ -1,5 +1,7 @@
 # Conceptual Domain Model
 
+Stage 4 adds owned SemesterScheduleSuppressedSlot records for intentional deletions, a permanent WeeklyLessonRule manual-management flag and a monotonic schedule revision. Manual CRUD, full-date snapshots and effective-day Saturday copies use the [management API](semester-schedule-management.md), independently of concrete Lessons.
+
 Stage 3 adds `SemesterScheduleImport` and nullable weekly-rule provenance/key/baseline metadata. It reconciles only unchanged managed rules, preserves manual rows and frozen days, and exposes a separate [complete import workflow](semester-schedule-import.md).
 
 The new semester domain now has a separate [read-only REST API](semester-schedule-read-api.md) for owned list/detail and effective date/week occurrences. No mutation or legacy schedule source policy changes.

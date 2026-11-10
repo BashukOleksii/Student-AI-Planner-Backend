@@ -36,7 +36,7 @@ class SemesterScheduleImportPlanner
     }
 
     /** @return array{rows: array, operations: array, projected_rules: array, errors: array, counts: array} */
-    public function plan(array $incoming, array $existing): array
+    public function plan(array $incoming, array $existing, array $suppressions = []): array
     {
         $byKey = $bySlot = $projected = [];
         foreach ($existing as $rule) {
@@ -65,6 +65,15 @@ class SemesterScheduleImportPlanner
             }
             $seen[$key] = $candidate;
             if ($row['errors'] !== []) {
+                $rows[] = $row;
+
+                continue;
+            }
+            $blocked = $this->blockingSuppressions($row, $suppressions);
+            if ($blocked !== []) {
+                $row['operation'] = 'suppressed';
+                $row['errors']['suppressed_slot'] = ['This recurring slot was intentionally removed. Release its suppression explicitly before importing it again.'];
+                $row['suppressed_slot_ids'] = array_values(array_column($blocked, 'id'));
                 $rows[] = $row;
 
                 continue;
@@ -108,9 +117,17 @@ class SemesterScheduleImportPlanner
         return ['rows' => $rows, 'operations' => $operations, 'projected_rules' => array_values($projected), 'errors' => $errors, 'counts' => $counts];
     }
 
+    public function blockingSuppressions(array $rule, array $suppressions): array
+    {
+        return array_values(array_filter($suppressions, fn ($slot) => $slot['weekday'] === $rule['weekday']
+            && $slot['pair_number'] === $rule['pair_number']
+            && ($slot['week_pattern'] === 'all' || $rule['week_pattern'] === 'all' || $slot['week_pattern'] === $rule['week_pattern'])));
+    }
+
     public function managed(array $rule): bool
     {
-        return ($rule['semester_schedule_import_id'] ?? null) !== null
+        return ! ($rule['is_manually_managed'] ?? false)
+            && ($rule['semester_schedule_import_id'] ?? null) !== null
             && ($rule['import_key'] ?? null) !== null && is_array($rule['import_baseline'] ?? null)
             && $this->values($rule) === $this->values($rule['import_baseline']);
     }

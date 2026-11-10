@@ -11,7 +11,7 @@ class SemesterScheduleImportResource extends JsonResource
     {
         $preview = $this->review;
         $rowFields = array_flip(['row_number', 'weekday', 'pair_number', 'pair_label', 'week_pattern', 'starts_at_local', 'ends_at_local',
-            'subject_name', 'teacher_name', 'subject', 'teacher', 'room', 'source', 'import_key', 'operation', 'matched_rule_id', 'errors']);
+            'subject_name', 'teacher_name', 'subject', 'teacher', 'room', 'source', 'import_key', 'operation', 'matched_rule_id', 'suppressed_slot_ids', 'errors']);
         $preview['rows'] = array_map(fn ($row) => array_intersect_key($row, $rowFields), $preview['rows']);
 
         return [

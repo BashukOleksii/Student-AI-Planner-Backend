@@ -113,6 +113,37 @@ class SemesterScheduleImportPlannerTest extends TestCase
         $this->assertNotEmpty($result['rows'][0]['errors']);
     }
 
+    public function test_explicit_manual_flag_keeps_an_identical_baseline_protected(): void
+    {
+        $rule = $this->managed(['is_manually_managed' => true]);
+        $this->assertFalse($this->planner()->managed($rule));
+        $this->assertSame('preserve', $this->planner()->plan([$this->rule()], [$rule])['rows'][0]['operation']);
+        $this->assertSame([], $this->planner()->plan([], [$rule])['operations']);
+    }
+
+    #[DataProvider('suppressedPatterns')]
+    public function test_suppressed_slots_block_only_intersecting_pair_and_parity(string $suppressionPattern, string $incomingPattern, bool $blocked): void
+    {
+        $suppression = ['id' => 9, 'weekday' => 1, 'pair_number' => 1, 'week_pattern' => $suppressionPattern];
+        $row = $this->rule(['week_pattern' => $incomingPattern]);
+        $plan = $this->planner()->plan([$row], [], [$suppression]);
+        $this->assertSame($blocked ? 'suppressed' : 'create', $plan['rows'][0]['operation']);
+        $this->assertCount($blocked ? 0 : 1, $plan['projected_rules']);
+        if ($blocked) {
+            $this->assertSame([9], $plan['rows'][0]['suppressed_slot_ids']);
+            $this->assertArrayHasKey('suppressed_slot', $plan['rows'][0]['errors']);
+        }
+        $this->assertSame([], $this->planner()->blockingSuppressions($this->rule(['pair_number' => 2]), [$suppression]));
+        $this->assertSame([], $this->planner()->blockingSuppressions($this->rule(['weekday' => 2]), [$suppression]));
+    }
+
+    public static function suppressedPatterns(): array
+    {
+        return [['all', 'all', true], ['all', 'numerator', true], ['all', 'denominator', true],
+            ['numerator', 'all', true], ['numerator', 'numerator', true], ['numerator', 'denominator', false],
+            ['denominator', 'all', true], ['denominator', 'numerator', false], ['denominator', 'denominator', true]];
+    }
+
     public function test_semester_validation_detects_a_skipped_weekday_far_after_the_first_two_weeks(): void
     {
         $this->expectException(InvalidArgumentException::class);

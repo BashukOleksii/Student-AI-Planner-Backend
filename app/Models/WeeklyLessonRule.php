@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['user_id', 'semester_schedule_id', 'weekday', 'pair_number', 'pair_label', 'week_pattern', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'room', 'source_import_batch_id', 'semester_schedule_import_id', 'import_key', 'import_baseline'])]
+#[Fillable(['user_id', 'semester_schedule_id', 'weekday', 'pair_number', 'pair_label', 'week_pattern', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'room', 'source_import_batch_id', 'semester_schedule_import_id', 'import_key', 'import_baseline', 'is_manually_managed'])]
 class WeeklyLessonRule extends Model
 {
     public function user(): BelongsTo
@@ -51,6 +51,7 @@ class WeeklyLessonRule extends Model
             'weekday' => 'integer',
             'pair_number' => 'integer',
             'import_baseline' => 'array',
+            'is_manually_managed' => 'boolean',
         ];
     }
 }

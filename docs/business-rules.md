@@ -1,5 +1,7 @@
 # Business Rules
 
+Stage 4 enforces [semester management rules](semester-schedule-management.md): stale graph writes conflict; complete projected semesters are validated; snapshots remain independent; manually deleted slots cannot be recreated by import until explicitly released. Real changes increment a revision, so edit/revert cannot revive an old preview. Historical receipts remain immutable.
+
 The new [semester import contract](semester-schedule-import.md) requires explicit revision-bound confirmation, exact owned catalog resolution, full projected conflict/timezone checks and atomic application. Protected manual/edited rows and independent snapshots survive re-import. Legacy concrete import rules below remain unchanged.
 
 Stage 2 publishes the semester foundation through [owned read-only endpoints](semester-schedule-read-api.md). Calendar, parity, frozen snapshot and DST rules are unchanged; invalid saved graphs fail with a controlled response.

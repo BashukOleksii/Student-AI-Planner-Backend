@@ -1,5 +1,7 @@
 # Stage 3: Complete semester schedule Excel import
 
+Stage 4 extends reconciliation with permanent manual flags and [suppressed-slot protection](semester-schedule-management.md#import-reconciliation-and-intentional-deletion). Blocked rows report `operation: suppressed`, `errors.suppressed_slot` and `suppressed_slot_ids`; `preview.impact.suppressed_slots` lists protections. Explicit release, revalidate and a new confirmation are required to recreate a manually deleted slot. Existing receipts and legacy import contracts remain unchanged; old uncommitted previews conservatively stale after deployment.
+
 Baseline: `a3df77520a6a5bb7a7110a79ee67f472c21a42dc` on main.
 [ADR-007](decisions/ADR-007-semester-schedule-import.md) records the decision made
 before implementation. [Stage 2](semester-schedule-read-api.md) remains the read API.
