@@ -49,3 +49,38 @@ Run database suites sequentially. PHPUnit 12 uses repeated selectors (`--group m
 `tests/Live` remains explicitly opt-in for paid provider observations and is outside the offline suite. Do not run it during routine verification. The transport/orchestration/action contracts are tested with deterministic providers instead. `tests/Deployment` contains separate Python safety checks; these are not business PHPUnit tests and do not deploy anything. No real browser, external email/push or paid LLM capability is implied by a local pass.
 
 Current forward migrations must upgrade cleanly and preserve history. Historical reversible migrations are tested against explicitly rebuilt predecessors on the disposable schema. Never claim the entire current application can downgrade through forward-only migrations, remove migration guards, or rewrite an applied migration to satisfy a historical test.
+
+## Independent Vue + Laravel browser verification
+
+The independent frontend's real-browser suite can be run against a separately
+provisioned MySQL process (not the regression suite's resetting database):
+
+```sh
+scripts/testing/fullstack-disposable-mysql.sh /absolute/path/to/Student-AI-Planner-Frontend
+vendor/bin/phpunit tests/Unit/SystemHarnessEntrypointTest.php
+```
+
+The frontend checkout must contain `playwright.fullstack.config.ts`. The runner
+proves a new server/datadir, zero application schemas and an empty new database,
+then applies migrations, starts Laravel HTTP on localhost:18000 and Vite on
+localhost:15173, and runs Chromium with actual cookie/CSRF requests. It refuses
+occupied HTTP ports and never connects to the retained development database.
+An ephemeral APP_KEY, database sessions/cache/queue, isolated storage/log mail and
+synthetic browser-registered accounts confine all writes and delivery. The test
+HTTP entry rechecks UUID/datadir/database on every request and prohibits stray
+provider HTTP requests. Production bootstrap/configuration remains unchanged.
+
+`tests/Support/SystemTestProvider.php` replaces only model selection at the
+`LlmProvider` boundary in the private test router. Registered Tools, orchestrator,
+confirmation Services and persisted receipts execute normally. Guarded CLI
+fixtures establish elapsed history and expiry cases only on that exact server.
+The ordinary app does not gain a fake provider or test endpoints. This suite is
+not evidence of paid natural-language model selection. The real five-minute
+scheduler observation may add up to five minutes to runtime.
+
+Results, UUID/process evidence, browser checks and scheduler logs are stored in
+the frontend's ignored `fullstack-results/`, outside ordinary Playwright's cleanup
+root. Private mail/token-bearing storage is deleted with the temporary server;
+never commit it. Detailed coverage and normal retained-demo startup commands are
+in the frontend's `docs/system-integration-report.md` and
+`docs/local-full-stack-setup.md`.
