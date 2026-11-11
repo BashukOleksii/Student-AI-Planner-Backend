@@ -68,44 +68,54 @@ class RecoverySuggestionService
             throw new \InvalidArgumentException;
         }
 
-        return DB::transaction(function () use ($ownerId, $days): string {
-            $owner = User::whereKey($ownerId)->lockForUpdate()->firstOrFail();
-            [$start, $end] = $this->period($owner, $days);
-            $source = $this->sources->capture($owner, $start, $end);
-            $hash = $source['source_hash'];
-            $active = $owner->recoverySuggestions()->where('status', 'pending')->lockForUpdate()->first();
-            if ($active !== null && ($active->expires_at <= CarbonImmutable::now('UTC') || ! hash_equals($active->source_hash, $hash))) {
-                $this->resolve($active, $active->expires_at <= CarbonImmutable::now('UTC') ? 'expired' : 'invalidated');
-            }
-            $state = DB::table('recovery_scan_states')->where('user_id', $owner->id)->first();
-            $latest = $owner->recoverySuggestions()->where('source_hash', $hash)->orderByDesc('created_at')->orderByDesc('id')->first();
-            if ($state?->last_source_hash === $hash && $state->last_outcome === 'no_need') {
-                $this->recordScan($owner, $hash, 'no_need');
+        return DB::transaction(fn () => $this->detectWithinTransaction($ownerId, $days));
+    }
 
-                return 'unchanged';
-            }
-            if (($active !== null && $active->status === 'pending' && hash_equals($active->source_hash, $hash))
-                || ($latest !== null && in_array($latest->kind, ['warning', 'decision_required'], true))) {
-                $this->recordScan($owner, $hash, 'unchanged');
+    /** Compose detection atomically with an owner-first application transaction; never applies a plan. */
+    public function detectWithinTransaction(int $ownerId, int $days = 7): string
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('Recovery detection requires an existing owner-first transaction.');
+        }
+        if ($days < 1 || $days > 31) {
+            throw new \InvalidArgumentException;
+        }
+        $owner = User::whereKey($ownerId)->lockForUpdate()->firstOrFail();
+        [$start, $end] = $this->period($owner, $days);
+        $source = $this->sources->capture($owner, $start, $end);
+        $hash = $source['source_hash'];
+        $active = $owner->recoverySuggestions()->where('status', 'pending')->lockForUpdate()->first();
+        if ($active !== null && ($active->expires_at <= CarbonImmutable::now('UTC') || ! hash_equals($active->source_hash, $hash))) {
+            $this->resolve($active, $active->expires_at <= CarbonImmutable::now('UTC') ? 'expired' : 'invalidated');
+        }
+        $state = DB::table('recovery_scan_states')->where('user_id', $owner->id)->first();
+        $latest = $owner->recoverySuggestions()->where('source_hash', $hash)->orderByDesc('created_at')->orderByDesc('id')->first();
+        if ($state?->last_source_hash === $hash && $state->last_outcome === 'no_need') {
+            $this->recordScan($owner, $hash, 'no_need');
 
-                return 'unchanged';
-            }
-            $result = $this->analysis->analyze($owner, $start, $end);
-            if ($result['kind'] === null) {
-                $this->recordScan($owner, $hash, 'no_need');
+            return 'unchanged';
+        }
+        if (($active !== null && $active->status === 'pending' && hash_equals($active->source_hash, $hash))
+            || ($latest !== null && in_array($latest->kind, ['warning', 'decision_required'], true))) {
+            $this->recordScan($owner, $hash, 'unchanged');
 
-                return 'no_need';
-            }
-            if ($owner->recoverySuggestions()->where('need_hash', $result['need_hash'])->exists()) {
-                $this->recordScan($owner, $result['source_hash'], 'unchanged');
+            return 'unchanged';
+        }
+        $result = $this->analysis->analyze($owner, $start, $end);
+        if ($result['kind'] === null) {
+            $this->recordScan($owner, $hash, 'no_need');
 
-                return 'unchanged';
-            }
-            $this->store($owner, $start, $end, $result);
-            $this->recordScan($owner, $result['source_hash'], 'created');
+            return 'no_need';
+        }
+        if ($owner->recoverySuggestions()->where('need_hash', $result['need_hash'])->exists()) {
+            $this->recordScan($owner, $result['source_hash'], 'unchanged');
 
-            return 'created';
-        });
+            return 'unchanged';
+        }
+        $this->store($owner, $start, $end, $result);
+        $this->recordScan($owner, $result['source_hash'], 'created');
+
+        return 'created';
     }
 
     public function listing(User $owner, array $filters)

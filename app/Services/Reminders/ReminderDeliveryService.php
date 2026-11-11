@@ -49,58 +49,65 @@ class ReminderDeliveryService
     {
         $this->outermost();
         try {
-            return DB::transaction(function () use ($ownerId, $reminderId): array {
-                // A current owner read precedes every RR snapshot and observes prior writers after a wait.
-                $owner = User::whereKey($ownerId)->lockForUpdate()->first();
-                $source = $owner?->reminders()->whereKey($reminderId)->first();
-                if ($source === null || $source->status !== ReminderStatus::Scheduled) {
-                    return ['status' => 'skipped'];
-                }
-                $context = $this->targets->forReminder($owner, $source, true);
-                $reminder = $owner->reminders()->whereKey($reminderId)->lockForUpdate()->first();
-                $now = CarbonImmutable::now('UTC');
-                if ($reminder === null || $reminder->status !== ReminderStatus::Scheduled) {
-                    return ['status' => 'skipped'];
-                }
-                if ($source->only(ReminderRules::TARGETS) !== $reminder->only(ReminderRules::TARGETS) || $source->anchor !== $reminder->anchor) {
-                    throw new ReminderIntegrityException;
-                }
-                $trigger = $this->rules->wireTime($reminder->getRawOriginal('trigger_at'));
-                if (! $this->delivery->due($trigger, $now)) {
-                    return ['status' => 'skipped'];
-                }
-                // A scheduled row with any existing receipt is corruption, never a reason to repair status.
-                if (DatabaseNotification::where('reminder_id', $reminderId)->exists()) {
-                    throw new ReminderIntegrityException;
-                }
-                if (! $this->targets->eligible($context, requireFutureSession: false)) {
-                    if (! $reminder->update(['status' => ReminderStatus::Cancelled, 'sent_at' => null])) {
-                        throw new ReminderIntegrityException;
-                    }
-
-                    return ['status' => 'cancelled'];
-                }
-                if ($reminder->anchor !== null) {
-                    $expected = $this->rules->resolve($this->targets->anchor($context), $reminder->offset_minutes);
-                    if ($expected !== $trigger) {
-                        throw new ReminderIntegrityException;
-                    }
-                }
-                $payload = $this->delivery->payload($reminder->id, $reminder->only(ReminderRules::TARGETS), $reminder->message, $trigger);
-                // Native Notifiable relation + DatabaseNotification model on this same connection/transaction.
-                $timestamp = $now->format('Y-m-d H:i:s');
-                $notification = $owner->notifications()->create(['id' => (string) Str::uuid(), 'type' => ReminderDeliveryRules::TYPE,
-                    'data' => $payload, 'read_at' => null, 'reminder_id' => $reminder->id,
-                    'created_at' => $timestamp, 'updated_at' => $timestamp]);
-                if (! $notification->exists || ! $reminder->update(['status' => ReminderStatus::Sent, 'sent_at' => $timestamp])) {
-                    throw new ReminderIntegrityException;
-                }
-
-                return ['status' => 'sent'];
-            });
+            return DB::transaction(fn () => $this->processWithinTransaction($ownerId, $reminderId));
         } catch (Throwable $exception) {
             throw $exception instanceof ReminderIntegrityException ? $exception : new ReminderIntegrityException($exception);
         }
+    }
+
+    /** Same database-only delivery core, for atomic owner-first application composition. */
+    public function processWithinTransaction(int $ownerId, int $reminderId): array
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('Reminder delivery core requires an existing owner-first transaction.');
+        }
+        // A current owner read precedes every RR snapshot and observes prior writers after a wait.
+        $owner = User::whereKey($ownerId)->lockForUpdate()->first();
+        $source = $owner?->reminders()->whereKey($reminderId)->first();
+        if ($source === null || $source->status !== ReminderStatus::Scheduled) {
+            return ['status' => 'skipped'];
+        }
+        $context = $this->targets->forReminder($owner, $source, true);
+        $reminder = $owner->reminders()->whereKey($reminderId)->lockForUpdate()->first();
+        $now = CarbonImmutable::now('UTC');
+        if ($reminder === null || $reminder->status !== ReminderStatus::Scheduled) {
+            return ['status' => 'skipped'];
+        }
+        if ($source->only(ReminderRules::TARGETS) !== $reminder->only(ReminderRules::TARGETS) || $source->anchor !== $reminder->anchor) {
+            throw new ReminderIntegrityException;
+        }
+        $trigger = $this->rules->wireTime($reminder->getRawOriginal('trigger_at'));
+        if (! $this->delivery->due($trigger, $now)) {
+            return ['status' => 'skipped'];
+        }
+        // A scheduled row with any existing receipt is corruption, never a reason to repair status.
+        if (DatabaseNotification::where('reminder_id', $reminderId)->exists()) {
+            throw new ReminderIntegrityException;
+        }
+        if (! $this->targets->eligible($context, requireFutureSession: false)) {
+            if (! $reminder->update(['status' => ReminderStatus::Cancelled, 'sent_at' => null])) {
+                throw new ReminderIntegrityException;
+            }
+
+            return ['status' => 'cancelled'];
+        }
+        if ($reminder->anchor !== null) {
+            $expected = $this->rules->resolve($this->targets->anchor($context), $reminder->offset_minutes);
+            if ($expected !== $trigger) {
+                throw new ReminderIntegrityException;
+            }
+        }
+        $payload = $this->delivery->payload($reminder->id, $reminder->only(ReminderRules::TARGETS), $reminder->message, $trigger);
+        // Native Notifiable relation + DatabaseNotification model on this same connection/transaction.
+        $timestamp = $now->format('Y-m-d H:i:s');
+        $notification = $owner->notifications()->create(['id' => (string) Str::uuid(), 'type' => ReminderDeliveryRules::TYPE,
+            'data' => $payload, 'read_at' => null, 'reminder_id' => $reminder->id,
+            'created_at' => $timestamp, 'updated_at' => $timestamp]);
+        if (! $notification->exists || ! $reminder->update(['status' => ReminderStatus::Sent, 'sent_at' => $timestamp])) {
+            throw new ReminderIntegrityException;
+        }
+
+        return ['status' => 'sent'];
     }
 
     private function outermost(): void
