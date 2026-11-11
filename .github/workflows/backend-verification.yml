@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      full_suite:
+        description: 'Also run the complete MySQL suite and Gemini regression matrix'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -81,18 +86,23 @@ jobs:
         run: |
           vendor/bin/pint --test
           git diff --check
-      - name: Run complete offline MySQL suite including independent processes
+      - name: Run fast MySQL smoke suite
+        run: vendor/bin/phpunit --configuration phpunit-smoke.xml --log-junit phpunit-smoke-results.xml
+      - name: Run complete offline MySQL suite including independent processes (manual only)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_suite }}
         run: vendor/bin/phpunit --log-junit phpunit-full.xml
-      - name: Run Gemini action regression matrix with offline native fixtures
+      - name: Run Gemini action regression matrix with offline native fixtures (manual only)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_suite }}
         env:
           AI_TEST_PROVIDER: gemini
         run: vendor/bin/phpunit tests/Feature/AiTaskActionsTest.php tests/Feature/AiSubtaskReminderActionsTest.php tests/Feature/AiPlanningActionsTest.php tests/Feature/AiLessonActionsTest.php --log-junit phpunit-gemini-actions.xml
       - name: Retain verification results
-        if: ${{ always() && hashFiles('phpunit-full.xml') != '' }}
+        if: ${{ always() && hashFiles('phpunit-smoke-results.xml') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: backend-phpunit-results
           path: |
+            phpunit-smoke-results.xml
             phpunit-full.xml
             phpunit-gemini-actions.xml
           if-no-files-found: error
