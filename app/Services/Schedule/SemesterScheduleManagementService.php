@@ -233,6 +233,7 @@ class SemesterScheduleManagementService
                 $lessons = $eligible->whereIn('id', $selected)->map(fn ($rule) => [
                     ...$rule->only(self::LESSON_FIELDS), 'source_weekly_rule_id' => $rule->id,
                 ])->values()->all();
+                $lessons = array_map($this->normalizeLessonType(...), $lessons);
                 $this->saveSnapshot($owner, $graph, $date, 'working_saturday', $values['copied_weekday'], $lessons, sourceWeekParity: $parity);
 
                 return;
@@ -249,6 +250,7 @@ class SemesterScheduleManagementService
                 $lessons[] = [...$origin->only(self::LESSON_FIELDS),
                     'source_weekly_rule_id' => $row['weekly_lesson_rule_id'] ?? $origin->source_weekly_rule_id];
             }
+            $lessons = array_map($this->normalizeLessonType(...), $lessons);
             $this->saveSnapshot($owner, $graph, $date, 'working_saturday', $values['copied_weekday'], $lessons,
                 sourceWeekParity: $this->calculator->weekParity($this->state->config($graph), $source));
         });
@@ -302,13 +304,20 @@ class SemesterScheduleManagementService
     private function lessonFields(array $row): array
     {
         $fields = array_replace(['pair_label' => null, 'teacher_id' => null, 'room' => null, 'lesson_type' => null], Arr::only($row, self::LESSON_FIELDS));
-        if ($fields['lesson_type'] instanceof LessonType) {
-            $fields['lesson_type'] = $fields['lesson_type']->value;
-        }
+        $fields = $this->normalizeLessonType($fields);
         $fields['teacher_id'] = $this->lessonTeachers->teacherId($fields);
         $fields['teacher_ids'] = [$fields['teacher_id']];
 
         return $fields;
+    }
+
+    private function normalizeLessonType(array $row): array
+    {
+        if ($row['lesson_type'] instanceof LessonType) {
+            $row['lesson_type'] = $row['lesson_type']->value;
+        }
+
+        return $row;
     }
 
     private function mergeLessonFields(array $before, array $patch): array
