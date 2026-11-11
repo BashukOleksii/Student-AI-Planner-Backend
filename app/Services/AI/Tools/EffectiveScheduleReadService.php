@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Services\Planning\CalendarBusyIntervalService;
 use App\Services\Planning\PlanningContextService;
 use App\Services\Schedule\EffectiveScheduleService;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 
 /** Read-only presentation adapter over planning's authoritative calendar selection. */
 class EffectiveScheduleReadService
@@ -21,6 +23,11 @@ class EffectiveScheduleReadService
     ) {}
 
     public function date(User $user, string $date): array
+    {
+        return DB::transaction(fn () => $this->readDate($user, $date));
+    }
+
+    private function readDate(User $user, string $date): array
     {
         $owner = $user->newQuery()->findOrFail($user->getKey(), ['id', 'timezone']);
         $coverage = $this->context->dateIntervals($date, $date, $owner->timezone);
@@ -47,7 +54,7 @@ class EffectiveScheduleReadService
             if ($record['source_type'] === 'legacy_lesson') {
                 $lesson = $legacy->get($record['lesson_id']);
                 if ($lesson !== null) {
-                    $lessons[] = $this->legacy($owner, $lesson);
+                    $lessons[] = $this->legacy($owner, $lesson, $record);
                 }
 
                 continue;
@@ -77,16 +84,18 @@ class EffectiveScheduleReadService
         ]];
     }
 
-    private function legacy(User $owner, Lesson $lesson): array
+    private function legacy(User $owner, Lesson $lesson, array $occupancy): array
     {
         $row = $this->presenter->lesson($owner, $lesson);
         $subject = $row['subject'];
         $teacher = $row['teacher'];
+        $toLocal = fn (int $timestamp) => CarbonImmutable::createFromTimestampUTC($timestamp)
+            ->setTimezone($owner->timezone)->format('Y-m-d\TH:i:sP');
 
-        return ['id' => $lesson->id, 'source_identity' => 'legacy_lesson:'.$lesson->id, 'source_type' => 'legacy_lesson',
+        return ['id' => $lesson->id, 'source_identity' => $occupancy['id'], 'source_type' => 'legacy_lesson',
             'subject' => $subject === null ? null : ['id' => $subject['id'], 'name' => $subject['name']],
             'teacher' => $teacher, 'type' => $lesson->type?->value, 'pair_number' => null, 'pair_label' => null,
-            'room' => $lesson->room, 'starts_at' => $row['starts_at'], 'ends_at' => $row['ends_at'],
+            'room' => $lesson->room, 'starts_at' => $toLocal($occupancy['start']), 'ends_at' => $toLocal($occupancy['end']),
             'replaces_lesson_id' => $row['replaces_lesson_id']];
     }
 }
