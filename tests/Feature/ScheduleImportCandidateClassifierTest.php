@@ -20,8 +20,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class ScheduleImportCandidateClassifierTest extends TestCase
 {
     use RefreshDatabase;

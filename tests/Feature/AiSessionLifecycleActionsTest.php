@@ -7,10 +7,13 @@ use App\Models\AiPendingAction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\InteractsWithPlanningActions;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('ai')]
 class AiSessionLifecycleActionsTest extends TestCase
 {
     use DatabaseTruncation, InteractsWithPlanningActions;

@@ -1,5 +1,7 @@
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
+Testing-stage compatibility fix: the new forward migration `2026_11_12_000003_expand_ai_action_type_length.php` widens action identity storage to VARCHAR(64), preserving names and constraints. MySQL reproduction showed 33/34-character registered semester names could not fit the prior column. No applied migration is rewritten. See [verification evidence](testing/backend-test-rebuild-report.md).
+
 > Current implementation update (after reference `4eb708e`): A new forward migration creates `recovery_suggestions` and `recovery_scan_states` for conversation-independent reviews. Unique pending-owner, dedupe and refresh-lineage keys plus CHECKs protect lifecycle invariants; existing applied migrations and AI action types are unchanged. Logical refresh lineage is owner checked by the service rather than a self-cascade foreign key. Protected tokens use Laravel encrypted casts; presentation excludes private fingerprints/tokens. Migration execution and MySQL concurrency remain deferred. See [ADR-012](decisions/ADR-012-automatic-learning-recovery.md).
 
 AI semester actions add one forward-only action-type CHECK extension, preserving all prior types, states and receipts. No new table/column or old migration change is needed. Migration execution and MySQL verification are deferred; see [the contract](unified-academic-calendar.md).

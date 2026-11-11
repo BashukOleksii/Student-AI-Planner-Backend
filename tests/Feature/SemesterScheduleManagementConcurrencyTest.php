@@ -14,11 +14,14 @@ use App\Services\Schedule\SemesterScheduleManagementService;
 use App\Services\Schedule\SemesterScheduleStateService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Process\Process;
 use Tests\Concerns\UsesForwardOnlyMigrations;
 use Tests\Support\TestDatabase;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('concurrency')]
 class SemesterScheduleManagementConcurrencyTest extends TestCase
 {
     use UsesForwardOnlyMigrations;
@@ -37,10 +40,11 @@ class SemesterScheduleManagementConcurrencyTest extends TestCase
         $service = app(SemesterScheduleManagementService::class);
         $graph = $service->create($owner, ['academic_period_id' => $period->id, 'group_name' => 'ПІ-231', 'parity_anchor_on' => '2026-09-07', 'first_week_parity' => 'numerator']);
         $subject = Subject::factory()->for($owner)->create();
+        $teacher = Teacher::factory()->for($owner)->create();
         $graph = $service->read($owner, $graph['schedule']);
         $graph = $service->createRule($owner, $graph['schedule'], ['schedule_token' => $graph['meta']['schedule_token'],
             'weekday' => 1, 'pair_number' => 1, 'week_pattern' => 'all', 'starts_at_local' => '08:30:00', 'ends_at_local' => '09:50:00',
-            'subject_id' => $subject->id]);
+            'subject_id' => $subject->id, 'teacher_id' => $teacher->id]);
 
         return [$graph['schedule'], $graph['rules']->first(), $graph['meta']['schedule_token']];
     }

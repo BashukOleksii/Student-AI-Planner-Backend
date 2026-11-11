@@ -10,18 +10,26 @@ use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Services\AI\Actions\SemesterActionRegistry;
+use App\Services\AI\Actions\SemesterActionService;
+use App\Services\AI\LlmProvider;
+use App\Services\AI\Tools\SemesterReadTools;
 use App\Services\Schedule\EffectiveScheduleService;
 use App\Services\Schedule\SemesterScheduleManagementService;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\InteractsWithAiResponses;
+use Tests\Support\AiCapabilities;
 use Tests\TestCase;
 
 /** Deferred execution: synthetic MySQL + offline provider regression cases for semester H3 adapters. */
+#[Group('mysql')]
+#[Group('ai')]
 class AiSemesterActionsTest extends TestCase
 {
     use DatabaseTruncation, InteractsWithAiResponses;
@@ -29,8 +37,9 @@ class AiSemesterActionsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->travelTo(now('UTC')->setDate(2026, 10, 16));
-        config(['ai.provider' => 'openai', 'ai.openai_key' => 'offline', 'ai.model' => 'offline', 'ai.requests_per_minute' => 60]);
+        $this->travelTo(CarbonImmutable::parse('2026-10-16T08:00:00Z'));
+        config(['ai.provider' => getenv('AI_TEST_PROVIDER') ?: 'openai', 'ai.openai_key' => 'offline', 'ai.model' => 'offline',
+            'ai.gemini_key' => 'offline-gemini-key', 'ai.gemini_model' => 'gemini-offline-fixture', 'ai.requests_per_minute' => 60]);
         Http::preventStrayRequests();
         $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
     }
@@ -56,7 +65,7 @@ class AiSemesterActionsTest extends TestCase
             'schedule_token' => $manager->read($owner, $schedule)['meta']['schedule_token']]);
         $rule = $schedule->weeklyLessonRules()->orderBy('id')->first();
         $this->actingAs($owner, 'web');
-        $conversation = $this->postJson('/api/ai/conversations')->assertCreated()->json('data.id');
+        $conversation = $this->json('POST', '/api/ai/conversations', [], [], JSON_FORCE_OBJECT)->assertCreated()->json('data.id');
         $base = '/api/ai/conversations/'.$conversation;
 
         return compact('owner', 'schedule', 'manager', 'fields', 'rule', 'base');
@@ -89,6 +98,7 @@ class AiSemesterActionsTest extends TestCase
     }
 
     #[DataProvider('operations')]
+    #[Group('smoke')]
     public function test_proposal_is_read_only_confirmation_is_owned_atomic_and_replayable(string $name): void
     {
         $f = $this->fixture();
@@ -115,19 +125,19 @@ class AiSemesterActionsTest extends TestCase
         $this->assertSame($before, $this->snapshot());
         $path = $f['base'].'/actions/'.$id.'/confirm';
         $this->app['auth']->forgetGuards();
-        $this->actingAs(User::factory()->create(), 'web')->postJson($path)->assertNotFound();
+        $this->actingAs(User::factory()->create(), 'web')->json('POST', $path, [], [], JSON_FORCE_OBJECT)->assertNotFound();
         $this->app['auth']->forgetGuards();
         $this->actingAs($f['owner'], 'web');
         AiMessage::creating(fn () => throw new RuntimeException('history failure'));
         try {
-            $this->postJson($path)->assertStatus(500);
+            $this->json('POST', $path, [], [], JSON_FORCE_OBJECT)->assertStatus(500);
         } finally {
             AiMessage::flushEventListeners();
         }
         $this->assertSame($before, $this->snapshot());
         $this->assertSame('pending', AiPendingAction::findOrFail($id)->status);
-        $receipt = $this->postJson($path)->assertOk()->assertJsonPath('data.status', 'executed')->json('data.receipt');
-        $this->assertSame($receipt, $this->postJson($path)->assertOk()->json('data.receipt'));
+        $receipt = $this->json('POST', $path, [], [], JSON_FORCE_OBJECT)->assertOk()->assertJsonPath('data.status', 'executed')->json('data.receipt');
+        $this->assertSame($receipt, $this->json('POST', $path, [], [], JSON_FORCE_OBJECT)->assertOk()->json('data.receipt'));
         $this->assertStringNotContainsString('schedule_token', json_encode($receipt));
         $after = $this->snapshot();
         foreach (['lessons', 'study_sessions', 'tasks', 'reminders'] as $table) {
@@ -149,7 +159,7 @@ class AiSemesterActionsTest extends TestCase
         $f['manager']->updateRule($f['owner'], $f['schedule'], $f['rule']->id, ['room' => 'Concurrent edit',
             'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
         $before = $this->snapshot();
-        $this->postJson($f['base'].'/actions/'.$id.'/confirm')->assertConflict()->assertJsonPath('code', 'action_stale');
+        $this->json('POST', $f['base'].'/actions/'.$id.'/confirm', [], [], JSON_FORCE_OBJECT)->assertConflict()->assertJsonPath('code', 'action_stale');
         $this->assertSame($before, $this->snapshot());
         $this->assertNull(AiPendingAction::findOrFail($id)->receipt);
     }
@@ -159,17 +169,18 @@ class AiSemesterActionsTest extends TestCase
         $f = $this->fixture();
         $id = $this->propose($f, 'propose_semester_rule_delete', ['semester_schedule_id' => $f['schedule']->id, 'weekly_lesson_rule_id' => $f['rule']->id]);
         $before = $this->snapshot();
-        $this->postJson($f['base'].'/actions/'.$id.'/reject')->assertOk()->assertJsonPath('data.status', 'rejected');
-        $this->postJson($f['base'].'/actions/'.$id.'/confirm')->assertConflict();
+        $this->json('POST', $f['base'].'/actions/'.$id.'/reject', [], [], JSON_FORCE_OBJECT)->assertOk()->assertJsonPath('data.status', 'rejected');
+        $this->json('POST', $f['base'].'/actions/'.$id.'/confirm', [], [], JSON_FORCE_OBJECT)->assertConflict();
         $this->assertSame($before, $this->snapshot());
     }
+
     public function test_expired_confirmation_preserves_the_calendar(): void
     {
         $f = $this->fixture();
         $id = $this->propose($f, 'propose_semester_rule_delete', ['semester_schedule_id' => $f['schedule']->id, 'weekly_lesson_rule_id' => $f['rule']->id]);
         AiPendingAction::whereKey($id)->update(['expires_at' => DB::raw('DATE_SUB(UTC_TIMESTAMP(6), INTERVAL 1 SECOND)')]);
         $before = $this->snapshot();
-        $this->postJson($f['base'].'/actions/'.$id.'/confirm')->assertStatus(410);
+        $this->json('POST', $f['base'].'/actions/'.$id.'/confirm', [], [], JSON_FORCE_OBJECT)->assertStatus(410);
         $this->assertSame($before, $this->snapshot());
         $this->assertNull(AiPendingAction::findOrFail($id)->receipt);
     }
@@ -177,7 +188,7 @@ class AiSemesterActionsTest extends TestCase
     public function test_foreign_rule_and_legacy_identity_cannot_prepare_a_semester_mutation(): void
     {
         $f = $this->fixture();
-        $service = app(\App\Services\AI\Actions\SemesterActionService::class);
+        $service = app(SemesterActionService::class);
         $other = User::factory()->create();
         $before = $this->snapshot();
         $foreign = $service->prepare($other, 'propose_semester_rule_delete', [
@@ -199,7 +210,7 @@ class AiSemesterActionsTest extends TestCase
         $foreign = User::factory()->create();
         Subject::factory()->for($foreign)->create(['name' => 'FOREIGN SUBJECT']);
         $before = $this->snapshot();
-        $reads = app(\App\Services\AI\Tools\SemesterReadTools::class);
+        $reads = app(SemesterReadTools::class);
         $catalog = $reads->execute($f['owner'], 'search_academic_catalog', ['kind' => 'subject', 'per_page' => 1]);
         $this->assertTrue($catalog['ok']);
         $this->assertCount(1, $catalog['data']['items']);
@@ -213,4 +224,43 @@ class AiSemesterActionsTest extends TestCase
         $this->assertSame($before, $this->snapshot());
     }
 
+    public function test_owned_semester_discovery_reads_feed_one_reviewable_proposal_without_calendar_writes(): void
+    {
+        $f = $this->fixture();
+        $before = $this->snapshot();
+        $round = 0;
+        $scheduleId = $ruleId = null;
+        $provider = $this->createMock(LlmProvider::class);
+        $provider->expects($this->exactly(5))->method('respond')->willReturnCallback(function ($instructions, $history, $definitions) use (&$round, &$scheduleId, &$ruleId) {
+            $this->assertSame(AiCapabilities::names(), array_column($definitions, 'name'));
+            if ($round > 0) {
+                $last = json_decode($history[array_key_last($history)]['content'], true, flags: JSON_THROW_ON_ERROR);
+                $this->assertTrue($last['ok']);
+            }
+            if ($round === 1) {
+                $scheduleId = $last['data']['schedules'][0]['id'];
+            }
+            if ($round === 2) {
+                $ruleId = $last['data']['weekly_rules'][0]['id'];
+            }
+            $call = match ($round++) {
+                0 => ['list_semester_schedules', []],
+                1 => ['get_semester_schedule_context', ['semester_schedule_id' => $scheduleId]],
+                2 => ['search_academic_catalog', ['kind' => 'subject']],
+                3 => ['propose_semester_rule_update', ['semester_schedule_id' => $scheduleId, 'weekly_lesson_rule_id' => $ruleId, 'room' => 'Reviewed room']],
+                default => null,
+            };
+
+            return $call === null ? ['text' => 'Please review the proposed change.', 'calls' => [], 'state' => []]
+                : ['text' => null, 'calls' => [['id' => 'semester_'.$round, 'name' => $call[0], 'arguments' => $call[1]]], 'state' => []];
+        });
+        $this->app->instance(LlmProvider::class, $provider);
+        $response = $this->postJson($f['base'].'/messages', ['content' => 'Inspect my semester, then propose a room change.'], ['Idempotency-Key' => (string) Str::uuid()])
+            ->assertOk()->assertJsonPath('data.action.state', 'confirmation_required');
+        $this->assertSame([...array_column((new SemesterActionRegistry)->readDefinitions(), 'name'), 'propose_semester_rule_update'], array_column($response->json('data.tools'), 'name'));
+        $this->assertSame($f['schedule']->id, $scheduleId);
+        $this->assertSame($f['rule']->id, $ruleId);
+        $this->assertSame($before, $this->snapshot());
+        $this->assertDatabaseCount('ai_pending_actions', 1);
+    }
 }

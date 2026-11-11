@@ -11,8 +11,11 @@ use App\Models\Teacher;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('security')]
 class LessonSecurityTest extends TestCase
 {
     use RefreshDatabase;

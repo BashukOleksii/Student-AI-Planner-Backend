@@ -25,10 +25,12 @@ use Illuminate\Testing\TestResponse;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 use ZipArchive;
 
+#[Group('mysql')]
 class ScheduleImportPreviewApiTest extends TestCase
 {
     use RefreshDatabase;

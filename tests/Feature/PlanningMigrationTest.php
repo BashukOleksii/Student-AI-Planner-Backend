@@ -5,15 +5,20 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\UsesForwardOnlyMigrations as DatabaseMigrations;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('migration')]
 class PlanningMigrationTest extends TestCase
 {
     use DatabaseMigrations;
 
-    public function test_domain_migrations_can_be_rolled_back_and_reapplied_without_losing_existing_users(): void
+    public function test_reversible_legacy_baseline_can_be_rolled_back_and_reapplied_without_losing_existing_users(): void
     {
+        $legacyBoundary = '2026_10_19_000002_add_ai_planning_actions';
+        $this->migrateThrough($legacyBoundary, true);
         $scaffoldMigrations = [
             '0001_01_01_000000_create_users_table',
             '0001_01_01_000001_create_cache_table',
@@ -35,7 +40,6 @@ class PlanningMigrationTest extends TestCase
         }
         $user = User::factory()->create(['timezone' => 'Europe/Kyiv']);
 
-        $domainMigrationCount -= $this->excludeForwardOnlyOverlayFromLegacyRollback();
         $this->artisan('migrate:rollback', ['--step' => $domainMigrationCount])->assertExitCode(0);
 
         $this->assertFalse(Schema::hasColumn('users', 'timezone'));
@@ -46,10 +50,30 @@ class PlanningMigrationTest extends TestCase
         $this->assertEqualsCanonicalizing($scaffoldTables, Schema::getTableListing(schema: DB::getDatabaseName(), schemaQualified: false));
         $this->assertSame($scaffoldMigrations, DB::table('migrations')->orderBy('migration')->pluck('migration')->all());
 
-        $this->artisan('migrate')->assertExitCode(0);
+        $this->migrateThrough($legacyBoundary);
 
         $this->assertSame('UTC', $user->refresh()->timezone);
         $this->assertEqualsCanonicalizing($tablesBeforeRollback, Schema::getTableListing(schema: DB::getDatabaseName(), schemaQualified: false));
         $this->assertSame($migrationsBeforeRollback, DB::table('migrations')->orderBy('migration')->pluck('migration')->all());
+    }
+
+    public function test_all_current_forward_migrations_upgrade_scaffold_without_losing_existing_users(): void
+    {
+        $expectedMigrations = DB::table('migrations')->orderBy('migration')->pluck('migration')->all();
+        $expectedTables = Schema::getTableListing(schema: DB::getDatabaseName(), schemaQualified: false);
+        $this->migrateThrough('2026_09_26_164204_create_personal_access_tokens_table', true);
+        $id = DB::table('users')->insertGetId(['name' => 'Retained student', 'email' => 'retained@example.test',
+            'password' => bcrypt('test-password'), 'created_at' => now(), 'updated_at' => now()]);
+        $before = (array) DB::table('users')->where('id', $id)->sole();
+        $this->artisan('migrate')->assertExitCode(0);
+        $after = (array) DB::table('users')->where('id', $id)->sole();
+        $this->assertSame('UTC', $after['timezone']);
+        unset($after['timezone']);
+        $this->assertSame($before, $after);
+        $this->assertSame($expectedMigrations, DB::table('migrations')->orderBy('migration')->pluck('migration')->all());
+        $this->assertEqualsCanonicalizing($expectedTables, Schema::getTableListing(schema: DB::getDatabaseName(), schemaQualified: false));
+        foreach (['recovery_suggestions', 'recovery_scan_states', 'semester_schedules', 'weekly_lesson_rules', 'ai_pending_actions'] as $table) {
+            $this->assertTrue(Schema::hasTable($table));
+        }
     }
 }

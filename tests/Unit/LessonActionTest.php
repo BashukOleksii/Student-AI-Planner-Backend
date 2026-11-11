@@ -52,7 +52,7 @@ class LessonActionTest extends TestCase
             ...(new PlanningActionRegistry)->definitions()];
         $definitions = (new LessonActionRegistry)->definitions();
         $this->assertSame(LessonActionRegistry::NAMES, array_column($definitions, 'name'));
-        $this->assertCount(31, array_unique(array_column([...$old, ...$definitions], 'name')));
+        $this->assertCount(count($old) + count($definitions), array_unique(array_column([...$old, ...$definitions], 'name')));
         foreach ((new OpenAiToolSchema)->definitions($definitions) as $i => $definition) {
             $this->assertFalse($definition['strict']);
             $this->assertFalse($definition['parameters']['additionalProperties']);

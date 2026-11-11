@@ -21,10 +21,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 use Tests\Unit\RelativeReminderRulesTest;
 
+#[Group('mysql')]
 class RelativeReminderApiTest extends TestCase
 {
     use DatabaseTruncation;

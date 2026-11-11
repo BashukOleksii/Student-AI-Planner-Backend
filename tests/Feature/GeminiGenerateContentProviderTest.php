@@ -20,9 +20,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use stdClass;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('ai')]
 class GeminiGenerateContentProviderTest extends TestCase
 {
     protected function setUp(): void

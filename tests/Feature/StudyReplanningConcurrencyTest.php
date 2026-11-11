@@ -23,14 +23,19 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Concerns\InteractsWithMysqlWorkers;
 use Tests\Support\TestDatabase;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('concurrency')]
+#[Group('recovery')]
 class StudyReplanningConcurrencyTest extends TestCase
 {
-    use DatabaseTruncation;
+    use DatabaseTruncation, InteractsWithMysqlWorkers;
 
     protected function setUp(): void
     {
@@ -244,53 +249,5 @@ class StudyReplanningConcurrencyTest extends TestCase
         $worker->start();
 
         return $worker;
-    }
-
-    private function readyConnection(Process $worker): int
-    {
-        $deadline = microtime(true) + 5;
-        do {
-            $ready = json_decode(explode("\n", $worker->getOutput())[0], true);
-            if (is_array($ready) && isset($ready['connection_id'])) {
-                $this->assertTrue($ready['ready']);
-
-                return (int) $ready['connection_id'];
-            }
-            if (! $worker->isRunning()) {
-                break;
-            }
-            usleep(10000);
-        } while (microtime(true) < $deadline);
-        $this->fail('The independent worker did not become ready: '.$worker->getErrorOutput());
-    }
-
-    private function assertWaitingOnOwner(int $connectionId): void
-    {
-        $deadline = microtime(true) + 5;
-        do {
-            $waiting = DB::selectOne(<<<'SQL'
-                SELECT COUNT(*) AS total FROM performance_schema.data_lock_waits AS waits
-                JOIN performance_schema.threads AS threads ON waits.REQUESTING_THREAD_ID = threads.THREAD_ID
-                JOIN performance_schema.data_locks AS locks ON waits.REQUESTING_ENGINE_LOCK_ID = locks.ENGINE_LOCK_ID
-                WHERE threads.PROCESSLIST_ID = ? AND locks.OBJECT_SCHEMA = DATABASE() AND locks.OBJECT_NAME = 'users'
-                SQL, [$connectionId]);
-            if ((int) $waiting->total > 0) {
-                $this->assertGreaterThan(0, (int) $waiting->total);
-
-                return;
-            }
-            usleep(10000);
-        } while (microtime(true) < $deadline);
-        $this->fail('The worker did not exhibit a real MySQL owner-row lock wait.');
-    }
-
-    private function outcome(Process $worker): array
-    {
-        $this->assertSame(0, $worker->wait(), $worker->getErrorOutput());
-        $lines = explode("\n", trim($worker->getOutput()));
-        $result = json_decode(end($lines), true, 512, JSON_THROW_ON_ERROR);
-        $this->assertArrayHasKey('status', $result);
-
-        return $result;
     }
 }

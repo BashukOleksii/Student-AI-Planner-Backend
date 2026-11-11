@@ -5,11 +5,8 @@ namespace Tests\Feature;
 use App\Services\AI\Actions\AvailabilityActionRegistry;
 use App\Services\AI\Actions\LessonActionRegistry;
 use App\Services\AI\Actions\PlanningActionRegistry;
-use App\Services\AI\Actions\SemesterActionRegistry;
 use App\Services\AI\Actions\SubtaskReminderActionRegistry;
 use App\Services\AI\Actions\TaskActionRegistry;
-use App\Services\AI\Tools\RecoveryReadTools;
-use App\Services\AI\Tools\ToolRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Http\Client\Factory;
@@ -17,11 +14,15 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\InteractsWithAiResponses;
 use Tests\Concerns\InteractsWithSpaBrowser;
+use Tests\Support\AiCapabilities;
 use Tests\TestCase;
 
 /** Offline H4 smoke. Every fixture mutation and readback uses the authenticated REST API. */
+#[Group('mysql')]
+#[Group('workflow')]
 class BackendIntegrationSmokeTest extends TestCase
 {
     use DatabaseTruncation, InteractsWithAiResponses, InteractsWithSpaBrowser;
@@ -29,6 +30,7 @@ class BackendIntegrationSmokeTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->travelTo(CarbonImmutable::parse(DB::selectOne('SELECT UTC_TIMESTAMP(6) AS clock')->clock, 'UTC')); // Align with database-owned AI leases.
         config(['ai.provider' => 'openai', 'ai.openai_key' => 'h4-fake-transport-key', 'ai.model' => 'gpt-5.4-mini', 'ai.requests_per_minute' => 60]);
         Http::preventStrayRequests();
         $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
@@ -68,13 +70,9 @@ class BackendIntegrationSmokeTest extends TestCase
             $this->assertSame(0, DB::transactionLevel());
             $this->assertSame('https://api.openai.com/v1/responses', $request->url());
             $body = $request->data();
-            $names = [...array_column((new ToolRegistry)->definitions(), 'name'), ...array_column((new TaskActionRegistry)->definitions(), 'name'),
-                ...array_column((new SubtaskReminderActionRegistry)->readDefinitions(), 'name'),
-                ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES, ...AvailabilityActionRegistry::NAMES,
-                ...array_column((new SemesterActionRegistry)->readDefinitions(), 'name'), ...SemesterActionRegistry::NAMES,
-                ...array_column(RecoveryReadTools::definitions(), 'name')];
+            $names = AiCapabilities::names();
             $this->assertSame($names, array_column($body['tools'], 'name'));
-            $this->assertCount(49, array_unique($names));
+            $this->assertCount(count($names), array_unique($names));
             foreach ($body['tools'] as $tool) {
                 $this->assertSame('function', $tool['type']);
                 $this->assertFalse($tool['parameters']['additionalProperties']);
@@ -262,7 +260,7 @@ class BackendIntegrationSmokeTest extends TestCase
         $this->browser('POST', $actionPath.'/confirm')->assertUnauthorized();
     }
 
-    public function test_all_eleven_reads_use_native_provider_calls_and_match_ordinary_owned_rest_reads_without_business_writes(): void
+    public function test_core_and_management_reads_use_native_provider_calls_and_match_equivalent_owned_rest_fields_without_business_writes(): void
     {
         $f = $this->fixture();
         $date = $f['day']->toDateString();

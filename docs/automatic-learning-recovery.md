@@ -1,5 +1,7 @@
 # Automatic learning recovery: Backend and frontend contract
 
+> Subsequent testing stage: the complete offline suite passed locally (6,782 tests, 74,032 assertions), including the recovery/calendar regressions. See [executed evidence and runtime limits](testing/backend-test-rebuild-report.md). Deferred-verification statements below describe the original implementation stage.
+
 Implementation follows reference `4eb708e6a97964007460d4f84585637f8e260b9b` on `main`. This document describes code, not verified runtime behavior. No database migration, scheduler, PHPUnit, browser, delivery or live LLM verification was executed for this implementation stage.
 
 ## Authority and lifecycle

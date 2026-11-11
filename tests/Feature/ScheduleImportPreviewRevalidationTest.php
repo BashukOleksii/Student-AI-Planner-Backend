@@ -22,9 +22,11 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class ScheduleImportPreviewRevalidationTest extends TestCase
 {
     use RefreshDatabase;

@@ -12,11 +12,14 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\InteractsWithAiResponses;
 use Tests\Concerns\InteractsWithSpaBrowser;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('ai')]
 class AiReadinessHardeningTest extends TestCase
 {
     use DatabaseTruncation, InteractsWithAiResponses, InteractsWithSpaBrowser;

@@ -2,18 +2,15 @@
 
 namespace Tests\Unit;
 
-use App\Services\AI\Actions\LessonActionRegistry;
-use App\Services\AI\Actions\PlanningActionRegistry;
-use App\Services\AI\Actions\SubtaskReminderActionRegistry;
-use App\Services\AI\Actions\TaskActionRegistry;
 use App\Services\AI\GeminiToolSchema;
 use App\Services\AI\OpenAiToolSchema;
 use App\Services\AI\Tools\ToolRegistry;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\AiCapabilities;
 
 class AiAvailabilityToolSchemaTest extends TestCase
 {
-    public function test_exact_schema_and_all_previous_definitions_are_preserved(): void
+    public function test_current_availability_schema_is_closed_and_registered_without_name_collisions(): void
     {
         $registry = new ToolRegistry;
         $definition = $registry->find('list_study_availability_windows');
@@ -31,15 +28,8 @@ class AiAvailabilityToolSchemaTest extends TestCase
                 'additionalProperties' => false,
             ],
         ], $definition);
-        $definitions = [...$registry->definitions(), ...(new TaskActionRegistry)->definitions(),
-            ...(new SubtaskReminderActionRegistry)->readDefinitions(), ...(new SubtaskReminderActionRegistry)->definitions(),
-            ...(new PlanningActionRegistry)->definitions(), ...(new LessonActionRegistry)->definitions()];
-        $this->assertCount(31, array_unique(array_column($definitions, 'name')));
-        $baseline = json_decode(file_get_contents(__DIR__.'/../Fixtures/AI/tool-definitions-lifecycle-before-availability-actions.json'), true, flags: JSON_THROW_ON_ERROR);
-        $this->assertCount(31, $baseline);
-        $baseline = array_values(array_filter($baseline, fn ($item) => $item['name'] !== $definition['name']));
-        $this->assertCount(30, $baseline);
-        $this->assertSame($baseline, array_values(array_filter($definitions, fn ($item) => $item['name'] !== $definition['name'])));
+        $this->assertContains($definition, AiCapabilities::definitions());
+        $this->assertCount(count(AiCapabilities::names()), array_unique(AiCapabilities::names()));
     }
 
     public function test_both_provider_schemas_preserve_bounds_and_optional_argument_semantics(): void

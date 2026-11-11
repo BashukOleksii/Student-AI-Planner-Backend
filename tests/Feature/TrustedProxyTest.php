@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class TrustedProxyTest extends TestCase
 {
     private const CONTEXT_URL = 'http://internal.test:8080/_testing/proxy-context';

@@ -24,10 +24,15 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Concerns\AssertsBatchedReads;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('recovery')]
 class StudyReplanningPreviewTest extends TestCase
 {
+    use AssertsBatchedReads;
     use DatabaseTruncation;
 
     protected function setUp(): void
@@ -373,8 +378,8 @@ class StudyReplanningPreviewTest extends TestCase
         $small = $this->queryCount($user);
         StudySession::factory()->count(40)->for($task)->create(['starts_at' => '2026-10-19 10:00:00', 'ends_at' => '2026-10-19 10:01:00']);
         $large = $this->queryCount($user);
-        $this->assertSame($small, $large);
-        $this->assertLessThan(30, $large);
+        $this->assertCount(count($small), $large);
+        $this->assertSameReadShape($small, $large);
         $data = $this->preview();
         $this->assertSame(41, $data['summary']['proposed_replacements']);
         $this->assertSame(2460, $data['summary']['replacement_seconds']);
@@ -547,12 +552,12 @@ class StudyReplanningPreviewTest extends TestCase
         return $this->postJson('/api/planning/replanning/preview', ['start_date' => '2026-10-19', 'end_date' => '2026-10-19', ...$scope])->assertOk()->json('data');
     }
 
-    private function queryCount(User $user): int
+    private function queryCount(User $user): array
     {
         DB::enableQueryLog();
         DB::flushQueryLog();
         app(StudyReplanningPreviewService::class)->preview($user, '2026-10-19', '2026-10-19');
-        $count = count(DB::getQueryLog());
+        $count = DB::getQueryLog();
         DB::disableQueryLog();
 
         return $count;

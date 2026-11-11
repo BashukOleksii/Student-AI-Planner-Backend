@@ -20,6 +20,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class ProgressStatisticsApiTest extends TestCase
 {
     use RefreshDatabase;

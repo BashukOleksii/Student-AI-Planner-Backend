@@ -13,8 +13,10 @@ use App\Models\User;
 use App\Services\Schedule\LessonService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class LessonApiTest extends TestCase
 {
     use RefreshDatabase;

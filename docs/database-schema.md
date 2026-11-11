@@ -1,5 +1,7 @@
 # Physical Database Schema
 
+Current compatibility migration `2026_11_12_000003_expand_ai_action_type_length.php` widens `ai_pending_actions.type` to VARCHAR(64). Registered semester occurrence and working-Saturday names exceed the original 32-character capacity. Existing identities, CHECKs, indexes and receipts are preserved; narrowing is forward-only. See [the executed rebuild report](testing/backend-test-rebuild-report.md). Historical stage descriptions below retain their original scope.
+
 Stage 4 adds `semester_schedules.management_revision` (BIGINT UNSIGNED, default 0), `weekly_lesson_rules.is_manually_managed` (BOOLEAN, default false, CHECK 0/1), and `semester_schedule_suppressed_slots` (id, owned schedule, weekday, pair, pattern, timestamps) with a composite schedule/owner restrictive FK, unique slot and scalar CHECKs. See [management persistence and deployment](semester-schedule-management.md#schedule-deletion-deployment-and-limits) and ADR-008.
 
 Stage 3 migration `2026_11_10_000002_create_semester_schedule_imports.php` adds an owned revision/review/receipt table and nullable recurring-rule provenance/key/baseline columns, without backfill. See [the physical additions and constraints](semester-schedule-import.md#persistence-and-consistency) and [ADR-007](decisions/ADR-007-semester-schedule-import.md).

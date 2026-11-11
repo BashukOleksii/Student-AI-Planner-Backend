@@ -28,10 +28,14 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\InteractsWithAiResponses;
+use Tests\Support\AiCapabilities;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('ai')]
 class AiAvailabilityActionsTest extends TestCase
 {
     use DatabaseTruncation, InteractsWithAiResponses;
@@ -500,7 +504,7 @@ class AiAvailabilityActionsTest extends TestCase
         $round = 0;
         $provider = $this->createMock(LlmProvider::class);
         $provider->expects($this->exactly(3))->method('respond')->willReturnCallback(function ($instructions, $history, $definitions) use (&$round) {
-            $this->assertCount(49, $definitions);
+            $this->assertSame(AiCapabilities::names(), array_column($definitions, 'name'));
             $this->assertSame(0, DB::transactionLevel());
             $this->assertDatabaseCount('ai_pending_actions', 0);
             $this->assertStringContainsString('Use list_study_availability_windows to discover exact owned window IDs', $instructions);

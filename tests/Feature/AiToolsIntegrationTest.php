@@ -31,9 +31,12 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('ai')]
 class AiToolsIntegrationTest extends TestCase
 {
     use DatabaseTruncation;

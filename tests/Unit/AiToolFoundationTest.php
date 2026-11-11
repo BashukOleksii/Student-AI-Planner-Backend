@@ -70,7 +70,7 @@ class AiToolFoundationTest extends TestCase
         $registry = new ToolRegistry;
         $definitions = $registry->definitions();
         $this->assertSame(array_column(self::validCalls(), 0), array_column($definitions, 'name'));
-        $this->assertCount(9, array_unique(array_column($definitions, 'name')));
+        $this->assertCount(count($definitions), array_unique(array_column($definitions, 'name')));
         $this->assertSame($definitions, json_decode(json_encode($definitions, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR));
         foreach ($definitions as $definition) {
             $this->assertNotEmpty($definition['description']);

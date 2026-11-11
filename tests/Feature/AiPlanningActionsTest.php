@@ -28,8 +28,11 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\InteractsWithPlanningActions;
+use Tests\Support\AiCapabilities;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('ai')]
 class AiPlanningActionsTest extends TestCase
 {
     use DatabaseTruncation, InteractsWithPlanningActions;
@@ -558,7 +561,7 @@ class AiPlanningActionsTest extends TestCase
         Http::preventStrayRequests();
         Http::fake(function ($request) {
             $this->assertSame(0, DB::transactionLevel());
-            $this->assertCount(49, $request['tools'][0]['functionDeclarations'] ?? $request['tools']);
+            $this->assertSame(AiCapabilities::names(), array_column($request['tools'][0]['functionDeclarations'] ?? $request['tools'], 'name'));
             $this->assertStringContainsString('action_stale', json_encode($this->aiInput($request)));
             $this->assertStringContainsString('failed', json_encode($this->aiInput($request)));
             $this->assertStringNotContainsString('preview_token', json_encode($request->data()));

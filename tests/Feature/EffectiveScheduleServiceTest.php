@@ -18,9 +18,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\AssertsMysqlPersistence;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class EffectiveScheduleServiceTest extends TestCase
 {
     use AssertsMysqlPersistence, RefreshDatabase;

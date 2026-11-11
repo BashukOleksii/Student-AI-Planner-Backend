@@ -24,6 +24,7 @@ use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class SemesterScheduleImportWorkflowTest extends TestCase
 {
     use RefreshDatabase;
@@ -145,18 +146,20 @@ class SemesterScheduleImportWorkflowTest extends TestCase
         $this->assertArrayNotHasKey('user_id', $preview->json('data'));
     }
 
-    public function test_missing_catalogs_are_fixed_with_existing_apis_then_revalidated_and_committed(): void
+    public function test_missing_catalogs_are_prepared_without_writes_and_manual_catalog_changes_require_revalidation(): void
     {
         [$user, $period, $template] = $this->context(false);
         // Foreign matching names are never resolutions.
         foreach (array_unique(array_column($template['rules'], 'subject_name')) as $name) {
             Subject::factory()->create(['name' => $name]);
         }
-        $preview = $this->upload($user, $period)->assertCreated()->assertJsonPath('data.status', 'invalid')
-            ->assertJsonPath('data.preview.rows.0.subject', null)->assertJsonPath('data.preview.rows.0.teacher', null);
-        $this->assertNotEmpty($preview->json('data.preview.rows.0.errors.subject_name'));
-        $this->assertNotEmpty($preview->json('data.preview.rows.0.errors.teacher_name'));
-        $this->confirm($preview)->assertUnprocessable();
+        $preview = $this->upload($user, $period)->assertCreated()->assertJsonPath('data.status', 'ready')
+            ->assertJsonPath('data.preview.rows.0.subject.id', null)->assertJsonPath('data.preview.rows.0.teacher.id', null)
+            ->assertJsonPath('data.preview.rows.0.subject.resolution', 'create')->assertJsonPath('data.preview.rows.0.teacher.resolution', 'create');
+        $this->assertSame(0, $user->subjects()->count());
+        $this->assertSame(0, $user->teachers()->count());
+        $this->confirm($preview, ['confirmed' => false])->assertUnprocessable();
+        $this->assertDatabaseCount('weekly_lesson_rules', 0);
         foreach (array_unique(array_column($template['rules'], 'subject_name')) as $name) {
             $this->postJson('/api/subjects', ['name' => $name])->assertCreated();
         }
@@ -176,7 +179,7 @@ class SemesterScheduleImportWorkflowTest extends TestCase
         [$user, $period, $template] = $this->context();
         $duplicate = Teacher::factory()->for($user)->create(['name' => $template['rules'][0]['teacher_name']]);
         $preview = $this->upload($user, $period)->assertCreated()->assertJsonPath('data.status', 'invalid');
-        $this->assertStringContainsString('Multiple', $preview->json('data.preview.rows.0.errors.teacher_name.0'));
+        $this->assertStringContainsString('Multiple', $preview->json('data.preview.rows.0.errors.teacher_names.0.errors.0'));
         $this->patchJson('/api/teachers/'.$duplicate->id, ['name' => 'Different owned teacher'])->assertOk();
         $fresh = $this->postJson('/api/semester-schedule-imports/'.$preview->json('data.id').'/revalidate')->assertOk()->assertJsonPath('data.status', 'ready');
         $this->confirm($fresh)->assertOk();
@@ -430,9 +433,22 @@ class SemesterScheduleImportWorkflowTest extends TestCase
 
     public static function invalidOptions(): array
     {
-        return [[['parity_anchor_on' => '2026-09-08']], [['parity_anchor_on' => '2026-02-30']],
-            [['first_week_parity' => 'all']], [['academic_period_id' => '01']],
+        return [[['academic_period_id' => '01']],
             [['schedule_file' => null]], [['schedule_file' => UploadedFile::fake()->create('wrong.txt', 1, 'text/plain')]]];
+    }
+
+    #[DataProvider('ignoredClientParity')]
+    public function test_client_parity_fields_cannot_override_server_owned_import_settings(array $options): void
+    {
+        [$user, $period] = $this->context();
+        $this->upload($user, $period, options: $options)->assertCreated()->assertJsonPath('data.status', 'ready')
+            ->assertJsonPath('data.parity_anchor_on', '2026-09-07')->assertJsonPath('data.first_week_parity', 'numerator');
+        $this->assertDatabaseCount('weekly_lesson_rules', 0);
+    }
+
+    public static function ignoredClientParity(): array
+    {
+        return [[['parity_anchor_on' => '2026-09-08']], [['parity_anchor_on' => '2026-02-30']], [['first_week_parity' => 'all']]];
     }
 
     public function test_unsupported_valid_xlsx_returns_failed_review_without_domain_writes(): void
@@ -552,7 +568,11 @@ class SemesterScheduleImportWorkflowTest extends TestCase
         [$user, $period] = $this->context();
         $preview = $this->upload($user, $period, options: ['first_week_parity' => 'denominator'])->assertCreated();
         $commit = $this->confirm($preview)->assertOk();
-        $rows = $this->getJson('/api/semester-schedules/'.$commit->json('data.receipt.semester_schedule_id').'/date/2026-09-08')->assertOk()->json('data');
+        $base = '/api/semester-schedules/'.$commit->json('data.receipt.semester_schedule_id');
+        $this->getJson($base.'/date/2026-09-08')->assertOk()->assertJsonPath('data.3.subject.name', 'Філософія');
+        $token = $this->getJson($base.'/management')->assertOk()->json('meta.schedule_token');
+        $this->patchJson($base, ['first_week_parity' => 'denominator', 'schedule_token' => $token])->assertOk();
+        $rows = $this->getJson($base.'/date/2026-09-08')->assertOk()->json('data');
         $this->assertSame('Проект інтерфейсів користувача ПС', collect($rows)->where('pair_number', 4)->sole()['subject']['name']);
         $legacy = $this->postJson('/api/schedule-imports', ['academic_period_id' => $period->id,
             'schedule_file' => new UploadedFile(self::FIXTURE, 'schedule.xlsx', null, null, true)])

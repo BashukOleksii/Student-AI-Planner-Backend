@@ -9,11 +9,14 @@ use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\AssertsMysqlPersistence;
 use Tests\Concerns\UsesForwardOnlyMigrations;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('migration')]
 class SemesterScheduleManagementPersistenceTest extends TestCase
 {
     use AssertsMysqlPersistence, UsesForwardOnlyMigrations;
@@ -59,7 +62,10 @@ class SemesterScheduleManagementPersistenceTest extends TestCase
         $migration->down();
         $this->assertFalse(Schema::hasColumn('weekly_lesson_rules', 'is_manually_managed'));
         $migration->up();
-        $this->assertSame($before, $rule->fresh()->getRawOriginal());
+        $after = $rule->fresh()->getRawOriginal();
+        ksort($before);
+        ksort($after);
+        $this->assertSame($before, $after);
         $this->assertSame($legacy, $lesson->fresh()->getRawOriginal());
         $schedule->management_revision = 1;
         $schedule->save();

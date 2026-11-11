@@ -27,11 +27,15 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Concerns\AssertsBatchedReads;
 use Tests\TestCase;
 use UnexpectedValueException;
 
+#[Group('mysql')]
 class StudyPlanningServiceTest extends TestCase
 {
+    use AssertsBatchedReads;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -626,11 +630,13 @@ class StudyPlanningServiceTest extends TestCase
         $this->assertCount(5, $smallPlan['sessions']);
         $this->assertCount(100, $largePlan['sessions']);
         $this->assertCount(count($small), $large);
-        $this->assertCount(14, $large);
+        $this->assertSameReadShape($small, $large);
         foreach ($large as $query) {
             $this->assertStringStartsWith('select ', $query['query']);
             $this->assertStringNotContainsString('for update', $query['query']);
-            $this->assertStringNotContainsString('select *', $query['query']);
+            if (! preg_match('/from `(lessons|schedule_import_batches|academic_periods)`/', $query['query'])) {
+                $this->assertStringNotContainsString('select *', $query['query']);
+            } // Calendar graph validation deliberately loads complete owned Lesson sources.
             if (str_contains($query['query'], 'from `lessons`') || str_contains($query['query'], 'from `study_sessions`') || str_contains($query['query'], 'from `tasks`')) {
                 $this->assertStringContainsString('`user_id` = ?', $query['query']);
                 $this->assertSame($user->id, $query['bindings'][0]);

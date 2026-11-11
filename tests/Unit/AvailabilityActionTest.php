@@ -34,6 +34,7 @@ use Illuminate\Validation\Factory;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\AiCapabilities;
 
 class AvailabilityActionTest extends TestCase
 {
@@ -50,10 +51,10 @@ class AvailabilityActionTest extends TestCase
         $old = [...(new ToolRegistry)->definitions(), ...(new TaskActionRegistry)->definitions(),
             ...(new SubtaskReminderActionRegistry)->readDefinitions(), ...(new SubtaskReminderActionRegistry)->definitions(),
             ...(new PlanningActionRegistry)->definitions(), ...(new LessonActionRegistry)->definitions()];
-        $this->assertSame(json_decode(file_get_contents(__DIR__.'/../Fixtures/AI/tool-definitions-lifecycle-before-availability-actions.json'), true, flags: JSON_THROW_ON_ERROR), $old);
+        $this->assertSame($old, array_slice(AiCapabilities::definitions(), 0, count($old)));
         $definitions = (new AvailabilityActionRegistry)->definitions();
         $this->assertSame(AvailabilityActionRegistry::NAMES, array_column($definitions, 'name'));
-        $this->assertCount(34, array_unique(array_column([...$old, ...$definitions], 'name')));
+        $this->assertCount(count($old) + count($definitions), array_unique(array_column([...$old, ...$definitions], 'name')));
         $fields = [
             'day_of_week' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 7],
             'starts_at' => ['type' => 'string', 'pattern' => '^(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$'],

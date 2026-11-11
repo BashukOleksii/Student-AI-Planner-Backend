@@ -6,11 +6,15 @@ use App\Models\AiConversation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\AssertsMysqlPersistence;
 use Tests\Concerns\UsesForwardOnlyMigrations as DatabaseMigrations;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('ai')]
+#[Group('migration')]
 class AiManagementActionMigrationTest extends TestCase
 {
     use AssertsMysqlPersistence, DatabaseMigrations;

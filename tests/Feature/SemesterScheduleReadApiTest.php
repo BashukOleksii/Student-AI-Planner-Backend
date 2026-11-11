@@ -19,10 +19,13 @@ use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
+use Tests\Concerns\AssertsBatchedReads;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class SemesterScheduleReadApiTest extends TestCase
 {
+    use AssertsBatchedReads;
     use RefreshDatabase;
 
     private function schedule(?User $user = null): SemesterSchedule
@@ -141,6 +144,8 @@ class SemesterScheduleReadApiTest extends TestCase
             'subject' => $rule->subject->only(['id', 'name', 'code', 'color']), 'teacher' => $teacher->only(['id', 'name']),
             'room' => '221', 'starts_at' => '2026-09-08T13:20:00+03:00', 'ends_at' => '2026-09-08T14:40:00+03:00',
             'weekly_lesson_rule_id' => $rule->id, 'schedule_date_exception_id' => null,
+            'lesson_type' => null, 'teacher_id' => $teacher->id, 'teacher_ids' => [$teacher->id],
+            'teachers' => [$teacher->only(['id', 'name'])],
         ]], 'meta' => ['timezone' => 'Europe/Kyiv', 'semester_schedule_id' => $schedule->id,
             'start_date' => '2026-09-08', 'end_date' => '2026-09-08']];
         $this->actingAs($schedule->user, 'web')->getJson($url)->assertExactJson($expected);
@@ -313,7 +318,7 @@ class SemesterScheduleReadApiTest extends TestCase
             Model::preventLazyLoading(false);
         }
         $this->assertCount(count($baseline), $dense);
-        $this->assertLessThanOrEqual(15, count($dense));
+        $this->assertSameReadShape($baseline, $dense);
         $this->assertCount(1, array_filter($dense, fn ($q) => str_contains($q['query'], '`weekly_lesson_rules`.`semester_schedule_id` =')));
     }
 

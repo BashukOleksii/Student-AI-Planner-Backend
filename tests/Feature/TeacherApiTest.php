@@ -9,8 +9,10 @@ use App\Models\User;
 use App\Services\Academic\TeacherService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class TeacherApiTest extends TestCase
 {
     use RefreshDatabase;

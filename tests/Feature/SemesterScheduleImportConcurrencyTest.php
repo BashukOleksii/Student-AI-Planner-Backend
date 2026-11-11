@@ -11,11 +11,14 @@ use App\Services\Imports\ScheduleWorkbookParser;
 use App\Services\Imports\SemesterScheduleImportService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Process\Process;
 use Tests\Concerns\UsesForwardOnlyMigrations;
 use Tests\Support\TestDatabase;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('concurrency')]
 class SemesterScheduleImportConcurrencyTest extends TestCase
 {
     use UsesForwardOnlyMigrations;

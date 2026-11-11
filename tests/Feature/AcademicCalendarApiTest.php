@@ -10,16 +10,28 @@ use App\Models\Subject;
 use App\Models\Task;
 use App\Models\Teacher;
 use App\Models\User;
+use App\Services\AI\Tools\EffectiveScheduleReadService;
 use App\Services\Schedule\SemesterScheduleManagementService;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
-/** Deferred until disposable MySQL verification; never includes self-study in the academic calendar. */
+/** Unified academic reads exclude self-study; fixtures clean up before transaction-based API suites. */
+#[Group('mysql')]
 class AcademicCalendarApiTest extends TestCase
 {
     use DatabaseTruncation;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
+    }
+
+    #[Group('smoke')]
     public function test_unified_day_week_and_today_preserve_owned_source_identity_and_legacy_contracts(): void
     {
         $this->travelTo(now('UTC')->setDate(2026, 10, 20)->setTime(8, 0));
@@ -67,14 +79,54 @@ class AcademicCalendarApiTest extends TestCase
             ->assertJsonCount(100, 'data')->assertJsonPath('meta.total', 101)->assertJsonPath('meta.returned', 100)
             ->assertJsonPath('meta.truncated', true);
     }
+
     public function test_unexpected_calendar_errors_do_not_disclose_sql_even_in_debug_mode(): void
     {
         config(['app.debug' => true]);
         $owner = User::factory()->create();
-        $reader = $this->mock(\App\Services\AI\Tools\EffectiveScheduleReadService::class);
+        $reader = $this->mock(EffectiveScheduleReadService::class);
         $reader->shouldReceive('range')->once()->andThrow(new \RuntimeException('SELECT private FROM secrets; credential'));
         $this->actingAs($owner, 'web')->getJson('/api/academic-calendar/date/2026-10-20')->assertStatus(500)
             ->assertExactJson(['message' => 'The academic calendar could not be processed.']);
     }
 
+    #[DataProvider('dstDates')]
+    public function test_unified_reads_preserve_dst_instants_and_cross_midnight_occupancy_without_self_study(string $date, string $localStart, string $localEnd): void
+    {
+        $this->travelTo(CarbonImmutable::parse($date.'T04:00:00Z'));
+        $owner = User::factory()->create(['timezone' => 'Europe/Kyiv']);
+        $institution = EducationInstitution::factory()->for($owner)->create();
+        $monday = CarbonImmutable::parse($date, 'UTC')->subDays(6)->toDateString();
+        $period = AcademicPeriod::factory()->for($owner)->for($institution)->create(['starts_on' => $monday, 'ends_on' => $date]);
+        $schedule = $owner->semesterSchedules()->create(['academic_period_id' => $period->id, 'group_name' => 'DST',
+            'parity_anchor_on' => $monday, 'first_week_parity' => 'numerator']);
+        $subject = Subject::factory()->for($owner)->create();
+        $teacher = Teacher::factory()->for($owner)->create();
+        $manager = app(SemesterScheduleManagementService::class);
+        $manager->replaceDate($owner, $schedule, $date, ['mode' => 'replace', 'lessons' => [['pair_number' => 1,
+            'starts_at_local' => '01:00:00', 'ends_at_local' => '02:00:00', 'subject_id' => $subject->id, 'teacher_id' => $teacher->id]],
+            'schedule_token' => $manager->read($owner, $schedule)['meta']['schedule_token']]);
+        $dst = Lesson::factory()->for($owner)->create(['starts_at' => $date.' 00:30:00', 'ends_at' => $date.' 01:30:00']);
+        $previous = CarbonImmutable::parse($date)->subDay()->toDateString();
+        $cross = Lesson::factory()->for($owner)->create(['starts_at' => $previous.' 20:30:00', 'ends_at' => $date.' 00:30:00']);
+        StudySession::factory()->for(Task::factory()->for($owner)->create())->create(['starts_at' => $date.' 09:00:00', 'ends_at' => $date.' 10:00:00']);
+        $this->actingAs($owner, 'web');
+        $rows = $this->getJson('/api/academic-calendar/date/'.$date)->assertOk()->assertJsonCount(3, 'data')->json('data');
+        $this->assertSame($rows, $this->getJson('/api/academic-calendar/today')->assertOk()->json('data'));
+        $this->assertSame($rows, $this->getJson('/api/academic-calendar/week/'.$date)->assertOk()->json('data'));
+        $lesson = collect($rows)->firstWhere('lesson_id', $dst->id);
+        $this->assertSame($localStart, $lesson['starts_at']);
+        $this->assertSame($localEnd, $lesson['ends_at']);
+        $this->assertSame(3600, strtotime($lesson['ends_at']) - strtotime($lesson['starts_at']));
+        $this->assertSame($cross->id, $rows[0]['lesson_id']);
+        $this->assertSame($previous, $rows[0]['occurs_on']);
+        $this->assertCount(1, array_filter($rows, fn ($row) => $row['source_type'] === 'semester_occurrence'));
+        $this->assertCount(3, array_unique(array_column($rows, 'source_identity')));
+    }
+
+    public static function dstDates(): array
+    {
+        return [['2026-03-29', '2026-03-29T02:30:00+02:00', '2026-03-29T04:30:00+03:00'],
+            ['2026-10-25', '2026-10-25T03:30:00+03:00', '2026-10-25T03:30:00+02:00']];
+    }
 }

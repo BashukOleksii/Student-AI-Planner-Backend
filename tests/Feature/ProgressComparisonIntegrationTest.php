@@ -17,10 +17,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\AssertsProgressComparison;
 use Tests\Support\TestDatabase;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class ProgressComparisonIntegrationTest extends TestCase
 {
     use AssertsProgressComparison, DatabaseTruncation;

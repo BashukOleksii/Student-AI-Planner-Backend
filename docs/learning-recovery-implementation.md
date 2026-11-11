@@ -1,5 +1,7 @@
 # Learning recovery implementation scope and completeness review
 
+> Subsequent testing stage: the complete offline suite passed locally (6,782 tests, 74,032 assertions), including the recovery/calendar regressions. See [executed evidence and runtime limits](testing/backend-test-rebuild-report.md). Deferred-verification statements below describe the original implementation stage.
+
 Reference: `4eb708e6a97964007460d4f84585637f8e260b9b`; initial branch `main`, initially clean. Current code is authoritative. [ADR-012](decisions/ADR-012-automatic-learning-recovery.md) records the explicit product decision. [API contract](automatic-learning-recovery.md) specifies routes, resource shapes, bounds, expiry, consent, AI and Vue behavior.
 
 ## Mandatory functionality review

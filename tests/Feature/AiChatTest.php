@@ -24,11 +24,14 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\InteractsWithAiResponses;
 use Tests\TestCase;
 use Tests\Unit\AgentOrchestratorTest;
 
+#[Group('mysql')]
+#[Group('ai')]
 class AiChatTest extends TestCase
 {
     use DatabaseTruncation, InteractsWithAiResponses;

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
@@ -21,6 +22,9 @@ use Tests\Concerns\InteractsWithAiResponses;
 use Tests\Support\TestDatabase;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('ai')]
+#[Group('concurrency')]
 class AiTaskActionConcurrencyTest extends TestCase
 {
     use DatabaseTruncation, InteractsWithAiResponses;

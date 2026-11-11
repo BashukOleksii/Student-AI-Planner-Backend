@@ -12,8 +12,11 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('migration')]
 class AcademicContextPersistenceTest extends TestCase
 {
     use RefreshDatabase;

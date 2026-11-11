@@ -3,60 +3,34 @@
 namespace Tests\Feature;
 
 use App\Models\Lesson;
-use App\Models\PlanningPreference;
-use App\Models\RecoverySuggestion;
-use App\Models\StudyAvailabilityWindow;
 use App\Models\StudySession;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\AI\Tools\RecoveryReadTools;
-use App\Services\Planning\RecoverySuggestionService;
 use App\Services\Planning\StudyPlanPersistenceService;
 use App\Services\Reminders\ReminderService;
 use App\Services\Tasks\TaskService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Concerns\InteractsWithLearningRecovery;
 use Tests\TestCase;
 
 /** Deferred disposable-MySQL verification of the automatic review workflow, not a live scheduler test. */
+#[Group('mysql')]
+#[Group('recovery')]
 class AutomaticLearningRecoveryTest extends TestCase
 {
-    use DatabaseTruncation;
+    use DatabaseTruncation, InteractsWithLearningRecovery;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->travelTo(CarbonImmutable::parse('2026-10-19T08:00:00Z'));
-        $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
+        $this->initializeRecovery();
     }
 
-    private function fixture(): array
-    {
-        $owner = User::factory()->create(['timezone' => 'UTC']);
-        PlanningPreference::factory()->for($owner)->create(['min_session_minutes' => 30, 'max_session_minutes' => 120,
-            'preferred_break_minutes' => 15, 'max_daily_study_minutes' => 240, 'max_weekly_study_minutes' => 1200]);
-        foreach (range(1, 7) as $day) {
-            StudyAvailabilityWindow::factory()->for($owner)->create(['day_of_week' => $day, 'starts_at' => '09:00:00', 'ends_at' => '17:00:00']);
-        }
-        $task = Task::factory()->for($owner)->create(['estimated_minutes' => 60, 'deadline_at' => '2026-10-21 17:00:00']);
-        $service = app(RecoverySuggestionService::class);
-        $this->actingAs($owner, 'web');
-
-        return compact('owner', 'task', 'service');
-    }
-
-    private function business(): array
-    {
-        return collect(['tasks', 'subtasks', 'lessons', 'study_sessions', 'reminders', 'notifications', 'planning_preferences', 'study_availability_windows'])
-            ->mapWithKeys(fn ($table) => [$table => DB::table($table)->get()->map(fn ($row) => (array) $row)->all()])->all();
-    }
-
-    private function pending(User $owner): RecoverySuggestion
-    {
-        return $owner->recoverySuggestions()->where('status', 'pending')->firstOrFail();
-    }
-
+    #[Group('smoke')]
     public function test_detection_has_no_business_writes_and_confirmation_is_owned_and_replayable(): void
     {
         $f = $this->fixture();
@@ -157,7 +131,7 @@ class AutomaticLearningRecoveryTest extends TestCase
         DB::table('recovery_suggestions')->where('id', $row->id)->update(['expires_at' => now('UTC')->subSecond()]);
         $this->postJson('/api/planning/recovery-suggestions/'.$row->id.'/confirm')->assertStatus(410);
         $this->assertSame('unchanged', $f['service']->detect($f['owner']->id));
-        $child = $this->postJson('/api/planning/recovery-suggestions/'.$row->id.'/refresh')->assertOk()->json('data.id');
+        $child = $this->postJson('/api/planning/recovery-suggestions/'.$row->id.'/refresh')->assertCreated()->json('data.id');
         $this->assertSame($child, $this->postJson('/api/planning/recovery-suggestions/'.$row->id.'/refresh')->assertOk()->json('data.id'));
         $this->postJson('/api/planning/recovery-suggestions/'.$child.'/reject')->assertOk()->assertJsonPath('data.status', 'rejected');
         $this->assertSame('unchanged', $f['service']->detect($f['owner']->id));
@@ -202,15 +176,15 @@ class AutomaticLearningRecoveryTest extends TestCase
         $f['service']->detect($f['owner']->id);
         $row = $this->pending($f['owner']);
         $path = '/api/planning/recovery-suggestions/'.$row->id.'/confirm';
-        foreach ([null, 1, 'true', '', []] as $value) {
-            $this->postJson($path, ['accept_partial' => $value])->assertUnprocessable()->assertJsonValidationErrors('accept_partial');
-        }
-        $before = $this->business();
         $this->mock(StudyPlanPersistenceService::class)->shouldReceive('confirmWithinTransaction')->once()
             ->andReturnUsing(function () use ($f) {
                 StudySession::factory()->for($f['task'])->create(['starts_at' => '2026-10-19 09:00:00', 'ends_at' => '2026-10-19 10:00:00']);
                 throw new \RuntimeException('SQL private writer failure');
             });
+        foreach ([null, 1, 'true', '', []] as $value) {
+            $this->postJson($path, ['accept_partial' => $value])->assertUnprocessable()->assertJsonValidationErrors('accept_partial');
+        }
+        $before = $this->business();
         $response = $this->postJson($path)->assertStatus(500)->assertJsonPath('code', 'recovery_failed');
         $this->assertStringNotContainsString('SQL', $response->getContent());
         $this->assertSame($before, $this->business());

@@ -27,6 +27,7 @@ use Tests\Support\TestDatabase;
 use Tests\TestCase;
 use Tests\Unit\ReminderRulesTest;
 
+#[Group('mysql')]
 class ReminderApiTest extends TestCase
 {
     use DatabaseTruncation;

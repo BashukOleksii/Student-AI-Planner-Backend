@@ -7,10 +7,14 @@ use App\Models\AiPendingAction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\AssertsMysqlPersistence;
 use Tests\Concerns\UsesForwardOnlyMigrations as DatabaseMigrations;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('ai')]
+#[Group('migration')]
 class AiTaskActionPersistenceTest extends TestCase
 {
     use AssertsMysqlPersistence, DatabaseMigrations;
@@ -32,7 +36,7 @@ class AiTaskActionPersistenceTest extends TestCase
         $this->assertTableDefinition('ai_pending_actions', [
             'id' => ['char(36)', false, null], 'conversation_id' => ['bigint unsigned', false, null],
             'turn_id' => ['bigint unsigned', false, null], 'call_id' => ['varchar(128)', false, null],
-            'type' => ['varchar(32)', false, null], 'arguments' => ['json', false, null], 'preview' => ['json', false, null],
+            'type' => ['varchar(64)', false, null], 'arguments' => ['json', false, null], 'preview' => ['json', false, null],
             'target_hash' => ['char(64)', true, null], 'status' => ['varchar(16)', false, 'pending'],
             'expires_at' => ['datetime(6)', false, null], 'receipt' => ['json', true, null],
             'resolved_at' => ['datetime(6)', true, null], 'created_at' => ['timestamp', true, null], 'updated_at' => ['timestamp', true, null],
@@ -58,17 +62,15 @@ class AiTaskActionPersistenceTest extends TestCase
 
     public function test_migration_round_trip_is_additive_and_preserves_turns_and_messages(): void
     {
+        $this->migrateThrough('2026_10_17_000001_create_ai_pending_actions_table', true);
         [$conversation, $values] = $this->fixture();
         $message = $conversation->messages()->create(['role' => 'user', 'content' => 'Preserved'])->refresh();
         DB::table('ai_pending_actions')->insert($values);
         $before = [$conversation->getAttributes(), $message->getAttributes(), DB::table('ai_conversation_turns')->sole()];
-        $this->assertSame(4, $this->excludeForwardOnlyOverlayFromLegacyRollback());
-        // Later additive migrations must not shift this test's rollback boundary.
-        $steps = DB::table('migrations')->where('migration', '>=', '2026_10_17_000001_create_ai_pending_actions_table')->count();
-        $this->artisan('migrate:rollback', ['--step' => $steps])->assertExitCode(0);
+        $this->artisan('migrate:rollback', ['--step' => 1])->assertExitCode(0);
         $this->assertFalse(Schema::hasTable('ai_pending_actions'));
         $this->assertEquals($before, [$conversation->fresh()->getAttributes(), $message->fresh()->getAttributes(), DB::table('ai_conversation_turns')->sole()]);
-        $this->artisan('migrate')->assertExitCode(0);
+        $this->migrateThrough('2026_10_17_000001_create_ai_pending_actions_table');
         $this->assertTrue(Schema::hasTable('ai_pending_actions'));
         $this->assertEquals($before, [$conversation->fresh()->getAttributes(), $message->fresh()->getAttributes(), DB::table('ai_conversation_turns')->sole()]);
     }

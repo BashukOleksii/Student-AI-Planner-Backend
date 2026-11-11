@@ -6,11 +6,14 @@ use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\AssertsMysqlPersistence;
 use Tests\Concerns\UsesForwardOnlyMigrations;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('migration')]
 class TaskMissedMigrationTest extends TestCase
 {
     use AssertsMysqlPersistence, UsesForwardOnlyMigrations;

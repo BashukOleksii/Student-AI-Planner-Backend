@@ -23,9 +23,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 use UnexpectedValueException;
 
+#[Group('mysql')]
 class PlanningWorkSelectionServiceTest extends TestCase
 {
     use RefreshDatabase;

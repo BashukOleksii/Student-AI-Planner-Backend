@@ -19,8 +19,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class FreeTimeServiceTest extends TestCase
 {
     use RefreshDatabase;
@@ -50,9 +52,12 @@ class FreeTimeServiceTest extends TestCase
         } finally {
             DB::disableQueryLog();
         }
-        $this->assertCount(1, $queries);
-        $this->assertStringContainsString('from `study_availability_windows`', $queries[0]['query']);
-        $this->assertStringStartsWith('select ', $queries[0]['query']);
+        $this->assertCount(2, $queries); // Trusted owner timezone + availability, no calendar/blocker expansion.
+        $this->assertStringContainsString('from `users`', $queries[0]['query']);
+        $this->assertStringContainsString('from `study_availability_windows`', $queries[1]['query']);
+        foreach ($queries as $query) {
+            $this->assertStringStartsWith('select ', $query['query']);
+        }
         $this->assertDatabaseCount('planning_preferences', 0);
     }
 

@@ -11,8 +11,10 @@ use App\Models\User;
 use App\Services\Academic\SubjectService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class SubjectApiTest extends TestCase
 {
     use RefreshDatabase;

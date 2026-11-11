@@ -15,10 +15,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\AssertsProgressComparison;
 use Tests\TestCase;
 use Tests\Unit\ProgressComparisonServiceTest;
 
+#[Group('mysql')]
 class ProgressComparisonApiTest extends TestCase
 {
     use AssertsProgressComparison, RefreshDatabase;

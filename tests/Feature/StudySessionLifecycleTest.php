@@ -28,10 +28,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 use Tests\Unit\StudySessionLifecycleRulesTest;
 
+#[Group('mysql')]
 class StudySessionLifecycleTest extends TestCase
 {
     use DatabaseTruncation;

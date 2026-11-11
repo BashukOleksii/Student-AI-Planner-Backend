@@ -8,9 +8,12 @@ use App\Services\AI\Tools\ToolRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\InteractsWithAiResponses;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('ai')]
 class OpenAiResponsesProviderTest extends TestCase
 {
     use InteractsWithAiResponses;
@@ -40,7 +43,7 @@ class OpenAiResponsesProviderTest extends TestCase
             $this->assertSame(['reasoning.encrypted_content'], $body['include']);
             $this->assertArrayNotHasKey('previous_response_id', $body);
             $this->assertArrayNotHasKey('conversation', $body);
-            $this->assertCount(9, $body['tools']);
+            $this->assertSame(array_column(app(ToolRegistry::class)->definitions(), 'name'), array_column($body['tools'], 'name'));
             foreach ($body['tools'] as $tool) {
                 $this->assertTrue($tool['strict']);
                 $this->assertSame('function', $tool['type']);

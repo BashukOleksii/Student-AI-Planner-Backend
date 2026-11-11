@@ -8,8 +8,10 @@ use App\Services\Planning\StudyAvailabilityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class StudyAvailabilityApiTest extends TestCase
 {
     use RefreshDatabase;

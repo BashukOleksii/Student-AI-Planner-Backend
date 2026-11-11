@@ -6,23 +6,24 @@ use App\Models\Lesson;
 use App\Models\SemesterSchedule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\UsesForwardOnlyMigrations;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('migration')]
 class SemesterScheduleMigrationTest extends TestCase
 {
     use UsesForwardOnlyMigrations;
 
     public function test_additive_upgrade_preserves_legacy_rows_and_refuses_destructive_downgrade(): void
     {
+        $this->migrateThrough('2026_11_08_000002_add_ai_availability_actions', true);
         $migration = require database_path('migrations/2026_11_10_000001_create_semester_schedule_foundation.php');
         // Remove the later FK overlay before testing the original foundation in isolation.
         $overlay = require database_path('migrations/2026_11_10_000002_create_semester_schedule_imports.php');
         $management = require database_path('migrations/2026_11_10_000003_add_semester_schedule_management_protections.php');
-        $management->down();
-        $overlay->down();
-        $migration->down();
         $lesson = Lesson::factory()->create();
         $before = $lesson->fresh()->getRawOriginal();
         $migration->up();

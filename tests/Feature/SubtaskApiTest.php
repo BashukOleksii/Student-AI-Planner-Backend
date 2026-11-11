@@ -11,9 +11,11 @@ use App\Services\Tasks\SubtaskService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class SubtaskApiTest extends TestCase
 {
     use RefreshDatabase;

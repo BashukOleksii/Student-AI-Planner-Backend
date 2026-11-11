@@ -26,6 +26,7 @@ use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class StudyPlanApiTest extends TestCase
 {
     use DatabaseTruncation;

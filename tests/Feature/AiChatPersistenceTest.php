@@ -7,10 +7,14 @@ use App\Models\AiMessage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\AssertsMysqlPersistence;
 use Tests\Concerns\UsesForwardOnlyMigrations as DatabaseMigrations;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('ai')]
+#[Group('migration')]
 class AiChatPersistenceTest extends TestCase
 {
     use AssertsMysqlPersistence, DatabaseMigrations;
@@ -40,17 +44,15 @@ class AiChatPersistenceTest extends TestCase
 
     public function test_additive_migration_round_trip_preserves_existing_conversations_and_messages(): void
     {
+        $this->migrateThrough('2026_10_16_000001_create_ai_conversation_turns_table', true);
         $message = AiMessage::factory()->create(['tool_calls' => ['historical' => ['retained' => true]]])->refresh();
         $conversation = $message->conversation;
         $before = [$conversation->getAttributes(), $message->getAttributes()];
-        $this->assertSame(4, $this->excludeForwardOnlyOverlayFromLegacyRollback());
-        // Later additive migrations must not shift this test's rollback boundary.
-        $steps = DB::table('migrations')->where('migration', '>=', '2026_10_16_000001_create_ai_conversation_turns_table')->count();
-        $this->artisan('migrate:rollback', ['--step' => $steps])->assertExitCode(0);
+        $this->artisan('migrate:rollback', ['--step' => 1])->assertExitCode(0);
         $this->assertFalse(Schema::hasTable('ai_pending_actions'));
         $this->assertFalse(Schema::hasTable('ai_conversation_turns'));
         $this->assertSame($before, [$conversation->fresh()->getAttributes(), $message->fresh()->getAttributes()]);
-        $this->artisan('migrate')->assertExitCode(0);
+        $this->migrateThrough('2026_10_16_000001_create_ai_conversation_turns_table');
         $this->assertTrue(Schema::hasTable('ai_conversation_turns'));
         $this->assertSame($before, [$conversation->fresh()->getAttributes(), $message->fresh()->getAttributes()]);
     }

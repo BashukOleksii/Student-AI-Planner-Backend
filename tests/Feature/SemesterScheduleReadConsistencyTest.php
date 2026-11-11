@@ -8,9 +8,11 @@ use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\UsesForwardOnlyMigrations;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class SemesterScheduleReadConsistencyTest extends TestCase
 {
     use UsesForwardOnlyMigrations;

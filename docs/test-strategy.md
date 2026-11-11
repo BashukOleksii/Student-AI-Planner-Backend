@@ -1,76 +1,51 @@
-# Backend test strategy
+# Backend testing
 
-## Routine smoke suite
+Current execution results, baseline failures, replacement coverage and limitations are recorded in [the rebuild report](testing/backend-test-rebuild-report.md). Historical Stage/CI totals are not current evidence.
 
-Run the focused cross-system regression suite against the same isolated MySQL
-schema as the full feature tests:
+## Organization
+
+The default `phpunit.xml` discovers every test under `tests/Unit` and `tests/Feature` exactly once. No critical directory or failed group is excluded. Keep pure deterministic tests in Unit and Laravel/REST/MySQL/fake-provider workflows in Feature. Existing high-value allocation, authorization, provider-wire, persistence and real-process concurrency regressions are retained.
+
+Feature classes have non-duplicating PHPUnit group attributes:
+
+| Selector | Purpose |
+|---|---|
+| `mysql` | All Laravel Feature tests using the guarded MySQL application bootstrap |
+| `migration` | Current constraints/persistence and explicit historical predecessor upgrades |
+| `concurrency` | Independent MySQL clients, including real InnoDB lock waits |
+| `ai` | Fake-provider transport, orchestration, proposal/confirmation and Tool execution |
+| `security` | Authentication, authorization, isolation and database-safety probes |
+| `recovery` | Session recovery, adaptive replanning, durable automatic reviews and scans |
+| `workflow` | Authenticated cross-module workflows |
+| `smoke` | Essential methods, also retained in the default complete suite |
+
+`phpunit-smoke.xml` discovers the same Feature directory and includes only methods/classes tagged `smoke`. It includes the mixed calendar read, nine semester actions, automatic recovery ownership/replay and complete semester-edit/recovery workflow. A smoke pass does not replace the complete suite.
+
+`tests/Concerns` contains reusable browser, fake-provider, MySQL assertion/worker and recovery fixtures. `tests/Support/AiCapabilities.php` derives current Tool manifests from registries; tests compare names/schema semantics and uniqueness rather than historical counts. Native provider-specific null/omission and continuation checks remain separate. Fixed clocks and explicit historical migration boundaries prevent calendar and schema drift.
+
+## Safe local execution
+
+Prefer a fresh process-owned server over an existing database:
 
 ```sh
-vendor/bin/phpunit --configuration phpunit-smoke.xml
+vendor/bin/phpunit --testsuite Unit
+scripts/testing/phpunit-disposable-mysql.sh --group migration --group concurrency
+scripts/testing/phpunit-disposable-mysql.sh --group ai
+scripts/testing/phpunit-disposable-mysql.sh --group security
+scripts/testing/phpunit-disposable-mysql.sh --group workflow
+scripts/testing/phpunit-disposable-mysql.sh --configuration phpunit-smoke.xml
+scripts/testing/phpunit-disposable-mysql.sh
+vendor/bin/pint --test
 ```
 
-`phpunit-smoke.xml` selects methods tagged `smoke` from the existing Feature test
-classes. The test methods remain in the normal `Feature` suite, and every other
-Unit and Feature test stays available through `vendor/bin/phpunit`. The group
-covers registration/authentication, cross-user task denial, semester schedule
-read, confirmed Excel import, effective free-time ownership, confirmed planning
-with stale review and rollback, replanning with stale review and rollback, AI
-proposal/confirmation including ownership and atomic failure, reminder ownership
-and rollback, and statistics owner isolation.
+The runner requires local MySQL 8.x binaries, PHP/extensions, OpenSSL and Composer dependencies. It initializes an empty private temporary datadir, verifies the connected server's datadir and absence of application schemas, creates a new randomly named empty database, exports testing/MySQL selectors and fake delivery configuration, and shuts down/removes only that temporary server on exit. Port defaults to 13380; set `PLANNER_TEST_PORT` to an unused local port if necessary. It neither discovers nor connects to a production/development instance. A missing prerequisite or identity mismatch stops execution.
 
-Only end-to-end checks belong in this group. Detailed invalid-input matrices,
-all status permutations, exhaustive conflict combinations, provider-wire variants,
-lock interleavings, migration compatibility and pure algorithm edge cases remain
-in the full suite. The selected 18 test methods expand to 91 PHPUnit cases. On the current local
-MySQL test database, the measured command completed in **26.12 seconds**:
-91 passed, 1,123 assertions, zero failures or errors. The full configuration still
-discovers 2,791 Unit and 3,900 Feature cases (6,691 total). The smoke suite
-supplements the full CI suite; it does not replace or gate it.
+For an independently provisioned environment, establish equivalent evidence of disposal before running any Feature test. `APP_ENV`, database naming and `.env` values alone are insufficient. The existing testing/mysql/exact selected-database guards remain in `tests/TestCase.php`. An additional server-UUID/database keyed local file lease refuses a second PHPUnit process against that same database before cleanup. Intentional worker clients inside a concurrency test do not run suite cleanup. Separate machines/runners must still use separate disposable MySQL instances or schemas; a local file lease is not a distributed lock.
 
-## CI modes and deployment
+Run database suites sequentially. PHPUnit 12 uses repeated selectors (`--group migration --group concurrency`), not one comma-joined group name. Preserve mail/notifications fakes; the offline bootstrap prevents stray HTTP requests. Test workers carry the trusted connection configuration explicitly.
 
-`phpunit.xml` still exposes all `Unit` and `Feature` tests; they are not deleted.
-Normal `main` pushes and pull requests run the focused MySQL smoke suite with
-`vendor/bin/phpunit --configuration phpunit-smoke.xml`, alongside dependency checks,
-disposable MySQL migration verification, deployment safety tests, and Pint.
+## External and historical boundaries
 
-To run all PHPUnit tests plus the separate Gemini regression matrix, open GitHub
-Actions → **Backend verification** → **Run workflow** and enable the `full_suite`
-input. A manual workflow run never deploys, even if it passes.
+`tests/Live` remains explicitly opt-in for paid provider observations and is outside the offline suite. Do not run it during routine verification. The transport/orchestration/action contracts are tested with deterministic providers instead. `tests/Deployment` contains separate Python safety checks; these are not business PHPUnit tests and do not deploy anything. No real browser, external email/push or paid LLM capability is implied by a local pass.
 
-This is a conscious development/testing deployment mode: normal deployments are
-now gated by *smoke and infrastructure checks*, not the full 6,000+ case matrix.
-The existing deploy job still requires successful `verify`, a push to `main`,
-the configured repository enable variable, and SSH/server-side safety and health checks.
-A passing smoke run does **not** establish correctness for all schedule imports,
-edge cases, locking or migration history. Run the complete suite before declaring
-a stable production release, and do not treat a smoke-passing deploy as a verified
-business-logic release.
-
-## Cleanup proposal for a later task
-
-Do not delete tests as part of this strategy change. First collect per-test runtime
-from JUnit output over several CI runs and compare coverage by behavior, not by
-file size. Then consider these narrow cleanups:
-
-1. Remove `tests/Unit/ExampleTest.php` and `tests/Feature/ExampleTest.php` if they
-   still contain only Laravel scaffold assertions. They exercise no planner,
-   persistence or API contract; removing them would drop two cases with no product
-   coverage loss.
-2. Audit the repeated authentication-before-validation test lists in endpoint
-   suites. Consolidate identical route/method checks into one table-driven security
-   test while retaining one assertion per sensitive endpoint and preserving
-   cross-user and ownership tests. The benefit is less duplicated setup and less
-   fixture drift; no endpoint check should disappear.
-3. Review provider contract snapshots and action matrices only after comparing
-   behavior coverage. OpenAI and Gemini wire contracts, per-action authorization,
-   stale rejection, replay and rollback each protect separate boundaries and must
-   remain covered. Avoid collapsing the matrix if it loses provider-specific
-   omission/null semantics or lifecycle coverage.
-4. Keep all migration rollback/refusal, independent-process concurrency and
-   deterministic planner edge tests in the full suite. Their runtime is justified
-   by database integrity, locking and scheduling risk; the smoke suite is the
-   appropriate fast path for routine edits.
-
-The complete suite remains available for manual deep regression checks. A passing
-smoke run is a fast signal, not evidence that all domain edge cases passed.
+Current forward migrations must upgrade cleanly and preserve history. Historical reversible migrations are tested against explicitly rebuilt predecessors on the disposable schema. Never claim the entire current application can downgrade through forward-only migrations, remove migration guards, or rewrite an applied migration to satisfy a historical test.

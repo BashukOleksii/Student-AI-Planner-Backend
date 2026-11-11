@@ -24,11 +24,14 @@ use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Tests\Support\TestDatabase;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('concurrency')]
 class ReminderDeliveryConcurrencyTest extends TestCase
 {
     use DatabaseTruncation;

@@ -9,11 +9,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\InteractsWithAiResponses;
 use Tests\Concerns\InteractsWithSpaBrowser;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('security')]
 class FrontendApiContractTest extends TestCase
 {
     use DatabaseTruncation, InteractsWithAiResponses, InteractsWithSpaBrowser;

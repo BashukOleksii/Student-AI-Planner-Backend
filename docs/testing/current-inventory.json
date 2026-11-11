@@ -1,0 +1,26 @@
+{
+  "Unit": {
+    "files": 37,
+    "test_methods": 261
+  },
+  "Feature": {
+    "files": 122,
+    "test_methods": 1368
+  },
+  "Live": {
+    "files": 1,
+    "test_methods": 1
+  },
+  "Support": {
+    "files": 14,
+    "test_methods": 0
+  },
+  "Concerns": {
+    "files": 9,
+    "test_methods": 0
+  },
+  "Fixtures": {
+    "files": 1,
+    "test_methods": 0
+  }
+}

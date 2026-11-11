@@ -11,9 +11,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\AssertsMysqlPersistence;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('migration')]
 class StudySessionPersistenceTest extends TestCase
 {
     use AssertsMysqlPersistence, RefreshDatabase;

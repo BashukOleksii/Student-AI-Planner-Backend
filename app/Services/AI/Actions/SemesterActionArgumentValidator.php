@@ -16,7 +16,7 @@ class SemesterActionArgumentValidator
         if ($definition === null) {
             throw new InvalidArgumentException;
         }
-        $this->value($arguments, $definition['parameters']);
+        $arguments = $this->value($arguments, $definition['parameters']);
         if (in_array($name, ['propose_semester_rule_update', 'propose_semester_occurrence_update', 'propose_semester_settings_update'], true)
             && count($arguments) <= count($definition['parameters']['required'])) {
             throw new InvalidArgumentException;
@@ -45,8 +45,12 @@ class SemesterActionArgumentValidator
         return count($ids) === count(array_unique($ids));
     }
 
-    private function value(mixed $value, array $schema): void
+    private function value(mixed $value, array $schema): mixed
     {
+        // Native provider adapters retain nested JSON objects. Normalize only schema-declared objects.
+        if ($schema['type'] === 'object' && $value instanceof \stdClass) {
+            $value = (array) $value;
+        }
         $type = match (true) {
             $value === null => 'null', is_bool($value) => 'boolean', is_int($value) => 'integer',
             is_string($value) => 'string', is_array($value) => ($schema['type'] === 'object' ? 'object' : 'array'),
@@ -76,16 +80,18 @@ class SemesterActionArgumentValidator
                 throw new InvalidArgumentException;
             }
             foreach ($value as $key => $item) {
-                $this->value($item, $schema['properties'][$key]);
+                $value[$key] = $this->value($item, $schema['properties'][$key]);
             }
         }
         if ($type === 'array') {
             if (! array_is_list($value) || count($value) < ($schema['minItems'] ?? 0) || count($value) > ($schema['maxItems'] ?? 255)) {
                 throw new InvalidArgumentException;
             }
-            foreach ($value as $item) {
-                $this->value($item, $schema['items']);
+            foreach ($value as $key => $item) {
+                $value[$key] = $this->value($item, $schema['items']);
             }
         }
+
+        return $value;
     }
 }

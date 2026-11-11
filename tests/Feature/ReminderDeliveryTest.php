@@ -25,9 +25,11 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class ReminderDeliveryTest extends TestCase
 {
     use DatabaseTruncation;

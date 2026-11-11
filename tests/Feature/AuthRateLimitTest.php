@@ -11,9 +11,12 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\InteractsWithSpaBrowser;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('security')]
 class AuthRateLimitTest extends TestCase
 {
     use InteractsWithSpaBrowser, RefreshDatabase;

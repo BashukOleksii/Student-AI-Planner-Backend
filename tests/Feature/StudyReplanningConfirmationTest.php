@@ -31,6 +31,8 @@ use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('recovery')]
 class StudyReplanningConfirmationTest extends TestCase
 {
     use DatabaseTruncation;

@@ -9,11 +9,15 @@ use App\Services\AI\Actions\SubtaskReminderActionRegistry;
 use App\Services\AI\Actions\TaskActionRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\AssertsMysqlPersistence;
 use Tests\Concerns\UsesForwardOnlyMigrations;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('ai')]
+#[Group('migration')]
 class AiLessonActionMigrationTest extends TestCase
 {
     use AssertsMysqlPersistence, UsesForwardOnlyMigrations;

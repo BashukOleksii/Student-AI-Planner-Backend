@@ -12,9 +12,13 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\InteractsWithAiResponses;
+use Tests\Support\AiCapabilities;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('ai')]
 class AiStudyAvailabilityToolTest extends TestCase
 {
     use DatabaseTruncation, InteractsWithAiResponses;
@@ -202,7 +206,7 @@ class AiStudyAvailabilityToolTest extends TestCase
         Http::assertSentCount(2);
         Http::assertSent(function ($request) use ($provider) {
             $definitions = $provider === 'openai' ? $request['tools'] : $request['tools'][0]['functionDeclarations'];
-            $this->assertCount(49, $definitions);
+            $this->assertSame(AiCapabilities::names(), array_column($definitions, 'name'));
             $this->assertContains(self::TOOL, array_column($definitions, 'name'));
             $instructions = $provider === 'openai' ? $request['instructions'] : $request['systemInstruction']['parts'][0]['text'];
             $this->assertStringContainsString('Configured weekly availability is different from calculated free study slots.', $instructions);

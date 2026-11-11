@@ -9,11 +9,14 @@ use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\AssertsMysqlPersistence;
 use Tests\Concerns\UsesForwardOnlyMigrations;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('migration')]
 class SemesterScheduleImportPersistenceTest extends TestCase
 {
     use AssertsMysqlPersistence, UsesForwardOnlyMigrations;

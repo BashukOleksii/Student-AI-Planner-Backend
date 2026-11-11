@@ -6,6 +6,7 @@ use App\Models\AiConversation;
 use App\Models\AiMessage;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\AI\Actions\SemesterActionArgumentValidator;
 use App\Services\AI\LlmProvider;
 use App\Services\AI\Tools\ToolRegistry;
 use Carbon\CarbonImmutable;
@@ -14,11 +15,15 @@ use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\InteractsWithAiResponses;
+use Tests\Support\AiCapabilities;
 use Tests\TestCase;
 use Tests\Unit\AgentOrchestratorTest;
 
 /** Same public result and real orchestration assertions, with native provider fixtures. */
+#[Group('mysql')]
+#[Group('ai')]
 class LlmProviderContractTest extends TestCase
 {
     use DatabaseTruncation, InteractsWithAiResponses;
@@ -64,6 +69,22 @@ class LlmProviderContractTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    #[DataProvider('providers')]
+    public function test_nested_semester_arguments_reach_shared_validation_and_keep_lists_and_nullable_fields(string $provider): void
+    {
+        config(['ai.provider' => $provider]);
+        $arguments = ['semester_schedule_id' => 12, 'date' => '2026-11-09', 'mode' => 'copy_base',
+            'changes' => [['weekly_lesson_rule_id' => 7, 'room' => 'New room', 'lesson_type' => null]]];
+        Http::fakeSequence()->push($this->aiResponse([$this->aiCall('propose_semester_date_replace', json_encode($arguments))]));
+        $call = app(LlmProvider::class)->respond('Trusted instructions.', [], AiCapabilities::definitions())['calls'][0];
+        $normalized = app(SemesterActionArgumentValidator::class)->validate($call['name'], $call['arguments']);
+        $this->assertSame($arguments, $normalized);
+        $this->assertTrue(array_is_list($normalized['changes']));
+        $this->assertArrayHasKey('lesson_type', $normalized['changes'][0]);
+        $this->assertNull($normalized['changes'][0]['lesson_type']);
+        Http::assertSentCount(1);
+    }
+
     public static function readTools(): iterable
     {
         foreach (['gemini', 'openai'] as $provider) {
@@ -74,7 +95,7 @@ class LlmProviderContractTest extends TestCase
     }
 
     #[DataProvider('readTools')]
-    public function test_all_nine_reads_use_owned_services_and_keep_the_frontend_contract(string $provider, string $name, array $arguments): void
+    public function test_core_and_management_reads_use_owned_services_and_keep_the_frontend_contract(string $provider, string $name, array $arguments): void
     {
         config(['ai.provider' => $provider]);
         $owner = User::factory()->create(['timezone' => 'UTC']);

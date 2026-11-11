@@ -14,9 +14,12 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\InteractsWithSpaBrowser;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('security')]
 class PasswordManagementTest extends TestCase
 {
     use DatabaseTruncation, InteractsWithSpaBrowser;

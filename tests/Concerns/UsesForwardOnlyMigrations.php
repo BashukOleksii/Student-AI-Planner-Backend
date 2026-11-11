@@ -4,7 +4,6 @@ namespace Tests\Concerns;
 
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
-use Illuminate\Support\Facades\DB;
 
 /** Disposable-schema tests rebuild rather than invoking unsupported production downgrades. */
 trait UsesForwardOnlyMigrations
@@ -22,12 +21,12 @@ trait UsesForwardOnlyMigrations
         });
     }
 
-    /** Keep legacy down/up coverage without downgrading forward-only overlays. */
-    protected function excludeForwardOnlyOverlayFromLegacyRollback(): int
+    /** Reproduce an explicit historical predecessor on the already guarded disposable database. */
+    protected function migrateThrough(string $lastMigration, bool $fresh = false): void
     {
-        // Only this guarded disposable test schema is involved. Legacy down resets
-        // the underlying CHECK/table; migrate then reapplies the overlays.
-        return DB::table('migrations')
-            ->whereIn('migration', ['2026_11_02_000001_add_ai_lesson_actions', '2026_11_08_000001_add_missed_task_status', '2026_11_08_000002_add_ai_availability_actions', '2026_11_11_000005_add_ai_session_lifecycle_actions'])->delete();
+        $paths = array_values(array_filter(glob(database_path('migrations/*.php')), fn ($path) => basename($path, '.php') <= $lastMigration));
+        $this->assertNotEmpty($paths);
+        $this->assertSame($lastMigration.'.php', basename(end($paths)));
+        $this->artisan($fresh ? 'migrate:fresh' : 'migrate', ['--path' => $paths, '--realpath' => true])->assertExitCode(0);
     }
 }

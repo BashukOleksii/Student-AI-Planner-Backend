@@ -24,11 +24,15 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Concerns\AssertsBatchedReads;
 use Tests\TestCase;
 use UnexpectedValueException;
 
+#[Group('mysql')]
 class PlanningCandidateEvaluationServiceTest extends TestCase
 {
+    use AssertsBatchedReads;
     use RefreshDatabase;
 
     #[DataProvider('basicCases')]
@@ -486,6 +490,7 @@ class PlanningCandidateEvaluationServiceTest extends TestCase
         $user = $this->user();
         $source = $this->studySession($user, '2026-10-04 23:00:00', '2026-10-05 01:00:00', StudySessionStatus::Completed);
         $this->mock(FreeTimeService::class, function ($mock) use ($user): void {
+            $mock->shouldReceive('calendarSources')->once()->andReturn([]);
             $mock->shouldReceive('calculate')->once()->withArgs(fn ($owner, $start, $end, $minimum): bool => $owner->is($user) && $start === '2026-10-05' && $end === '2026-10-05' && $minimum === null)->andReturn([]);
         });
         $this->mock(PlanningConstraintService::class, function ($mock) use ($source): void {
@@ -570,12 +575,18 @@ class PlanningCandidateEvaluationServiceTest extends TestCase
         $this->studySession($user, '2000-01-01 07:00:00', '2000-01-01 08:00:00', StudySessionStatus::Completed);
         $large = $this->evaluationQueries($user);
         $this->assertCount(count($small), $large);
-        $this->assertLessThanOrEqual(11, count($large));
+        $this->assertSameReadShape($small, $large);
         foreach ($large as $query) {
-            $this->assertStringNotContainsString('select *', $query['query']);
+            if (! preg_match('/from `(lessons|schedule_import_batches|academic_periods)`/', $query['query'])) {
+                $this->assertStringNotContainsString('select *', $query['query']);
+            } // Calendar graph validation deliberately loads complete owned Lesson sources.
             if (str_contains($query['query'], 'from `study_sessions`') || str_contains($query['query'], 'from `lessons`')) {
-                $this->assertStringContainsString('`starts_at` < ?', $query['query']);
-                $this->assertStringContainsString('`ends_at` > ?', $query['query']);
+                if (str_contains($query['query'], '0 = 1')) {
+                    $this->assertStringContainsString('from `lessons`', $query['query']); // Empty owned replacement ID batch.
+                } else {
+                    $this->assertStringContainsString('`starts_at` < ?', $query['query']);
+                    $this->assertStringContainsString('`ends_at` > ?', $query['query']);
+                }
                 $this->assertStringContainsString('`user_id` = ?', $query['query']);
                 $this->assertSame($user->id, $query['bindings'][0]);
                 $this->assertStringNotContainsString('actual_minutes', $query['query']);

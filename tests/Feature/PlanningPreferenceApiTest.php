@@ -6,8 +6,10 @@ use App\Models\PlanningPreference;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class PlanningPreferenceApiTest extends TestCase
 {
     use RefreshDatabase;

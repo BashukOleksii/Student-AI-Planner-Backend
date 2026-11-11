@@ -37,6 +37,7 @@ use Illuminate\Validation\Factory;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\AiCapabilities;
 
 class TaskActionTest extends TestCase
 {
@@ -65,7 +66,8 @@ class TaskActionTest extends TestCase
         $this->assertSame($arguments, $schema->arguments('propose_task_update', $arguments, $before));
         $this->assertSame(['task_id' => 1], $schema->arguments('propose_task_update', ['task_id' => 1], $before));
         $this->assertSame($before, $registry->definitions());
-        $this->assertCount(9, (new ToolRegistry)->definitions());
+        $reads = (new ToolRegistry)->definitions();
+        $this->assertSame($reads, array_slice(AiCapabilities::definitions(), 0, count($reads)));
     }
 
     public static function valid(): array

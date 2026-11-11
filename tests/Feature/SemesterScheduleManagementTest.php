@@ -18,11 +18,15 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
+use Tests\Concerns\AssertsBatchedReads;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class SemesterScheduleManagementTest extends TestCase
 {
+    use AssertsBatchedReads;
     use RefreshDatabase;
 
     private User $owner;
@@ -109,9 +113,13 @@ class SemesterScheduleManagementTest extends TestCase
         foreach (['2026-09-07', '2026-09-14'] as $date) {
             $this->getJson($this->url('/date/'.$date))->assertOk()->assertJsonPath('data.0.weekly_lesson_rule_id', $id)->assertJsonPath('data.0.room', '101');
         }
-        $this->mutate('PATCH', '/weekly-rules/'.$id, ['room' => '202', 'teacher_id' => null])->assertOk();
+        $this->mutate('PATCH', '/weekly-rules/'.$id, ['teacher_id' => null])->assertUnprocessable()->assertJsonValidationErrors('teacher_id');
+        $teacher = $this->teacher;
+        $conflictingTeacher = Teacher::factory()->for($this->owner)->create();
+        $this->mutate('PATCH', '/weekly-rules/'.$id, ['teacher_id' => $conflictingTeacher->id])->assertUnprocessable()->assertJsonValidationErrors('teacher_id');
+        $this->mutate('PATCH', '/weekly-rules/'.$id, ['room' => '202', 'teacher_id' => $teacher->id])->assertOk();
         foreach (['2026-09-07', '2026-09-14'] as $date) {
-            $this->getJson($this->url('/date/'.$date))->assertOk()->assertJsonPath('data.0.room', '202')->assertJsonPath('data.0.teacher', null);
+            $this->getJson($this->url('/date/'.$date))->assertOk()->assertJsonPath('data.0.room', '202')->assertJsonPath('data.0.teacher.id', $teacher->id);
         }
         $this->mutate('PATCH', '/weekly-rules/'.$id, ['weekday' => 2, 'pair_number' => 4, 'pair_label' => '7-8'])->assertOk();
         $this->getJson($this->url('/date/2026-09-07'))->assertJsonCount(0, 'data');
@@ -167,7 +175,7 @@ class SemesterScheduleManagementTest extends TestCase
         $second = $this->rule(['pair_number' => 2, 'starts_at_local' => '10:00:00', 'ends_at_local' => '11:20:00']);
         $subject = Subject::factory()->for($this->owner)->create();
         $this->mutate('PUT', '/date-exceptions/2026-09-07', ['mode' => 'copy_base',
-            'changes' => [['weekly_lesson_rule_id' => $id, 'subject_id' => $subject->id, 'teacher_id' => null, 'room' => 'replacement']]])
+            'changes' => [['weekly_lesson_rule_id' => $id, 'subject_id' => $subject->id, 'teacher_id' => $this->teacher->id, 'room' => 'replacement']]])
             ->assertOk()->assertJsonCount(2, 'data.date_exceptions.0.lessons');
         $snapshot = $this->getJson($this->url('/date-exceptions/2026-09-07'))->assertOk();
         $snapshot->assertJsonPath('data.lessons.0.subject.id', $subject->id)->assertJsonPath('data.lessons.1.source_weekly_rule_id', $second);
@@ -442,11 +450,12 @@ class SemesterScheduleManagementTest extends TestCase
     public function test_management_graph_is_batched_and_trusted_profile_controls_timezone(): void
     {
         $this->rule();
-        $queries = function (): int {
+        $this->mutate('PUT', '/date-exceptions/2026-09-07', ['mode' => 'copy_base'])->assertOk();
+        $queries = function (): array {
             DB::enableQueryLog();
             DB::flushQueryLog();
             $this->getJson($this->url('/management').'?timezone=UTC&user_id=99999')->assertOk()->assertJsonPath('meta.timezone', 'Europe/Kyiv');
-            $count = count(DB::getQueryLog());
+            $count = DB::getQueryLog();
             DB::disableQueryLog();
 
             return $count;
@@ -459,8 +468,8 @@ class SemesterScheduleManagementTest extends TestCase
             $this->mutate('PUT', '/date-exceptions/'.$date, ['mode' => 'copy_base'])->assertOk();
         }
         $dense = $queries();
-        $this->assertSame($baseline, $dense);
-        $this->assertLessThanOrEqual(14, $dense);
+        $this->assertCount(count($baseline), $dense);
+        $this->assertSameReadShape($baseline, $dense);
         $owner = $this->owner;
         $owner->timezone = 'UTC';
         $this->actingAs($owner, 'web');

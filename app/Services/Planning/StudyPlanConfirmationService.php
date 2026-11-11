@@ -21,6 +21,11 @@ class StudyPlanConfirmationService
             throw new InvalidArgumentException('Invalid preview issuance parameters.');
         }
 
+        if (array_key_exists('not_before_utc', $parameters) && (! is_int($parameters['not_before_utc'])
+            || $parameters['not_before_utc'] < 0 || $parameters['not_before_utc'] > 253402300799)) {
+            throw new InvalidArgumentException('Invalid server allocation cutoff.');
+        }
+
         return $this->encrypter->encrypt(json_encode([
             'purpose' => 'study-plan-confirmation', 'version' => 1, 'owner_id' => $ownerId,
             'parameters' => $parameters, 'plan' => $plan,

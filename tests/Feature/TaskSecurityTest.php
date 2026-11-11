@@ -13,6 +13,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('security')]
 class TaskSecurityTest extends TestCase
 {
     use RefreshDatabase;

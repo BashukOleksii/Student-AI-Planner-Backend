@@ -1,0 +1,12 @@
+{
+  "php_files_checked": 139,
+  "syntax_errors": [],
+  "bash_syntax": "passed: bash -n scripts/testing/phpunit-disposable-mysql.sh",
+  "whitespace": "passed: git diff --check",
+  "smoke_discovery": {
+    "required_calendar_recovery_workflow_methods": true,
+    "semester_action_cases": 9
+  },
+  "missing_local_documentation_targets": [],
+  "pint": "passed: vendor/bin/pint --test"
+}

@@ -17,8 +17,8 @@ class SemesterActionSchemaTest extends TestCase
     {
         $registry = new SemesterActionRegistry;
         $definitions = [...$registry->readDefinitions(), ...$registry->definitions()];
-        $this->assertCount(12, array_unique(array_column($definitions, 'name')));
-        $this->assertCount(12, (new GeminiToolSchema)->definitions($definitions));
+        $this->assertCount(count($definitions), array_unique(array_column($definitions, 'name')));
+        $this->assertCount(count($definitions), (new GeminiToolSchema)->definitions($definitions));
         foreach ((new OpenAiToolSchema)->definitions($definitions) as $tool) {
             $this->assertFalse($tool['strict']);
             $this->assertFalse($tool['parameters']['additionalProperties']);

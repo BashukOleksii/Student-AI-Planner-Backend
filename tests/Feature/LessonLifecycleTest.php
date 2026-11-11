@@ -13,8 +13,10 @@ use App\Services\Schedule\LessonService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('mysql')]
 class LessonLifecycleTest extends TestCase
 {
     use RefreshDatabase;
