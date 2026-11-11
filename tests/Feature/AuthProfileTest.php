@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 class AuthProfileTest extends TestCase
@@ -42,6 +43,7 @@ class AuthProfileTest extends TestCase
         ]]);
     }
 
+    #[Group('smoke')]
     public function test_registration_persists_hash_defaults_and_authenticates_a_rotated_session(): void
     {
         $this->getJson('/sanctum/csrf-cookie')->assertNoContent();

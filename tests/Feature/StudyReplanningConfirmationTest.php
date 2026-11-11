@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -87,6 +88,7 @@ class StudyReplanningConfirmationTest extends TestCase
             ['preview_token' => $token, 'accept_partial' => true, 'accept_unplaced_cancellation' => true])->assertOk();
     }
 
+    #[Group('smoke')]
     public function test_full_batch_preserves_intervals_history_effort_and_reminders(): void
     {
         [$user, $task, $source] = $this->fixture();
@@ -255,6 +257,7 @@ class StudyReplanningConfirmationTest extends TestCase
     }
 
     #[DataProvider('staleChanges')]
+    #[Group('smoke')]
     public function test_current_material_changes_conflict_without_partial_writes(string $change): void
     {
         [$user, $task, $source, $lesson] = $this->fixture();
@@ -396,6 +399,7 @@ class StudyReplanningConfirmationTest extends TestCase
     }
 
     #[DataProvider('failurePoints')]
+    #[Group('smoke')]
     public function test_failures_and_elapsed_time_restore_exact_database_snapshot(string $point, int $status): void
     {
         [$user, $task, $source] = $this->fixture();

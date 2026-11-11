@@ -17,6 +17,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -61,6 +62,7 @@ class SemesterScheduleReadApiTest extends TestCase
         return '/api/semester-schedules/'.$schedule->id.$suffix;
     }
 
+    #[Group('smoke')]
     public function test_list_contains_only_owned_schedules_and_empty_list_needs_no_creation(): void
     {
         $user = User::factory()->create();

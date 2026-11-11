@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 class FreeSlotsApiTest extends TestCase
@@ -147,6 +148,7 @@ class FreeSlotsApiTest extends TestCase
         $this->assertPayload($this->getJson($this->url()), 'UTC', '2026-10-12', '2026-10-12', [$this->slot('2026-10-12T09:00:00Z', '2026-10-12T09:00:01Z', 1)]);
     }
 
+    #[Group('smoke')]
     public function test_overlapping_effective_blockers_are_subtracted_and_multiple_slots_are_sorted(): void
     {
         $user = User::factory()->create(['timezone' => 'Europe/Kyiv']);
@@ -244,6 +246,7 @@ class FreeSlotsApiTest extends TestCase
         ];
     }
 
+    #[Group('smoke')]
     public function test_foreign_availability_and_blockers_and_spoofed_ownership_or_timezone_never_affect_results(): void
     {
         $owner = User::factory()->create(['timezone' => 'UTC']);

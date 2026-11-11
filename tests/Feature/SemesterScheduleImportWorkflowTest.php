@@ -20,6 +20,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -110,6 +111,7 @@ class SemesterScheduleImportWorkflowTest extends TestCase
             'source_weekly_rule_id' => $rule->id, 'room' => 'Frozen snapshot'])->refresh();
     }
 
+    #[Group('smoke')]
     public function test_upload_confirm_and_stage2_reads_form_a_complete_weekly_import(): void
     {
         [$user, $period] = $this->context();

@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 class ProgressStatisticsApiTest extends TestCase
@@ -342,6 +343,7 @@ class ProgressStatisticsApiTest extends TestCase
             ]);
     }
 
+    #[Group('smoke')]
     public function test_owner_isolation_and_fresh_persisted_timezone_ignore_cached_relations_and_attributes(): void
     {
         $user = User::factory()->create(['timezone' => 'UTC']);

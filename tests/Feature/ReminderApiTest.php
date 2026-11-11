@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Support\TestDatabase;
 use Tests\TestCase;
@@ -149,6 +150,7 @@ class ReminderApiTest extends TestCase
         $this->assertDatabaseCount('reminders', 1);
     }
 
+    #[Group('smoke')]
     public function test_listing_pagination_order_filters_and_owner_isolation(): void
     {
         $owner = User::factory()->create();
@@ -296,6 +298,7 @@ class ReminderApiTest extends TestCase
     }
 
     #[DataProvider('writeFailures')]
+    #[Group('smoke')]
     public function test_failed_writes_and_final_clock_recheck_roll_back(string $action, string $failure): void
     {
         [$owner] = $this->fixture();

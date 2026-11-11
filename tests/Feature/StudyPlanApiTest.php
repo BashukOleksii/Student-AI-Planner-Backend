@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -74,6 +75,7 @@ class StudyPlanApiTest extends TestCase
         $this->assertArrayNotHasKey('user_id', $data);
     }
 
+    #[Group('smoke')]
     public function test_full_plan_is_created_with_exact_fields_and_no_other_application_mutations(): void
     {
         [$user, $task] = $this->fixture();
@@ -266,6 +268,7 @@ class StudyPlanApiTest extends TestCase
     }
 
     #[DataProvider('staleChanges')]
+    #[Group('smoke')]
     public function test_material_changes_reject_the_review_without_automatic_replacement(string $change): void
     {
         [$user, $task] = $this->fixture();
@@ -377,6 +380,7 @@ class StudyPlanApiTest extends TestCase
     }
 
     #[DataProvider('insertFailures')]
+    #[Group('smoke')]
     public function test_later_insert_failure_or_time_change_rolls_back_the_entire_batch(string $failure): void
     {
         [$user] = $this->fixture();

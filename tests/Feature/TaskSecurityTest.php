@@ -10,6 +10,7 @@ use App\Services\Tasks\TaskService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 class TaskSecurityTest extends TestCase
@@ -25,6 +26,7 @@ class TaskSecurityTest extends TestCase
         $this->assertDatabaseCount('tasks', 1);
     }
 
+    #[Group('smoke')]
     public function test_foreign_task_is_hidden_before_body_validation(): void
     {
         $task = Task::factory()->create()->refresh();

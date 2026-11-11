@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Concerns\InteractsWithPlanningActions;
 use Tests\TestCase;
@@ -47,6 +48,7 @@ class AiPlanningActionsTest extends TestCase
     }
 
     #[DataProvider('actions')]
+    #[Group('smoke')]
     public function test_complete_review_commits_only_with_turn_and_confirmation_executes_once_without_provider(string $name): void
     {
         $f = $this->planningFixture($name);
@@ -261,6 +263,7 @@ class AiPlanningActionsTest extends TestCase
     }
 
     #[DataProvider('actions')]
+    #[Group('smoke')]
     public function test_rejection_expiration_and_foreign_access_preserve_all_business_data(string $name): void
     {
         $f = $this->planningFixture($name);
@@ -295,6 +298,7 @@ class AiPlanningActionsTest extends TestCase
     }
 
     #[DataProvider('failures')]
+    #[Group('smoke')]
     public function test_failure_after_business_or_receipt_write_rolls_back_every_domain_effect(string $name, string $failure): void
     {
         $f = $this->planningFixture($name);
