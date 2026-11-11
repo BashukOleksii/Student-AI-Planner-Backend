@@ -43,9 +43,13 @@ class StudyPlanConfirmationService
             || $payload['expires_at'] - $payload['issued_at'] !== self::TOKEN_LIFETIME_SECONDS
             || ! is_array($payload['parameters'] ?? null) || ! is_array($payload['plan'] ?? null)
             || array_diff(['start_date', 'end_date', 'task_id', 'subtask_id'], array_keys($payload['parameters'])) !== []
-            || count($payload['parameters']) !== 4
+            || array_diff(array_keys($payload['parameters']), ['start_date', 'end_date', 'task_id', 'subtask_id', 'not_before_utc']) !== []
             || ! is_string($payload['parameters']['start_date']) || ! is_string($payload['parameters']['end_date'])) {
             throw new InvalidArgumentException('The preview token is invalid or expired.');
+        }
+        if (array_key_exists('not_before_utc', $payload['parameters']) && (! is_int($payload['parameters']['not_before_utc'])
+            || $payload['parameters']['not_before_utc'] < 0 || $payload['parameters']['not_before_utc'] > 253402300799)) {
+            throw new InvalidArgumentException('Invalid server allocation cutoff.');
         }
         foreach (['task_id', 'subtask_id'] as $field) {
             $id = $payload['parameters'][$field];

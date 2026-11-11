@@ -22,11 +22,12 @@ class WorkloadAdviceService
         private WorkloadConstraintService $workload,
     ) {}
 
-    public function analyze(User $user, string $startDate, string $endDate): array
+    public function analyze(User $user, string $startDate, string $endDate, mixed $notBeforeUtc = null): array
     {
-        return DB::transaction(function () use ($user, $startDate, $endDate): array {
+        return DB::transaction(function () use ($user, $startDate, $endDate, $notBeforeUtc): array {
             $owner = $user->newQuery()->whereKey($user->getKey())->firstOrFail(['id', 'timezone']);
-            $plan = $this->planning->plan($owner, $startDate, $endDate);
+            $plan = $notBeforeUtc === null ? $this->planning->plan($owner, $startDate, $endDate)
+                : $this->planning->plan($owner, $startDate, $endDate, notBeforeUtc: $notBeforeUtc);
             $work = [];
             foreach ($plan['work_results'] as $index => $item) {
                 $work[] = [...$item, 'rank' => $index + 1,

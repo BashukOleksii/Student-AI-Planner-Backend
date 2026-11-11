@@ -17,6 +17,7 @@ use App\Services\AI\Actions\SubtaskReminderActionService;
 use App\Services\AI\Actions\TaskActionProposalService;
 use App\Services\AI\Actions\TaskActionRegistry;
 use App\Services\AI\Tools\ManagementReadTools;
+use App\Services\AI\Tools\RecoveryReadTools;
 use App\Services\AI\Tools\SemesterReadTools;
 use App\Services\AI\Tools\ToolExecutor;
 use App\Services\AI\Tools\ToolRegistry;
@@ -29,13 +30,14 @@ class AgentOrchestrator
         private PlanningActionRegistry $planningRegistry, private PlanningActionService $planning,
         private LessonActionRegistry $lessonRegistry, private LessonActionService $lessons,
         private AvailabilityActionRegistry $availabilityRegistry, private AvailabilityActionService $availability,
-        private SemesterActionRegistry $semesterRegistry, private SemesterActionService $semesters, private SemesterReadTools $semesterReads) {}
+        private SemesterActionRegistry $semesterRegistry, private SemesterActionService $semesters, private SemesterReadTools $semesterReads,
+        private RecoveryReadTools $recoveryReads) {}
 
     public function run(User $owner, array $history, string $content, ?callable $assertCurrent = null): array
     {
         $started = microtime(true);
         $instructions = $this->instructions($owner);
-        $definitions = [...$this->registry->definitions(), ...$this->actions->definitions(), ...$this->managementRegistry->readDefinitions(), ...$this->managementRegistry->definitions(), ...$this->planningRegistry->definitions(), ...$this->lessonRegistry->definitions(), ...$this->availabilityRegistry->definitions(), ...$this->semesterRegistry->readDefinitions(), ...$this->semesterRegistry->definitions()];
+        $definitions = [...$this->registry->definitions(), ...$this->actions->definitions(), ...$this->managementRegistry->readDefinitions(), ...$this->managementRegistry->definitions(), ...$this->planningRegistry->definitions(), ...$this->lessonRegistry->definitions(), ...$this->availabilityRegistry->definitions(), ...$this->semesterRegistry->readDefinitions(), ...$this->semesterRegistry->definitions(), ...RecoveryReadTools::definitions()];
         $proposal = null;
         $proposalCalls = 0;
         $proposalDomain = null;
@@ -156,6 +158,8 @@ class AgentOrchestrator
                     $result = $prepared['result'];
                 } elseif ($this->semesterRegistry->findRead($call['name']) !== null) {
                     $result = $this->semesterReads->execute($owner, $call['name'], $call['arguments']);
+                } elseif (RecoveryReadTools::find($call['name']) !== null) {
+                    $result = $this->recoveryReads->execute($owner, $call['name'], $call['arguments']);
                 } elseif ($this->managementRegistry->findRead($call['name']) !== null) {
                     $result = $this->managementReads->execute($owner, $call['name'], $call['arguments']);
                 } else {
@@ -209,6 +213,7 @@ Configured weekly availability is different from calculated free study slots.
 list_study_availability_windows reads recurring local weekly availability windows only.
 find_free_study_slots calculates free time considering the existing schedule and study reservations.
 get_study_recovery_overview reads deterministic recovery diagnostics for a selected 1–31 day local period and optional owned task/subtask scope. Use its remaining-effort metrics, exclusions, warnings and bounded missed/past-planned session lists; never calculate remaining effort or free time yourself. A status of missed is distinct from a past session still marked planned. When a past planned session requires a lifecycle decision, ask whether the student completed or missed it; do not classify it or prepare a new recovery plan until that decision is resolved. Expired deadlines remain excluded by planning Services: explain the exclusion, do not move the deadline or claim an extension.
+Use list_recovery_suggestions and get_recovery_suggestion to describe automatic reviews: pending does not mean applied, and an applied receipt alone proves a confirmed change. The model cannot accept, reject, refresh or confirm automatic reviews. Direct the student to their authenticated recovery review interface, with separate explicit partial and unplaced-cancellation consent when required. Do not issue a duplicate plan to bypass a pending review. Use get_recovery_diagnostics for current server-computed risk, effort, overload and academic conflicts. Unknown elapsed planned sessions are not missed; ask for their actual outcome and never invent actual minutes. If analysis exceeds safety bounds, explain that a narrower task-scoped manual recovery workflow is needed.
 For a clear request to recover eligible work, use get_study_recovery_overview first. If a past session remains planned, ask whether the student completed or missed it; after their explicit answer, use propose_session_complete or propose_session_mark_missed for that one session and require authenticated confirmation. Never infer a missed/completed state from the date or claim it changed before confirmation. On a later turn after a lifecycle action is confirmed, fetch fresh recovery diagnostics before proposing a replacement plan. Then use propose_study_plan_create only when the fresh overview shows a safe, actionable proposal and no unresolved lifecycle decision. Explain partial allocation and deadline restrictions. The proposal is not saved until the existing authenticated confirmation succeeds; never claim sessions were created before then. Changing a recorded deadline is a separate explicit action.
 get_schedule_for_date returns the effective schedule for the requested date in the persisted timezone: semester rules with numerator/denominator parity, replacements, cancellations, extra lessons and working Saturdays, together with independent active legacy Lessons. Its source selection is the same calendar service used by find_free_study_slots; every current class occupies time for independent study, including laboratory and practical classes. Use each semester occurrence's returned type as its saved classification, including date-specific replacements and working Saturday snapshots; do not substitute a recurring rule's type for that occurrence. Describe supported returned values (lecture, laboratory, practical, seminar, consultation, exam, other) accurately. When type is null, explicitly say that the lesson is unclassified; never infer a missing type from subject, teacher, room, parity or pair number. Semester occurrence identities are virtual read-only strings, never legacy Lesson IDs; preserve the distinction between semester occurrences and numeric legacy Lessons. Schedule reads never mutate business data. For “tomorrow” or another relative date, use the trusted local date/time and call get_schedule_for_date; for combined class/free-time questions, call both tools and report their results without calculating free time yourself. Semester edits use only the registered semester proposal tools and authenticated confirmation.
 A successful availability read does not authorize modifying availability.

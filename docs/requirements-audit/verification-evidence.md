@@ -1,5 +1,7 @@
 # Verification evidence
 
+> Current implementation supersession: For the implementation after `4eb708e`, source/Git/document inspection, changed-file formatting, autoload-only Tool registry counting (17 reads, 32 proposals), local documentation target checks and PHP syntax/whitespace checks were performed. Final syntax inspection covered 40 changed/new PHP files with zero syntax failures; `git diff --check` returned exit 0 and local link checks found zero missing targets. No new PHPUnit, database migration, MySQL, scheduler, browser, mail or LLM execution is claimed. [AutomaticLearningRecoveryTest](../../tests/Feature/AutomaticLearningRecoveryTest.php) is new unexecuted coverage; [verification plan](../automatic-learning-recovery.md#deferred-verification). Earlier command/results below retain their original commit scope.
+
 Audit date: 2026-11-11. Source commit: `e21497938654a30bebb78814a35438f87304cd85`, branch `main`. The initial tree was clean. Audit changes are limited to the four Markdown files in this directory. No application code, tests, migrations, configuration or infrastructure was edited. No database writes, scheduler dispatch, external email or paid provider calls were executed.
 
 ## Commands actually executed

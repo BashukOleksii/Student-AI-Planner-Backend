@@ -18,11 +18,12 @@ class StudyRecoveryPreviewService
         private TimeIntervalService $intervals,
     ) {}
 
-    public function preview(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null): array
+    public function preview(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null, mixed $notBeforeUtc = null): array
     {
         // One nonlocking MySQL snapshot covers the authoritative proposal and its diagnostics.
-        return DB::transaction(function () use ($user, $startDate, $endDate, $taskId, $subtaskId): array {
-            $preview = $this->plans->preview($user, $startDate, $endDate, $taskId, $subtaskId);
+        return DB::transaction(function () use ($user, $startDate, $endDate, $taskId, $subtaskId, $notBeforeUtc): array {
+            $preview = $notBeforeUtc === null ? $this->plans->preview($user, $startDate, $endDate, $taskId, $subtaskId)
+                : $this->plans->preview($user, $startDate, $endDate, $taskId, $subtaskId, $notBeforeUtc);
             $plan = $preview['plan'];
             $now = CarbonImmutable::parse($plan['as_of_utc']);
             $units = [];

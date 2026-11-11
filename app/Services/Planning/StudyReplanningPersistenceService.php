@@ -32,11 +32,15 @@ class StudyReplanningPersistenceService
     ) {}
 
     /** Lightweight HTTP adapter; the E1 application operation remains SELECT-only. */
-    public function preview(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null): array
+    public function preview(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null, mixed $notBeforeUtc = null): array
     {
-        $review = $this->preview->preview($user, $startDate, $endDate, $taskId, $subtaskId);
+        $review = $notBeforeUtc === null ? $this->preview->preview($user, $startDate, $endDate, $taskId, $subtaskId)
+            : $this->preview->preview($user, $startDate, $endDate, $taskId, $subtaskId, $notBeforeUtc);
         $issued = CarbonImmutable::now('UTC')->getTimestamp();
         $parameters = ['start_date' => $startDate, 'end_date' => $endDate, 'task_id' => $taskId, 'subtask_id' => $subtaskId];
+        if ($notBeforeUtc !== null) {
+            $parameters['not_before_utc'] = $notBeforeUtc;
+        }
 
         return [...$review, 'preview_token' => $this->confirmation->issue($user->getKey(), $parameters, $review, $issued),
             'expires_at' => CarbonImmutable::createFromTimestampUTC($issued + StudyReplanningConfirmationService::TOKEN_LIFETIME_SECONDS)->format('Y-m-d\TH:i:s\Z')];
@@ -112,8 +116,9 @@ class StudyReplanningPersistenceService
             $scheduled = $scheduled->concat($this->reminders->scheduledForSession($owner, $source));
         }
         try {
-            $current = $this->preview->preview($owner, $parameters['start_date'], $parameters['end_date'],
-                $parameters['task_id'], $parameters['subtask_id']);
+            $current = isset($parameters['not_before_utc'])
+                ? $this->preview->preview($owner, $parameters['start_date'], $parameters['end_date'], $parameters['task_id'], $parameters['subtask_id'], $parameters['not_before_utc'])
+                : $this->preview->preview($owner, $parameters['start_date'], $parameters['end_date'], $parameters['task_id'], $parameters['subtask_id']);
         } catch (ModelNotFoundException) {
             throw new StudyPlanConflictException;
         }

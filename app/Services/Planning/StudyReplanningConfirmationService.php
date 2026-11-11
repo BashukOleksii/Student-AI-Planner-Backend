@@ -54,13 +54,18 @@ class StudyReplanningConfirmationService
             || ! is_int($payload['expires_at'] ?? null)
             || $payload['expires_at'] !== $payload['issued_at'] + self::TOKEN_LIFETIME_SECONDS
             || $payload['issued_at'] > $now || $now >= $payload['expires_at']
-            || ! is_array($payload['parameters'] ?? null) || count($payload['parameters']) !== 4
+            || ! is_array($payload['parameters'] ?? null)
+            || array_diff(array_keys($payload['parameters']), ['start_date', 'end_date', 'task_id', 'subtask_id', 'not_before_utc']) !== []
             || array_diff(['start_date', 'end_date', 'task_id', 'subtask_id'], array_keys($payload['parameters'])) !== []
             || ! is_string($payload['parameters']['start_date']) || ! is_string($payload['parameters']['end_date'])
             || ! is_array($payload['review'] ?? null) || array_is_list($payload['review'])) {
             throw new InvalidArgumentException('Invalid review payload.');
         }
         $parameters = $payload['parameters'];
+        if (array_key_exists('not_before_utc', $parameters) && (! is_int($parameters['not_before_utc'])
+            || $parameters['not_before_utc'] < 0 || $parameters['not_before_utc'] > 253402300799)) {
+            throw new InvalidArgumentException('Invalid server allocation cutoff.');
+        }
         $this->context->validateDates($parameters['start_date'], $parameters['end_date']);
         foreach (['task_id', 'subtask_id'] as $field) {
             if ($parameters[$field] !== null && (! is_int($parameters[$field]) || $parameters[$field] < 1)) {

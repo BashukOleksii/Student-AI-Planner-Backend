@@ -8,6 +8,7 @@ use App\Services\AI\Actions\PlanningActionRegistry;
 use App\Services\AI\Actions\SemesterActionRegistry;
 use App\Services\AI\Actions\SubtaskReminderActionRegistry;
 use App\Services\AI\Actions\TaskActionRegistry;
+use App\Services\AI\Tools\RecoveryReadTools;
 use App\Services\AI\Tools\ToolRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
@@ -70,9 +71,10 @@ class BackendIntegrationSmokeTest extends TestCase
             $names = [...array_column((new ToolRegistry)->definitions(), 'name'), ...array_column((new TaskActionRegistry)->definitions(), 'name'),
                 ...array_column((new SubtaskReminderActionRegistry)->readDefinitions(), 'name'),
                 ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES, ...AvailabilityActionRegistry::NAMES,
-                ...array_column((new SemesterActionRegistry)->readDefinitions(), 'name'), ...SemesterActionRegistry::NAMES];
+                ...array_column((new SemesterActionRegistry)->readDefinitions(), 'name'), ...SemesterActionRegistry::NAMES,
+                ...array_column(RecoveryReadTools::definitions(), 'name')];
             $this->assertSame($names, array_column($body['tools'], 'name'));
-            $this->assertCount(46, array_unique($names));
+            $this->assertCount(49, array_unique($names));
             foreach ($body['tools'] as $tool) {
                 $this->assertSame('function', $tool['type']);
                 $this->assertFalse($tool['parameters']['additionalProperties']);

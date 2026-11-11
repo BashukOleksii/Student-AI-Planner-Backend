@@ -19,6 +19,11 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
+    public function recoverySuggestions(): HasMany
+    {
+        return $this->hasMany(RecoverySuggestion::class);
+    }
+
     public function semesterSchedules(): HasMany
     {
         return $this->hasMany(SemesterSchedule::class);

@@ -1,5 +1,7 @@
 # Integration gaps and readiness
 
+> Current implementation supersession: Historical calendar presentation, semester AI editing and absent-trigger findings below are superseded by the current source and [implementation review](../learning-recovery-implementation.md). Automatic recovery now proposes through an authenticated review feed and never applies unattended. Remaining gaps are verification, bounded account/horizon coverage, original-source fidelity, frontend integration and operational scheduler/delivery/LLM readiness; see [contract](../automatic-learning-recovery.md).
+
 Applies to the checkout and requirement IDs in [functional coverage](functional-coverage.md). Findings below are source inspection results, not deployed-system observations. Test references identify coverage to execute; only [verification evidence](verification-evidence.md) records executions.
 
 ## I1 — Calendar source integration exists; REST presentation is split

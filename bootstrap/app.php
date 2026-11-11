@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\AiAgentException;
+use App\Exceptions\RecoverySuggestionException;
 use App\Exceptions\ReminderConflictException;
 use App\Exceptions\ReminderIntegrityException;
 use App\Exceptions\StudyPlanConflictException;
@@ -42,7 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/lessons', 'api/lessons/*'),
             fn (Request $request) => $request->isMethod('GET') && $request->is('api/tasks'),
             fn (Request $request) => $request->isMethod('GET') && $request->is('api/planning/free-slots', 'api/planning/workload-advice'),
-            fn (Request $request) => $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/planning/recovery/*', 'api/study-sessions', 'api/study-sessions/*'),
+            fn (Request $request) => $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/planning/recovery/*', 'api/planning/recovery-suggestions', 'api/planning/recovery-suggestions/*', 'api/study-sessions', 'api/study-sessions/*'),
         ]);
         // Subject color and Task deadlines distinguish null from an invalid empty string.
         $middleware->convertEmptyStringsToNull(except: [
@@ -50,7 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/reminders', 'api/reminders/*', 'api/notifications', 'api/notifications/*'),
             fn (Request $request) => $request->is('api/subjects', 'api/subjects/*'),
             fn (Request $request) => $request->is('api/tasks', 'api/tasks/*'),
-            fn (Request $request) => $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/planning/recovery/*', 'api/study-sessions', 'api/study-sessions/*'),
+            fn (Request $request) => $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/planning/recovery/*', 'api/planning/recovery-suggestions', 'api/planning/recovery-suggestions/*', 'api/study-sessions', 'api/study-sessions/*'),
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -83,6 +84,20 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
         $exceptions->render(function (Throwable $exception, Request $request) {
+            if ($request->is('api/planning/recovery-suggestions', 'api/planning/recovery-suggestions/*', 'api/planning/recovery/diagnostics')) {
+                if ($exception instanceof RecoverySuggestionException) {
+                    return response()->json(['message' => $exception->getMessage(), 'code' => $exception->errorCode], $exception->status());
+                }
+                if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
+                    return null;
+                }
+                if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                }
+
+                return response()->json(['message' => 'Recovery suggestions could not be processed.', 'code' => 'recovery_failed'], 500);
+            }
+
             if ($request->is('api/academic-calendar/*')) {
                 if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
                     return null;
@@ -195,7 +210,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
                 return response()->json(['message' => 'The reminder could not be processed.'], 500);
             }
-            if (! $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/planning/recovery/*', 'api/study-sessions', 'api/study-sessions/*')) {
+            if (! $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/planning/recovery/*', 'api/planning/recovery-suggestions', 'api/planning/recovery-suggestions/*', 'api/study-sessions', 'api/study-sessions/*')) {
                 return null;
             }
             if ($exception instanceof StudyPlanConflictException || $exception instanceof StudySessionConflictException) {

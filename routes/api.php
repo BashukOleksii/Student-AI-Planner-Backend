@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ProgressComparisonController;
 use App\Http\Controllers\Api\ProgressStatisticsController;
 use App\Http\Controllers\Api\ProgressTrendsController;
+use App\Http\Controllers\Api\RecoverySuggestionController;
 use App\Http\Controllers\Api\ReminderController;
 use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\ScheduleImportController;
@@ -42,6 +43,15 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
 });
 
 Route::middleware('auth:sanctum')->group(function (): void {
+    Route::get('/planning/recovery/diagnostics', [RecoverySuggestionController::class, 'diagnostics'])->name('planning.recovery.diagnostics');
+    Route::prefix('planning/recovery-suggestions')->name('recovery-suggestions.')->group(function (): void {
+        Route::get('/', [RecoverySuggestionController::class, 'index'])->name('index');
+        Route::get('/{recoverySuggestion}', [RecoverySuggestionController::class, 'show'])->whereUuid('recoverySuggestion')->name('show');
+        Route::post('/{recoverySuggestion}/confirm', [RecoverySuggestionController::class, 'confirm'])->whereUuid('recoverySuggestion')->name('confirm');
+        Route::post('/{recoverySuggestion}/reject', [RecoverySuggestionController::class, 'reject'])->whereUuid('recoverySuggestion')->name('reject');
+        Route::post('/{recoverySuggestion}/refresh', [RecoverySuggestionController::class, 'refresh'])->whereUuid('recoverySuggestion')->name('refresh');
+    });
+
     Route::get('/academic-calendar/today', [AcademicCalendarController::class, 'today'])->name('academic-calendar.today');
     Route::get('/academic-calendar/date/{date}', [AcademicCalendarController::class, 'date'])->where('date', '.*')->name('academic-calendar.date');
     Route::get('/academic-calendar/week/{date}', [AcademicCalendarController::class, 'week'])->where('date', '.*')->name('academic-calendar.week');

@@ -25,6 +25,7 @@ use App\Services\AI\AgentOrchestrator;
 use App\Services\AI\LlmProvider;
 use App\Services\AI\OpenAiToolSchema;
 use App\Services\AI\Tools\ManagementReadTools;
+use App\Services\AI\Tools\RecoveryReadTools;
 use App\Services\AI\Tools\SemesterReadTools;
 use App\Services\AI\Tools\ToolExecutor;
 use App\Services\AI\Tools\ToolRegistry;
@@ -208,7 +209,7 @@ class TaskActionTest extends TestCase
         $executor->expects($this->never())->method('execute');
         $agent = new AgentOrchestrator($provider, new ToolRegistry, $executor,
             new AgentLimits(['max_tool_rounds' => 5, 'max_tool_calls' => 8, 'max_context_bytes' => 131072,
-                'max_tool_result_bytes' => 65536, 'max_turn_seconds' => 180]), new TaskActionRegistry, $proposals, new SubtaskReminderActionRegistry, $this->createMock(SubtaskReminderActionService::class), $this->createMock(ManagementReadTools::class), new PlanningActionRegistry, $this->createMock(PlanningActionService::class), new LessonActionRegistry, $this->createMock(LessonActionService::class), new AvailabilityActionRegistry, $this->createMock(AvailabilityActionService::class), new SemesterActionRegistry, $this->createMock(SemesterActionService::class), $this->createMock(SemesterReadTools::class));
+                'max_tool_result_bytes' => 65536, 'max_turn_seconds' => 180]), new TaskActionRegistry, $proposals, new SubtaskReminderActionRegistry, $this->createMock(SubtaskReminderActionService::class), $this->createMock(ManagementReadTools::class), new PlanningActionRegistry, $this->createMock(PlanningActionService::class), new LessonActionRegistry, $this->createMock(LessonActionService::class), new AvailabilityActionRegistry, $this->createMock(AvailabilityActionService::class), new SemesterActionRegistry, $this->createMock(SemesterActionService::class), $this->createMock(SemesterReadTools::class), $this->createMock(RecoveryReadTools::class));
         $owner = new User;
         $owner->timezone = 'UTC';
         try {

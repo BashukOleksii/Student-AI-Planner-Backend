@@ -1,5 +1,7 @@
 # Backend Architecture
 
+> Current implementation update (after reference `4eb708e`): Automatic learning recovery now uses a bounded scheduled detector and durable owner-scoped reviews. Only explicit authenticated confirmation delegates to existing deterministic planning/replanning writers. See [ADR-012](decisions/ADR-012-automatic-learning-recovery.md) and [API contract](automatic-learning-recovery.md). No automatic session relocation or inferred missed status is introduced.
+
 Unified academic-calendar REST reads now share the authoritative effective calendar with AI and planning. Confirmed semester AI actions reuse management projection validation and the existing pending-action/receipt workflow. Earlier stage summaries below describe their historical scope; see [the current contract](unified-academic-calendar.md) and [ADR-011](decisions/ADR-011-unified-calendar-and-ai-semester-actions.md).
 
 Stage 4 adds owner-serialized [semester management](semester-schedule-management.md), shared import/management graph loading, optimistic graph tokens with a monotonic revision, frozen snapshot writers and explicit suppressed-slot release. See [ADR-008](decisions/ADR-008-semester-schedule-management.md); legacy consumers remain unchanged.

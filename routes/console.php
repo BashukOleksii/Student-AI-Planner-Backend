@@ -9,3 +9,6 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('reminders:dispatch-due --limit=100')->everyMinute();
+
+// Separate from reminder delivery: this command only creates reviews, never sessions or reminders.
+Schedule::command('learning:detect-recovery --limit=10 --days=7')->everyFiveMinutes()->withoutOverlapping(10);

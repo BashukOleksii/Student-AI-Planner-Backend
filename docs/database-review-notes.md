@@ -1,5 +1,7 @@
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
+> Current implementation update (after reference `4eb708e`): A new forward migration creates `recovery_suggestions` and `recovery_scan_states` for conversation-independent reviews. Unique pending-owner, dedupe and refresh-lineage keys plus CHECKs protect lifecycle invariants; existing applied migrations and AI action types are unchanged. Logical refresh lineage is owner checked by the service rather than a self-cascade foreign key. Protected tokens use Laravel encrypted casts; presentation excludes private fingerprints/tokens. Migration execution and MySQL concurrency remain deferred. See [ADR-012](decisions/ADR-012-automatic-learning-recovery.md).
+
 AI semester actions add one forward-only action-type CHECK extension, preserving all prior types, states and receipts. No new table/column or old migration change is needed. Migration execution and MySQL verification are deferred; see [the contract](unified-academic-calendar.md).
 
 Stage 4 adds one [forward management migration](semester-schedule-management.md#schedule-deletion-deployment-and-limits) for a monotonic schedule revision, permanent manual rule flag and owned suppressed slots. No legacy deletion intent is inferred. Guarded downgrade preserves revisions/protections; existing migrations and retained application data are unchanged.

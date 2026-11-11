@@ -29,8 +29,11 @@ class StudyPlanningService
      * @throws ModelNotFoundException For missing, foreign, deleted or incorrectly nested work.
      * @throws UnexpectedValueException For incompatible owned source relationships, without private details.
      */
-    public function plan(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null): array
+    public function plan(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null, mixed $notBeforeUtc = null): array
     {
+        if ($notBeforeUtc !== null && (! is_int($notBeforeUtc) || $notBeforeUtc < 0 || $notBeforeUtc > 253402300799)) {
+            throw new InvalidArgumentException('Invalid server allocation cutoff.');
+        }
         $this->context->validateDates($startDate, $endDate);
         $user = $user->newQuery()->whereKey($user->getKey())->firstOrFail(['id', 'timezone']);
         $selection = $this->selection->select($user, $taskId, $subtaskId);
@@ -46,7 +49,7 @@ class StudyPlanningService
             }
             $notBefore++;
         }
-        $plan = $this->allocator->allocate($selection['work_items'], $context, $notBefore);
+        $plan = $this->allocator->allocate($selection['work_items'], $context, max($notBefore, $notBeforeUtc ?? $notBefore));
 
         return ['as_of_utc' => $selection['as_of_utc'], 'start_date' => $startDate, 'end_date' => $endDate, 'timezone' => $user->timezone,
             'sessions' => $plan['sessions'], 'work_results' => $plan['work_results'],

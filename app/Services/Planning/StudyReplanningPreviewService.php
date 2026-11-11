@@ -22,7 +22,7 @@ class StudyReplanningPreviewService
         private StudySessionLifecycleRules $history,
     ) {}
 
-    public function preview(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null): array
+    public function preview(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null, mixed $notBeforeUtc = null): array
     {
         $this->context->validateDates($startDate, $endDate);
         $owner = $user->newQuery()->whereKey($user->getKey())->firstOrFail(['id', 'timezone']);
@@ -84,7 +84,8 @@ class StudyReplanningPreviewService
         $results = $this->analysis->analyze($sources, $snapshot, $now);
         $ids = array_values(array_column(array_filter($results, fn ($row) => $row['classification'] === 'requires_replanning'), 'study_session_id'));
         $projectedSelection = $ids === [] ? $selection : $this->selection->select($owner, $taskId, $subtaskId, $ids, $now);
-        $proposal = $this->analysis->propose($results, $projectedSelection, $snapshot, $coverage, $now);
+        $proposal = $notBeforeUtc === null ? $this->analysis->propose($results, $projectedSelection, $snapshot, $coverage, $now)
+            : $this->analysis->propose($results, $projectedSelection, $snapshot, $coverage, $now, $notBeforeUtc);
 
         return ['as_of_utc' => $now->format('Y-m-d\TH:i:s.u\Z'), 'start_date' => $startDate, 'end_date' => $endDate,
             'timezone' => $owner->timezone, ...$proposal, 'excluded_items' => $selection['excluded_items'], 'warnings' => $selection['warnings']];

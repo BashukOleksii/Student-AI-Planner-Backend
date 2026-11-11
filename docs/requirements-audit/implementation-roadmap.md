@@ -1,5 +1,7 @@
 # Small follow-up tasks
 
+> Current implementation supersession: Historical tasks 2/5 and unsupported-semester statements below predate implemented unified calendar, AI semester actions and automatic owner reviews. Do not repeat those implementation tasks. Prioritize the dedicated disposable-MySQL regression/concurrency stage, then browser review integration and scheduler/delivery observation; [current required checks](../automatic-learning-recovery.md#deferred-verification). Product decision: automatic proposals with explicit confirmation; no unattended relocation.
+
 Order prioritizes correctness and integration. Each item is independently reviewable and grounded in [integration gaps](integration-gaps.md); no item authorizes production changes or a new architecture. Optional capabilities follow source/contract decisions.
 
 ## 1. Establish current-head database regression evidence

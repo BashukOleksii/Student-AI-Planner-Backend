@@ -1,5 +1,7 @@
 # Functional coverage audit
 
+> Current implementation supersession: The matrix below is the preserved audit of `e214979`; it is not a current missing-feature verdict. Unified academic REST reads and AI semester management were implemented before `4eb708e`. This stage adds scheduled automatic recovery proposals with explicit student confirmation, resolving the T4/X2 autonomy decision. The current nine-group [implementation review](../learning-recovery-implementation.md) supersedes affected S1/A4/R/T4/X2 findings; [ADR-012](../decisions/ADR-012-automatic-learning-recovery.md) records the decision. Runtime verification remains deferred.
+
 Audited checkout: `e21497938654a30bebb78814a35438f87304cd85` on `main`, 2026-11-11. Documentation-only assessment. [Verification evidence](verification-evidence.md) states exactly what was executed.
 
 ## Requirements provenance and status meaning

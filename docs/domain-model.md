@@ -1,5 +1,7 @@
 # Conceptual Domain Model
 
+> Current implementation update (after reference `4eb708e`): `RecoverySuggestion` stores a conversation-independent owner review, protected encrypted planning token, source/need fingerprints and immutable applied receipt. `recovery_scan_states` records bounded scan fairness/outcomes. Review metadata is distinct from study sessions, academic lessons, reminders and AI pending actions. See [ADR-012](decisions/ADR-012-automatic-learning-recovery.md).
+
 The unified academic calendar is a read projection of semester occurrences plus independent legacy Lessons, never StudySessions. Semester AI actions add proposal types to existing AiPendingAction, not a new approval domain. See [the contract](unified-academic-calendar.md).
 
 Stage 4 adds owned SemesterScheduleSuppressedSlot records for intentional deletions, a permanent WeeklyLessonRule manual-management flag and a monotonic schedule revision. Manual CRUD, full-date snapshots and effective-day Saturday copies use the [management API](semester-schedule-management.md), independently of concrete Lessons.

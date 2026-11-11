@@ -202,4 +202,27 @@ class StudyPlanConfirmationServiceTest extends TestCase
         $this->assertFalse($service->startsAreFuture($sessions, new DateTimeImmutable('@1000')));
         $this->assertFalse($service->startsAreFuture($sessions, new DateTimeImmutable('1970-01-01T00:16:40.500000Z')));
     }
+
+    public function test_server_cutoff_is_preserved_without_changing_legacy_token_parameters(): void
+    {
+        $service = $this->service();
+        foreach ([$this->parameters(), [...$this->parameters(), 'not_before_utc' => 1792397700]] as $parameters) {
+            $token = $service->issue(12, $parameters, $this->plan(), 1000);
+            $this->assertSame($parameters, $service->decode($token, 12, 1001)['parameters']);
+        }
+    }
+
+    #[DataProvider('invalidServerCutoffs')]
+    public function test_malformed_internal_cutoffs_fail_closed(mixed $cutoff): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $service = $this->service();
+        $token = $service->issue(12, [...$this->parameters(), 'not_before_utc' => $cutoff], $this->plan(), 1000);
+        $service->decode($token, 12, 1001);
+    }
+
+    public static function invalidServerCutoffs(): array
+    {
+        return [[null], [-1], [253402300800], ['1792397700'], [1792397700.0], [true], [[]]];
+    }
 }

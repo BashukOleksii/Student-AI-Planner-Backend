@@ -1,5 +1,7 @@
 # Business Rules
 
+> Current implementation update (after reference `4eb708e`): Automatic recovery proposes only. A planned session with an unknown outcome remains planned; started unknown sessions require an explicit lifecycle decision before automatic allocation. Confirmed adaptive changes preserve valid/completed work and require separate consent for unplaced cancellation. Changed source state invalidates reviews. Existing deterministic allocators enforce all constraints; optional internal future cutoff makes background reviews usable without altering ordinary default planning. See [contract and limits](automatic-learning-recovery.md).
+
 Unified calendar reads and semester AI edits now use the existing effective source and projected management validation rules. One-date changes freeze a complete snapshot; recurring edits preserve existing frozen dates. Academic edits never silently replan study sessions. All AI semester writes require existing authenticated confirmation; see [the current contract](unified-academic-calendar.md).
 
 Stage 4 enforces [semester management rules](semester-schedule-management.md): stale graph writes conflict; complete projected semesters are validated; snapshots remain independent; manually deleted slots cannot be recreated by import until explicitly released. Real changes increment a revision, so edit/revert cannot revive an old preview. Historical receipts remain immutable.

@@ -90,7 +90,7 @@ class StudyReplanningAnalysisService
         return $results;
     }
 
-    public function propose(array $results, array $selection, array $snapshot, array $coverage, DateTimeImmutable $now): array
+    public function propose(array $results, array $selection, array $snapshot, array $coverage, DateTimeImmutable $now, mixed $notBeforeUtc = null): array
     {
         if (! array_is_list($results) || ! isset($selection['work_items'], $selection['excluded_items'])
             || ! is_array($selection['work_items']) || ! array_is_list($selection['work_items'])
@@ -126,6 +126,10 @@ class StudyReplanningAnalysisService
             throw new InvalidArgumentException('Unrepresentable future planning clock.');
         }
         $cutoff++; // Strictly future, also at exact clock equality.
+        if ($notBeforeUtc !== null && (! is_int($notBeforeUtc) || $notBeforeUtc < 0 || $notBeforeUtc > 253402300799)) {
+            throw new InvalidArgumentException('Invalid server allocation cutoff.');
+        }
+        $cutoff = max($cutoff, $notBeforeUtc ?? $cutoff);
         $this->allocator->allocate([], $context, $cutoff);
         $work = $totals = [];
         foreach ([...$selection['work_items'], ...$selection['excluded_items']] as $unit) {
