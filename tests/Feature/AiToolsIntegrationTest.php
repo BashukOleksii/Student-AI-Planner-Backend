@@ -3,11 +3,14 @@
 namespace Tests\Feature;
 
 use App\Enums\StudySessionStatus;
+use App\Models\AcademicPeriod;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
+use App\Models\EducationInstitution;
 use App\Models\Lesson;
 use App\Models\PlanningPreference;
 use App\Models\Reminder;
+use App\Models\SemesterSchedule;
 use App\Models\StudyAvailabilityWindow;
 use App\Models\StudySession;
 use App\Models\Subject;
@@ -15,9 +18,10 @@ use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\Teacher;
 use App\Models\User;
+use App\Models\WeeklyLessonRule;
+use App\Services\AI\Tools\EffectiveScheduleReadService;
 use App\Services\AI\Tools\ToolExecutor;
 use App\Services\AI\Tools\ToolRegistry;
-use App\Services\Schedule\ScheduleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
@@ -82,29 +86,69 @@ class AiToolsIntegrationTest extends TestCase
         $original = $this->lesson($owner, '2026-10-20 06:00:00', '2026-10-20 07:00:00', ['status' => 'replaced']);
         $replacement = $this->lesson($owner, '2026-10-20 07:00:00', '2026-10-20 08:00:00', ['replaces_lesson_id' => $original->id, 'teacher_id' => $teacher->id]);
         $crossing = $this->lesson($owner, '2026-10-19 20:59:59', '2026-10-19 21:00:01');
-        $masked = $this->lesson($owner, '2026-10-20 10:00:00', '2026-10-20 11:00:00', [
-            'subject_id' => Subject::factory()->for($foreign)->create(['name' => 'PRIVATE SUBJECT'])->id,
-            'teacher_id' => Teacher::factory()->for($foreign)->create(['name' => 'PRIVATE TEACHER'])->id,
-            'replaces_lesson_id' => $this->lesson($foreign, '2026-10-20 06:00:00', '2026-10-20 07:00:00', ['status' => 'replaced'])->id,
-        ]);
         $this->lesson($owner, '2026-10-19 20:00:00', '2026-10-19 21:00:00');
         $this->lesson($owner, '2026-10-20 21:00:00', '2026-10-20 22:00:00');
         $this->lesson($owner, '2026-10-20 12:00:00', '2026-10-20 13:00:00', ['status' => 'cancelled']);
         $this->lesson($owner, '2026-10-20 14:00:00', '2026-10-20 15:00:00')->delete();
         $this->lesson($foreign, '2026-10-20 12:00:00', '2026-10-20 13:00:00');
         $data = $this->data($owner, 'get_schedule_for_date', ['date' => '2026-10-20']);
-        $this->assertSame([$crossing->id, $replacement->id, $masked->id], array_column($data['lessons'], 'id'));
+        $this->assertSame([$crossing->id, $replacement->id], array_column($data['lessons'], 'id'));
+        $this->assertSame(['legacy_lesson:'.$crossing->id, 'legacy_lesson:'.$replacement->id], array_column($data['lessons'], 'source_identity'));
+        $this->assertSame(['legacy_lesson', 'legacy_lesson'], array_column($data['lessons'], 'source_type'));
         $this->assertSame($original->id, $data['lessons'][1]['replaces_lesson_id']);
         $this->assertSame(['id' => $teacher->id, 'name' => $teacher->name], $data['lessons'][1]['teacher']);
         $this->assertSame('2026-10-20T10:00:00+03:00', $data['lessons'][1]['starts_at']);
-        foreach (['subject', 'teacher', 'replaces_lesson_id'] as $field) {
-            $this->assertNull($data['lessons'][2][$field]);
-        }
-        $this->assertStringNotContainsString('PRIVATE', json_encode($data));
+        $this->assertSame('2026-10-20T00:00:01+03:00', $data['lessons'][0]['ends_at']);
         $rest = $this->actingAs($owner, 'web')->getJson('/api/schedule/date/2026-10-20')->assertOk();
-        $this->assertSame($rest->json('data'), $data['lessons']);
-        $this->assertSame($rest->json('meta'), $data['meta']);
+        $sharedFields = ['id', 'subject', 'teacher', 'type', 'room', 'starts_at', 'ends_at', 'replaces_lesson_id'];
+        $normalize = fn (array $rows) => array_map(fn ($row) => [
+            ...array_intersect_key($row, array_flip($sharedFields)),
+            'subject' => $row['subject'] === null ? null : array_intersect_key($row['subject'], array_flip(['id', 'name'])),
+        ], $rows);
+        $this->assertSame($normalize($rest->json('data')), $normalize($data['lessons']));
+        $this->assertSame($rest->json('meta'), array_intersect_key($data['meta'], array_flip(['timezone', 'start_date', 'end_date'])));
         $this->assertSame([], $this->data($owner, 'get_schedule_for_date', ['date' => '2026-10-22'])['lessons']);
+    }
+
+    public function test_schedule_fails_closed_for_cross_user_replacement_provenance(): void
+    {
+        $owner = User::factory()->create(['timezone' => 'Europe/Kyiv']);
+        $foreign = User::factory()->create();
+        $private = $this->lesson($foreign, '2026-10-20 06:00:00', '2026-10-20 07:00:00', ['status' => 'replaced']);
+        $this->lesson($owner, '2026-10-20 07:00:00', '2026-10-20 08:00:00', ['replaces_lesson_id' => $private->id]);
+
+        $result = app(ToolExecutor::class)->execute($owner, 'get_schedule_for_date', ['date' => '2026-10-20']);
+
+        $this->assertSame(['ok' => false, 'tool' => 'get_schedule_for_date',
+            'error' => ['code' => 'execution_failed', 'message' => 'Tool execution failed.']], $result);
+        $this->assertStringNotContainsString((string) $private->id, json_encode($result));
+        $this->assertStringNotContainsString('PRIVATE', json_encode($result));
+    }
+
+    public function test_schedule_combines_legacy_and_semester_sources_with_distinct_identities(): void
+    {
+        $owner = User::factory()->create(['timezone' => 'Europe/Kyiv']);
+        $institution = EducationInstitution::factory()->for($owner)->create();
+        $period = AcademicPeriod::factory()->for($owner)->for($institution)->create([
+            'starts_on' => '2026-10-19', 'ends_on' => '2026-10-25',
+        ]);
+        $schedule = $owner->semesterSchedules()->create(['academic_period_id' => $period->id, 'group_name' => 'ПІ-231',
+            'parity_anchor_on' => '2026-10-19', 'first_week_parity' => 'numerator']);
+        $subject = Subject::factory()->for($owner)->create();
+        $rule = $schedule->weeklyLessonRules()->create(['user_id' => $owner->id, 'weekday' => 2, 'week_pattern' => 'all',
+            'pair_number' => 1, 'pair_label' => '1', 'starts_at_local' => '08:00:00', 'ends_at_local' => '09:00:00',
+            'subject_id' => $subject->id]);
+        $legacy = $this->lesson($owner, '2026-10-20 06:00:00', '2026-10-20 07:00:00');
+
+        $lessons = $this->data($owner, 'get_schedule_for_date', ['date' => '2026-10-20'])['lessons'];
+
+        $this->assertSame(['semester_occurrence', 'legacy_lesson'], array_column($lessons, 'source_type'));
+        $this->assertSame('semester:'.$schedule->id.':2026-10-20:rule:'.$rule->id, $lessons[0]['source_identity']);
+        $this->assertSame($lessons[0]['source_identity'], $lessons[0]['id']);
+        $this->assertSame('legacy_lesson:'.$legacy->id, $lessons[1]['source_identity']);
+        $this->assertSame($legacy->id, $lessons[1]['id']);
+        $this->assertSame('2026-10-20T08:00:00+03:00', $lessons[0]['starts_at']);
+        $this->assertSame('2026-10-20T09:00:00+03:00', $lessons[1]['starts_at']);
     }
 
     public static function dstDays(): array
@@ -409,7 +453,7 @@ class AiToolsIntegrationTest extends TestCase
     public function test_unknown_tools_and_unexpected_sql_errors_are_safe(): void
     {
         $owner = User::factory()->create();
-        $schedule = $this->mock(ScheduleService::class);
+        $schedule = $this->mock(EffectiveScheduleReadService::class);
         $schedule->shouldReceive('date')->once()->andThrow(new QueryException('mysql', 'SELECT private FROM secrets WHERE foreign_id = 999', [], new RuntimeException('credentials')));
         $executor = app(ToolExecutor::class);
         $this->assertSame(['ok' => false, 'tool' => 'App\\Services\\Tasks\\TaskService::delete', 'error' => ['code' => 'unknown_tool', 'message' => 'Unknown tool.']],

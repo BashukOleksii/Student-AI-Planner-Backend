@@ -293,7 +293,13 @@ class BackendIntegrationSmokeTest extends TestCase
         }
         $this->assertCount(11, $results);
         $this->assertSame($this->browser('GET', '/api/study-availability-windows')->assertOk()->json('data'), $results['list_study_availability_windows']['windows']);
-        $this->assertSame($this->browser('GET', '/api/schedule/date/'.$date)->assertOk()->json('data'), $results['get_schedule_for_date']['lessons']);
+        $restSchedule = $this->browser('GET', '/api/schedule/date/'.$date)->assertOk()->json('data');
+        $sharedScheduleFields = ['id', 'subject', 'teacher', 'type', 'room', 'starts_at', 'ends_at', 'replaces_lesson_id'];
+        $normalizeSchedule = fn (array $rows) => array_map(fn ($row) => [
+            ...array_intersect_key($row, array_flip($sharedScheduleFields)),
+            'subject' => $row['subject'] === null ? null : array_intersect_key($row['subject'], array_flip(['id', 'name'])),
+        ], $rows);
+        $this->assertSame($normalizeSchedule($restSchedule), $normalizeSchedule($results['get_schedule_for_date']['lessons']));
         $this->assertSame($this->browser('GET', '/api/tasks')->assertOk()->json('data'), $results['list_tasks']['tasks']);
         $this->assertSame($this->browser('GET', '/api/tasks/'.$f['task']['id'].'/subtasks')->assertOk()->json('data'), $results['list_subtasks_for_task']['subtasks']);
         $this->assertSame($this->browser('GET', '/api/reminders')->assertOk()->json('data'), $results['list_reminders']['reminders']);
