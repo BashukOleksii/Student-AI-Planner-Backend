@@ -22,7 +22,6 @@ class SemesterScheduleImportPlanner
         }
 
         $values['teacher_ids'] = $this->teacherIds($rule);
-        $values['teacher_id'] = $values['teacher_ids'][0] ?? null;
 
         return $values;
     }

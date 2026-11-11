@@ -1,14 +1,13 @@
 # Stage 4: Semester schedule management API
 
-Multi-teacher extension: weekly rules, `lessons` and `changes` accept canonical
-`teacher_ids: [id, ...]` (unique owned IDs), including `[]` for no teacher. When
-supplied, this list takes precedence over `teacher_id`. A legacy `teacher_id`
-patch alone replaces the list with zero or one teacher; omitting both preserves
-the list on partial updates. Resources add `teacher_id`, `teacher_ids`, `teachers`
-and retain `teacher`; the scalar represents the lowest canonical teacher ID.
-Complete lists are copied into date replacements and working Saturdays, including
-copies of saved effective replacements. Teacher link changes enter graph tokens.
-See [ADR-009](decisions/ADR-009-automatic-semester-import-and-teachers.md).
+The current single-teacher/custom-Saturday contract extends baseline `6235635c`.
+Each new/edited lesson requires one owned scalar `teacher_id`; a subject cannot
+be assigned a different teacher once assigned in the semester catalog. Optional
+`teacher_ids` is a compatibility singleton matching the scalar, never an override.
+Multiple historical teacher identities cause a 422 repair-required error without
+changing stored links. Old teacherless lessons remain readable until edited/copied.
+See [the current API contract](single-teacher-and-working-saturdays.md) and
+[ADR-010](decisions/ADR-010-single-teacher-and-custom-saturdays.md).
 
 Implemented against `main` at `9a00da6abcaa43d7acd67f534c3b4ececee0b86b`.
 [ADR-008](decisions/ADR-008-semester-schedule-management.md) records the decisions
@@ -168,8 +167,8 @@ POST `S/weekly-rules`:
 ```
 
 Required: weekday integer 1–5, pair integer 1–255, pattern `all|numerator|denominator`,
-strict local `HH:MM:SS` start/end, owned integer subject ID. Optional nullable:
-label (32 characters), owned teacher ID, room (100). PATCH uses the same fields,
+strict local `HH:MM:SS` start/end, owned integer subject ID and owned teacher ID.
+Optional nullable: label (32 characters), room (100). PATCH uses the same fields,
 all optional, plus required token. Omitted optional fields survive a PATCH.
 No lesson type is required or inferred. Owner/import/baseline fields are not writable.
 
@@ -212,7 +211,7 @@ partial changes in the same transaction:
   "schedule_token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "mode": "copy_base",
   "changes": [
-    {"weekly_lesson_rule_id": 4, "subject_id": 17, "teacher_id": null, "room": "122"},
+    {"weekly_lesson_rule_id": 4, "subject_id": 17, "teacher_id": 8, "room": "122"},
     {"weekly_lesson_rule_id": 5, "cancelled": true}
   ],
   "lessons": [
@@ -275,23 +274,42 @@ POST `S/working-saturdays`:
 ```json
 {
   "schedule_token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "occurs_on": "2026-09-12",
-  "copied_weekday": 5
+  "occurs_on": "2026-11-14",
+  "copied_weekday": 1,
+  "source_week_parity": "numerator",
+  "selected_weekly_rule_ids": [12, 14]
 }
 ```
 
-Target must be an in-period Saturday; source weekday must be integer 1–5. Resolve
-the source date in that Saturday's Monday-first week (here Friday 2026-09-11).
-Source must also lie inside the period. Resolve its *effective* schedule, including
-its parity and any replacement/empty cancellation, using the shared calculator.
-Copy local lesson values and valid nullable rule references into an independent
-Saturday snapshot with `kind: working_saturday` and the selected copy marker.
-The source snapshot's own child IDs are never reused on Saturday.
+Target must be an in-period Saturday. Source weekday is an integer 1–5 and parity
+is numerator/denominator, independent of that Saturday's calendar parity. Include
+both new fields together. The selected IDs must be a nonempty, unique integer list
+of this semester's base rules with the chosen weekday and pattern `all` or the
+chosen parity. Copied subject, teacher, pair, local times and room come only from
+the locked authoritative rules; date replacements do not affect this custom mode.
+The write revalidates the token, selection, conflicts and local timezone endpoints.
+An existing target exception returns 409; it is never silently replaced.
 
-Edit the Saturday using `PUT S/date-exceptions/2026-09-12`, `mode: replace` and its
-saved child list/IDs. Kind/copy marker remain unchanged. Delete it through the same
-exception DELETE. Other Saturdays and source weekdays do not change. Later source
-edits do not recopy anything. An empty source produces a valid empty Saturday.
+Use `GET S/management` or `GET S/weekly-rules` to display source choices and obtain
+`meta.schedule_token`. These provide all eligible rule fields. No extra preview
+endpoint is necessary. The final write always revalidates the chosen IDs.
+
+Success is the existing 201 management response. Its `data.date_exceptions` entry
+contains `kind: working_saturday`, `copied_weekday`, `source_week_parity`, and frozen
+lessons with `source_weekly_rule_id`. `meta.schedule_token` is refreshed.
+
+Omitting both new fields preserves compatibility mode: resolve the source weekday
+in the target Saturday's Monday-first week, require it inside the period, and copy
+its effective schedule including a replacement or empty cancellation. New legacy
+copies save the calendar source parity; older snapshots retain null metadata.
+Copied nonempty lessons must still have one valid teacher.
+
+Edit the Saturday through the existing `PUT S/date-exceptions/{date}`, `mode:
+replace`, including a complete lesson list and one teacher per lesson. Pair numbers
+such as 3 and 5 may be added. Kind, weekday and original source parity remain
+unchanged. Delete through the existing exception DELETE. Later source edits never
+recopy saved lessons. No extra full-day editing endpoint is added.
+
 
 ## Import reconciliation and intentional deletion
 

@@ -15,7 +15,7 @@ use InvalidArgumentException;
 /** Owned semester reads; legacy Lesson/planning/import/AI consumers stay separate. */
 class EffectiveScheduleService
 {
-    public function __construct(private EffectiveScheduleCalculator $calculator) {}
+    public function __construct(private EffectiveScheduleCalculator $calculator, private SemesterLessonTeacherService $lessonTeachers) {}
 
     public function schedules(User $user): Collection
     {
@@ -66,6 +66,8 @@ class EffectiveScheduleService
             $owner = User::query()->findOrFail($user->getKey());
             $schedule = $this->ownedSchedule($owner, $schedule);
             $period = $schedule->academicPeriod;
+            $catalog = $owner->subjects()->with('teachers')->orderBy('id')->get();
+            $this->lessonTeachers->catalogAssignments($owner, $catalog);
             $rules = $schedule->weeklyLessonRules()->with(['subject', 'teacher', 'teachers', 'sourceImportBatch'])->get();
             $exceptions = $schedule->dateExceptions()->whereBetween('occurs_on', [$start, $end])
                 ->with(['lessons.subject', 'lessons.teacher', 'lessons.teachers', 'lessons.sourceWeeklyRule'])->get();
@@ -73,6 +75,7 @@ class EffectiveScheduleService
             $teachers = [];
             $remember = function (WeeklyLessonRule|ScheduleDateExceptionLesson $lesson) use ($owner, &$subjects, &$teachers): void {
                 $this->validateAssociations($owner, $lesson);
+                $this->lessonTeachers->assertHistoricalLesson($lesson);
                 $subjects[$lesson->subject_id] = $lesson->subject->only(['id', 'name', 'code', 'color']);
                 foreach ($lesson->teachers as $teacher) {
                     $teachers[$teacher->id] = $teacher->only(['id', 'name']);
@@ -104,7 +107,7 @@ class EffectiveScheduleService
                 }
                 $snapshots[$exception->occurs_on->format('Y-m-d')] = [
                     'id' => $exception->id, 'occurs_on' => $exception->occurs_on->format('Y-m-d'),
-                    'kind' => $exception->kind, 'copied_weekday' => $exception->copied_weekday,
+                    'kind' => $exception->kind, 'copied_weekday' => $exception->copied_weekday, 'source_week_parity' => $exception->source_week_parity,
                     'lessons' => $exception->lessons->map->attributesToArray()->all(),
                 ];
             }

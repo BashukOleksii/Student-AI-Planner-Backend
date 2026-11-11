@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['user_id', 'semester_schedule_id', 'occurs_on', 'kind', 'copied_weekday'])]
+#[Fillable(['user_id', 'semester_schedule_id', 'occurs_on', 'kind', 'copied_weekday', 'source_week_parity'])]
 class ScheduleDateException extends Model
 {
     public function user(): BelongsTo

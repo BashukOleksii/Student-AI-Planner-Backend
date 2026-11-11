@@ -1,10 +1,10 @@
 # Stage 2: Semester Schedule Read API
 
-Multi-teacher extension: occurrences additionally expose canonical `teacher_ids`
-and `teachers: [{id, name}, ...]`, including empty lists, and the legacy-compatible
-`teacher_id`/`teacher` scalar view. Teacher lists are ordered by ID. Weekly and
-snapshot occurrences retain all associated teachers; room remains a string.
-The earlier examples below omit these additive fields.
+Semester occurrences use canonical `teacher_id`/`teacher`. Compatibility
+`teacher_ids` and `teachers` remain singleton lists (empty for historical
+teacherless rows). Historical multiple/conflicting teacher identities produce a
+422 `errors.semester_teacher_repair` response, preserving every stored relationship.
+See [the current single-teacher contract](single-teacher-and-working-saturdays.md).
 
 Stage 4 adds separate [management endpoints](semester-schedule-management.md). These original Stage 2 list/detail/date/week JSON contracts remain unchanged; new management responses supply the graph token needed for writes.
 

@@ -1,5 +1,9 @@
 # Semester schedule Excel import
 
+Current teacher cardinality and catalog assignment rules are defined by
+[the single-teacher contract](single-teacher-and-working-saturdays.md) and
+[ADR-010](decisions/ADR-010-single-teacher-and-custom-saturdays.md).
+
 Stage 4 extends reconciliation with permanent manual flags and [suppressed-slot protection](semester-schedule-management.md#import-reconciliation-and-intentional-deletion). Blocked rows report `operation: suppressed`, `errors.suppressed_slot` and `suppressed_slot_ids`; `preview.impact.suppressed_slots` lists protections. Explicit release, revalidate and a new confirmation are required to recreate a manually deleted slot. Existing receipts and legacy import contracts remain unchanged; old uncommitted previews conservatively stale after deployment.
 
 Automatic catalog creation and multi-teacher support extend baseline `295bf5c` on main.
@@ -39,8 +43,10 @@ request fields; group comes from XLSX, timezone from the persisted User. The fil
 uses the repository `Приклад розкладу.xlsx` dialect. Semester parsing additionally
 preserves explicit teacher separators: newlines, semicolons, and commas/slashes
 whose separated parts each clearly identify a person. Initials are never split.
-Ambiguous or empty list members produce preview errors. Blank teacher cells are
-allowed. Legacy parsing retains its original behavior.
+Exactly one valid teacher name is required for each nonempty lesson. Empty cells,
+multiple separated names, malformed names and ambiguous matches are row errors.
+Separators are recognized to reject multi-teacher sources without inventing a
+combined Teacher. Legacy dated parsing retains its original behavior.
 The explicit pair mapping is `1-2 → 1`, `3-4 → 2`, `5-6 → 3`, `7-8 → 4`.
 Source lesson type is never inferred.
 
@@ -58,6 +64,12 @@ error. Existing records keep their names, institution and other relationships;
 new records inherit the period's owned institution. No catalog or active schedule
 writes occur during preview/revalidation. Confirming the existing commit action
 creates missing records, reconciles rules and saves the receipt in one transaction.
+Each subject must use a single teacher identity across rows and the user's existing
+semester catalog. Disagreements attach `errors.teacher_id` to every affected row;
+missing/multiple names use `errors.teacher_name`, malformed/ambiguous names use
+`errors.teacher_names`. Source worksheet/range/rows remain on each preview row.
+Invalid cardinality/assignments cannot be committed. Historical multi-teacher
+catalogs/lessons produce a clear `errors.semester_teacher_repair` 422 response.
 
 ### Review contract
 
@@ -298,16 +310,17 @@ The new prefix's error boundary does not change legacy route behavior.
 
 Legacy import endpoints, Lesson commit/CRUD, frontend, AI schemas/tools,
 FreeTimeService and planning/reminder/statistics logic remain separate. Semester
-Resources add `teacher_ids` and `teachers`, preserving scalar `teacher_id`/`teacher`
-compatibility. Occurrences remain virtual; no legacy Lessons are generated.
+Resources use canonical scalar `teacher_id`/`teacher`, retaining singleton
+`teacher_ids`/`teachers` compatibility fields. Occurrences remain virtual; no legacy Lessons are generated.
 
 Additive migration `2026_11_11_000001_add_semester_lesson_teachers.php` creates
 `subject_teacher`, `weekly_lesson_rule_teacher` and
 `schedule_date_exception_lesson_teacher`. Unique pairs and composite owner FKs
 prevent duplicate and foreign links. Existing single-teacher links are backfilled;
 historical nine-field baselines stay unchanged and compare through normalized
-single-teacher lists. New baselines include `teacher_ids`. Frozen snapshots copy
-all teachers and stay independent after later rule edits/deletions.
+single-teacher lists. New baselines retain `teacher_ids` for format compatibility.
+No historical baseline/receipt or pivot is rewritten. New snapshots require one
+teacher and stay independent after later rule edits/deletions.
 
 Only the supported XLSX dialect is accepted. No mapping UI, cancellation/deletion,
 force replacement, automatic legacy conversion or frontend integration is added.

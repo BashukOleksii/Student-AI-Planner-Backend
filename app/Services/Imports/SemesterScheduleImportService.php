@@ -130,7 +130,8 @@ class SemesterScheduleImportService
                 }
                 $after = $operation['after'];
                 $after['subject_id'] = $identities['subjects'][$after['subject_id']];
-                $after['teacher_ids'] = array_map(fn ($id) => $identities['teachers'][$id], $after['teacher_ids']);
+                $after['teacher_id'] = $identities['teachers'][$after['teacher_id']];
+                $after['teacher_ids'] = [$after['teacher_id']];
                 $after = $this->planner->values($after);
                 $fields = [...Arr::except($after, ['teacher_ids']), 'user_id' => $owner->id, 'semester_schedule_import_id' => $import->id,
                     'import_key' => $operation['import_key'], 'import_baseline' => $after];
@@ -141,7 +142,7 @@ class SemesterScheduleImportService
                     $rule = $graph['rules']->find($operation['rule_id']);
                     $this->check($rule->update($fields));
                 }
-                $this->lessonTeachers->sync($rule, $after['teacher_ids']);
+                $this->lessonTeachers->sync($rule, $after['teacher_id']);
             }
             if ($graph['schedule'] !== null && ($review['impact']['schedule']['before'] !== $values
                 || $review['counts']['create'] + $review['counts']['update'] + $review['counts']['delete'] > 0)) {
@@ -186,6 +187,9 @@ class SemesterScheduleImportService
             $subject = $references['subjects'][$raw['subject_name']];
             $rowTeachers = collect($raw['teacher_names'])->map(fn ($name) => $references['teachers'][$name])->unique('id')->sortBy('id')->values();
             $errors = [];
+            if (count($raw['teacher_names']) !== 1) {
+                $errors['teacher_name'] = ['Exactly one teacher name is required for each semester lesson.'];
+            }
             if ($subject['errors'] !== []) {
                 $errors['subject_name'] = $subject['errors'];
             }
@@ -199,8 +203,11 @@ class SemesterScheduleImportService
             }
             $incoming[] = [...$raw, 'row_number' => $index + 1, 'pair_number' => $this->planner->pairNumber($raw['pair_label']),
                 'week_pattern' => $raw['parity'], 'subject_id' => $subject['id'],
-                'teacher_id' => $rowTeachers->first()['id'] ?? null, 'teacher_ids' => $rowTeachers->pluck('id')->all(),
-                'subject' => $subject, 'teacher' => $rowTeachers->first(), 'teachers' => $rowTeachers->all(), 'errors' => $errors];
+                'teacher_id' => count($raw['teacher_names']) === 1 ? $rowTeachers->first()['id'] : null, 'teacher_ids' => $rowTeachers->pluck('id')->all(),
+                'subject' => $subject, 'teacher' => count($raw['teacher_names']) === 1 ? $rowTeachers->first() : null, 'teachers' => $rowTeachers->all(), 'errors' => $errors];
+        }
+        foreach ($this->lessonTeachers->assignmentErrors($incoming, $graph['teacherAssignments']) as $index => $message) {
+            $incoming[$index]['errors']['teacher_id'] = [$message];
         }
         $plan = $this->planner->plan($incoming, $rules->map->attributesToArray()->all(), $suppressions->map->attributesToArray()->all());
         if (mb_strlen($template['group']) > 255) {

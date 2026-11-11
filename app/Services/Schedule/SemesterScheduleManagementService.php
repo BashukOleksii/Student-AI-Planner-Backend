@@ -86,6 +86,7 @@ class SemesterScheduleManagementService
     public function createRule(User $user, SemesterSchedule $schedule, array $values): array
     {
         return $this->write($user, $schedule, $values, function ($owner, $graph) use ($values): void {
+            $this->lessonTeachers->teacherId($values);
             $fields = $this->planner->values($values);
             $this->references($graph, $fields);
             $this->notSuppressed($graph, $fields);
@@ -97,7 +98,7 @@ class SemesterScheduleManagementService
             $this->validate($owner, $candidate);
             unset($rule->id);
             $this->check($rule->save());
-            $this->lessonTeachers->sync($rule, $fields['teacher_ids']);
+            $this->lessonTeachers->sync($rule, $fields['teacher_id']);
         });
     }
 
@@ -106,7 +107,9 @@ class SemesterScheduleManagementService
         return $this->write($user, $schedule, $values, function ($owner, $graph) use ($id, $values): bool {
             $rule = $graph['rules']->find($id) ?? abort(404);
             $before = $this->planner->values($rule->attributesToArray());
-            $fields = $this->planner->values($this->mergeLessonFields($before, Arr::only($values, SemesterScheduleImportPlanner::FIELDS)));
+            $merged = $this->mergeLessonFields($before, Arr::only($values, SemesterScheduleImportPlanner::FIELDS));
+            $this->lessonTeachers->teacherId($merged);
+            $fields = $this->planner->values($merged);
             $this->references($graph, $fields);
             if ($this->planner->key($before) !== $this->planner->key($fields)) {
                 $this->notSuppressed($graph, $fields);
@@ -120,7 +123,7 @@ class SemesterScheduleManagementService
                 }
                 $rule->is_manually_managed = true;
                 $this->check($rule->save());
-                $this->lessonTeachers->sync($rule, $fields['teacher_ids']);
+                $this->lessonTeachers->sync($rule, $fields['teacher_id']);
 
                 return true;
             }
@@ -205,6 +208,30 @@ class SemesterScheduleManagementService
             if ($graph['exceptions']->contains(fn ($row) => $row->occurs_on->format('Y-m-d') === $date)) {
                 throw new ConflictHttpException('A date exception already exists. Edit or delete it explicitly.');
             }
+            if (array_key_exists('source_week_parity', $values) || array_key_exists('selected_weekly_rule_ids', $values)) {
+                $parity = $values['source_week_parity'] ?? null;
+                $selected = $values['selected_weekly_rule_ids'] ?? [];
+                if (! in_array($parity, ['numerator', 'denominator'], true)) {
+                    $this->invalid('source_week_parity', 'Select numerator or denominator together with the lesson IDs.');
+                }
+                if (! is_array($selected) || ! array_is_list($selected) || $selected === []
+                    || count($selected) !== count(array_unique($selected, SORT_REGULAR))
+                    || ! collect($selected)->every(fn ($id) => is_int($id) && $id > 0)) {
+                    $this->invalid('selected_weekly_rule_ids', 'Select a nonempty list of unique positive weekly rule IDs.');
+                }
+                $eligible = $graph['rules']->filter(fn ($rule) => $rule->weekday === $values['copied_weekday']
+                    && in_array($rule->week_pattern, ['all', $parity], true));
+                if (array_diff($selected, $eligible->modelKeys()) !== []) {
+                    $this->invalid('selected_weekly_rule_ids', 'Every selected rule must belong to this semester and match the chosen weekday and parity.');
+                }
+                $lessons = $eligible->whereIn('id', $selected)->map(fn ($rule) => [
+                    ...$rule->only(self::LESSON_FIELDS), 'source_weekly_rule_id' => $rule->id,
+                ])->values()->all();
+                $this->saveSnapshot($owner, $graph, $date, 'working_saturday', $values['copied_weekday'], $lessons, sourceWeekParity: $parity);
+
+                return;
+            }
+            // Compatibility mode copies the effective source date, including replacements/cancellation.
             [$monday] = $this->calculator->weekDates($date);
             $source = (new DateTimeImmutable($monday.' UTC'))->modify('+'.($values['copied_weekday'] - 1).' days')->format('Y-m-d');
             $this->within($graph, $source);
@@ -216,7 +243,8 @@ class SemesterScheduleManagementService
                 $lessons[] = [...$origin->only(self::LESSON_FIELDS),
                     'source_weekly_rule_id' => $row['weekly_lesson_rule_id'] ?? $origin->source_weekly_rule_id];
             }
-            $this->saveSnapshot($owner, $graph, $date, 'working_saturday', $values['copied_weekday'], $lessons);
+            $this->saveSnapshot($owner, $graph, $date, 'working_saturday', $values['copied_weekday'], $lessons,
+                sourceWeekParity: $this->calculator->weekParity($this->state->config($graph), $source));
         });
     }
 
@@ -231,7 +259,7 @@ class SemesterScheduleManagementService
         });
     }
 
-    private function saveSnapshot(User $owner, array $graph, string $date, string $kind, ?int $copied, array $lessons, $existing = null): void
+    private function saveSnapshot(User $owner, array $graph, string $date, string $kind, ?int $copied, array $lessons, $existing = null, ?string $sourceWeekParity = null): void
     {
         foreach ($lessons as $index => &$lesson) {
             $this->references($graph, $lesson);
@@ -240,10 +268,10 @@ class SemesterScheduleManagementService
         unset($lesson);
         $candidate = $graph;
         $candidate['snapshots'][$date] = ['id' => $existing?->id ?? 0, 'occurs_on' => $date, 'kind' => $kind,
-            'copied_weekday' => $copied, 'lessons' => $lessons];
+            'copied_weekday' => $copied, 'source_week_parity' => $existing?->source_week_parity ?? $sourceWeekParity, 'lessons' => $lessons];
         $this->validate($owner, $candidate);
         $exception = $existing ?? $graph['schedule']->dateExceptions()->make(['user_id' => $owner->id,
-            'occurs_on' => $date, 'kind' => $kind, 'copied_weekday' => $copied]);
+            'occurs_on' => $date, 'kind' => $kind, 'copied_weekday' => $copied, 'source_week_parity' => $sourceWeekParity]);
         if (! $exception->exists) {
             $this->check($exception->save());
         }
@@ -261,22 +289,22 @@ class SemesterScheduleManagementService
                 $model->created_at = $lesson['created_at'];
             }
             $this->check($model->save());
-            $this->lessonTeachers->sync($model, $lesson['teacher_ids']);
+            $this->lessonTeachers->sync($model, $lesson['teacher_id']);
         }
     }
 
     private function lessonFields(array $row): array
     {
         $fields = array_replace(['pair_label' => null, 'teacher_id' => null, 'room' => null], Arr::only($row, self::LESSON_FIELDS));
-        $fields['teacher_ids'] = $this->planner->teacherIds($fields);
-        $fields['teacher_id'] = $fields['teacher_ids'][0] ?? null;
+        $fields['teacher_id'] = $this->lessonTeachers->teacherId($fields);
+        $fields['teacher_ids'] = [$fields['teacher_id']];
 
         return $fields;
     }
 
     private function mergeLessonFields(array $before, array $patch): array
     {
-        // A legacy teacher_id patch replaces the list; teacher_ids is authoritative when supplied.
+        // Scalar teacher_id is canonical; discard only an omitted, cached compatibility list.
         if (array_key_exists('teacher_id', $patch) && ! array_key_exists('teacher_ids', $patch)) {
             unset($before['teacher_ids']);
         }
@@ -319,6 +347,13 @@ class SemesterScheduleManagementService
 
     private function validate(User $owner, array $graph): void
     {
+        $definitions = $graph['rules']->map->attributesToArray()->all();
+        foreach ($graph['snapshots'] as $snapshot) {
+            array_push($definitions, ...$snapshot['lessons']);
+        }
+        if ($this->lessonTeachers->assignmentErrors($definitions, $graph['teacherAssignments']) !== []) {
+            $this->invalid('teacher_id', 'A subject cannot have conflicting teacher assignments in the projected semester.');
+        }
         try {
             $this->calculator->validateSemester($this->state->config($graph), $graph['rules']->map->attributesToArray()->all(), $graph['snapshots'], $owner->timezone);
         } catch (InvalidArgumentException) {
@@ -331,8 +366,12 @@ class SemesterScheduleManagementService
         if (! $graph['subjects']->contains('id', $row['subject_id'])) {
             $this->invalid('subject_id', 'The selected subject must belong to you.');
         }
-        if (array_diff($this->planner->teacherIds($row), $graph['teachers']->modelKeys()) !== []) {
-            $this->invalid('teacher_ids', 'Every selected teacher must belong to you.');
+        $teacherId = $this->lessonTeachers->teacherId($row);
+        if (! $graph['teachers']->contains('id', $teacherId)) {
+            $this->invalid('teacher_id', 'The selected teacher must belong to you.');
+        }
+        if (isset($graph['teacherAssignments'][$row['subject_id']]) && $graph['teacherAssignments'][$row['subject_id']] !== $teacherId) {
+            $this->invalid('teacher_id', 'The subject is already assigned to another teacher.');
         }
     }
 

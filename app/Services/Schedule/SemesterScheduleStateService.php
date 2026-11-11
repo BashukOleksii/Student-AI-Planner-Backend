@@ -11,7 +11,7 @@ use Illuminate\Validation\ValidationException;
 /** Shared authoritative graph for consistent management reads and owner-locked writes. */
 class SemesterScheduleStateService
 {
-    public function __construct(private SemesterScheduleImportPlanner $planner) {}
+    public function __construct(private SemesterScheduleImportPlanner $planner, private SemesterLessonTeacherService $lessonTeachers) {}
 
     public function load(User $owner, int $periodId, bool $lock = false): array
     {
@@ -29,6 +29,7 @@ class SemesterScheduleStateService
         $lessons = ScheduleDateExceptionLesson::with(['teachers' => fn ($query) => $query->when($lock, fn ($q) => $q->lockForUpdate())])->whereIn('schedule_date_exception_id', $exceptions->pluck('id'))
             ->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get();
         foreach ($rules->concat($lessons) as $rule) {
+            $this->lessonTeachers->assertHistoricalLesson($rule);
             if ($rule->user_id !== $owner->id || $rule->semester_schedule_id !== $schedule->id
                 || ! $subjects->contains('id', $rule->subject_id)
                 || array_diff($rule->teacher_ids, $teachers->modelKeys()) !== []
@@ -36,6 +37,7 @@ class SemesterScheduleStateService
                 $this->invalidGraph();
             }
         }
+        $teacherAssignments = $this->lessonTeachers->catalogAssignments($owner, $subjects, $lock);
         $suppressions = $schedule?->suppressedSlots()->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get() ?? collect();
         foreach ($suppressions as $slot) {
             if ($slot->user_id !== $owner->id) {
@@ -74,10 +76,10 @@ class SemesterScheduleStateService
             }
             $date = $exception->occurs_on->format('Y-m-d');
             $snapshots[$date] = ['id' => $exception->id, 'occurs_on' => $date, 'kind' => $exception->kind,
-                'copied_weekday' => $exception->copied_weekday, 'lessons' => $children->map->attributesToArray()->values()->all()];
+                'copied_weekday' => $exception->copied_weekday, 'source_week_parity' => $exception->source_week_parity, 'lessons' => $children->map->attributesToArray()->values()->all()];
         }
 
-        return compact('period', 'subjects', 'teachers', 'schedule', 'rules', 'exceptions', 'lessons', 'suppressions', 'provenance', 'snapshots');
+        return compact('period', 'subjects', 'teachers', 'schedule', 'rules', 'exceptions', 'lessons', 'suppressions', 'provenance', 'snapshots', 'teacherAssignments');
     }
 
     public function config(array $state): array
@@ -91,12 +93,12 @@ class SemesterScheduleStateService
 
     public function fingerprint(User $owner, array $state): string
     {
-        return $this->hash(['timezone' => $owner->timezone, 'period' => $state['period']->getAttributes(),
+        return $this->hash(['teacher_semantics' => 'single', 'teacher_assignments' => $state['teacherAssignments'], 'timezone' => $owner->timezone, 'period' => $state['period']->getAttributes(),
             'institution' => $state['period']->educationInstitution->getAttributes(),
             'subjects' => $state['subjects']->map->getAttributes()->all(), 'teachers' => $state['teachers']->map->getAttributes()->all(),
             'subject_teachers' => $state['subjects']->map(fn ($subject) => [$subject->id, $subject->teachers->modelKeys()])->all(),
-            'schedule' => $state['schedule']?->getAttributes(), 'rules' => $state['rules']->map(fn ($rule) => [...$rule->getAttributes(), 'teacher_ids' => $rule->teacher_ids])->all(),
-            'exceptions' => $state['exceptions']->map->getAttributes()->all(), 'lessons' => $state['lessons']->map(fn ($lesson) => [...$lesson->getAttributes(), 'teacher_ids' => $lesson->teacher_ids])->all(),
+            'schedule' => $state['schedule']?->getAttributes(), 'rules' => $state['rules']->map(fn ($rule) => [...$rule->getAttributes(), 'teacher_ids' => $rule->teacher_ids, 'teacher_links' => $rule->teachers->modelKeys()])->all(),
+            'exceptions' => $state['exceptions']->map->getAttributes()->all(), 'lessons' => $state['lessons']->map(fn ($lesson) => [...$lesson->getAttributes(), 'teacher_ids' => $lesson->teacher_ids, 'teacher_links' => $lesson->teachers->modelKeys()])->all(),
             'suppressions' => $state['suppressions']->map->getAttributes()->all(), 'provenance' => $state['provenance']]);
     }
 

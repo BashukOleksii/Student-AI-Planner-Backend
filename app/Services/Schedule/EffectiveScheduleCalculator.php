@@ -26,6 +26,20 @@ class EffectiveScheduleCalculator
         return [$start, $end];
     }
 
+    /** Calendar parity is reusable for legacy effective-day Saturday copies. */
+    public function weekParity(array $schedule, string $date): string
+    {
+        $anchor = $this->calendarDate($schedule['parity_anchor_on']);
+        if ($anchor->format('N') !== '1' || ! in_array($schedule['first_week_parity'], ['numerator', 'denominator'], true)) {
+            throw new InvalidArgumentException('Invalid semester parity anchor.');
+        }
+        $days = (int) $anchor->diff($this->calendarDate($date))->format('%r%a');
+        $weeks = (int) floor($days / 7);
+
+        return $weeks % 2 === 0 ? $schedule['first_week_parity']
+            : ($schedule['first_week_parity'] === 'numerator' ? 'denominator' : 'numerator');
+    }
+
     /**
      * Validate an entire semester without expanding/storing every ordinary date.
      * Ordinary offsets need two weekly cycles; every offset transition and saved
@@ -92,10 +106,7 @@ class EffectiveScheduleCalculator
             return [];
         }
 
-        $days = (int) $anchor->diff($day)->format('%r%a');
-        $weeks = (int) floor($days / 7);
-        $parity = $weeks % 2 === 0 ? $schedule['first_week_parity']
-            : ($schedule['first_week_parity'] === 'numerator' ? 'denominator' : 'numerator');
+        $parity = $this->weekParity($schedule, $date);
         $source = 'base';
         if ($snapshot !== null) {
             $this->validateSnapshot($snapshot);
@@ -165,7 +176,9 @@ class EffectiveScheduleCalculator
     {
         $date = $this->calendarDate($snapshot['occurs_on']);
         $copied = $snapshot['copied_weekday'] ?? null;
-        if (! in_array($snapshot['kind'], ['replacement', 'working_saturday'], true)
+        $parity = $snapshot['source_week_parity'] ?? null;
+        if (($parity !== null && ($snapshot['kind'] !== 'working_saturday' || ! in_array($parity, ['numerator', 'denominator'], true)))
+            || ! in_array($snapshot['kind'], ['replacement', 'working_saturday'], true)
             || ($snapshot['kind'] === 'replacement' && $copied !== null)
             || ($snapshot['kind'] === 'working_saturday'
                 && ($date->format('N') !== '6' || ! is_int($copied) || $copied < 1 || $copied > 5))) {

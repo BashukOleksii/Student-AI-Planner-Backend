@@ -20,9 +20,9 @@ class SemesterScheduleLessonDefinitionResource extends JsonResource
             'starts_at_local' => $this->starts_at_local, 'ends_at_local' => $this->ends_at_local,
             'subject' => $this->subject->only(['id', 'name', 'code', 'color']),
             'teacher_id' => $this->teacher_id, 'teacher' => $this->teacher?->only(['id', 'name']),
-            'teacher_ids' => $this->teacher_ids,
-            'teachers' => collect($this->teacher_ids)->map(fn ($id) => $this->teachers->find($id)?->only(['id', 'name'])
-                ?? $this->teacher?->only(['id', 'name']))->all(),
+            // Historical multi-teacher graphs are rejected before reaching this Resource.
+            'teacher_ids' => $this->teacher_id === null ? [] : [$this->teacher_id],
+            'teachers' => $this->teacher === null ? [] : [$this->teacher->only(['id', 'name'])],
             'room' => $this->room,
             'is_manually_managed' => $this->when($weekly, fn () => $this->is_manually_managed),
             'semester_schedule_import_id' => $this->when($weekly, fn () => $this->semester_schedule_import_id),
