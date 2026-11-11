@@ -3,7 +3,7 @@
 Backend for the Student Personal Learning Planning Service with an AI Agent. The
 intended service helps students manage class schedules, tasks, study plans,
 reminders, and progress, with an AI agent that performs application actions
-through tools backed by deterministic business logic.
+through tools backed by deterministic business logic
 
 The backend and frontend are independent applications in separate repositories.
 The Vue 3 + TypeScript + Vite frontend communicates with this backend through a
