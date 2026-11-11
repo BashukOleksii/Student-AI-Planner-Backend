@@ -15,8 +15,11 @@ use App\Services\Planning\StudyPlanConfirmationService;
 use App\Services\Planning\StudyPlanPersistenceService;
 use App\Services\Planning\StudyReplanningConfirmationService;
 use App\Services\Planning\StudyReplanningPersistenceService;
+use App\Services\Planning\StudySessionLifecycleRules;
+use App\Services\Planning\StudySessionLifecycleService;
 use App\Services\Planning\StudySessionMutationContextService;
 use App\Services\Planning\StudySessionReschedulingService;
+use App\Services\Reminders\ReminderDependencyService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
@@ -34,7 +37,8 @@ class PlanningActionService
         private StudyReplanningPersistenceService $replanning, private StudySessionReschedulingService $sessions,
         private StudySessionMutationContextService $mutation, private StudyPlanConfirmationService $planTokens,
         private StudyReplanningConfirmationService $replanningTokens, private ActionTargetFingerprint $fingerprints,
-        private AgentLimits $limits) {}
+        private AgentLimits $limits, private StudySessionLifecycleService $lifecycle,
+        private StudySessionLifecycleRules $lifecycleRules, private ReminderDependencyService $reminders) {}
 
     public function prepare(User $owner, string $name, array $arguments, string $callId): array
     {
@@ -56,6 +60,30 @@ class PlanningActionService
                         'validation' => 'preliminary', 'feasibility_confirmed' => false];
                     $required = [];
                     $actionable = true;
+                } elseif ($this->isLifecycleAction($name)) {
+                    $action = $name === 'propose_session_mark_missed' ? 'miss' : 'complete';
+                    $actualMinutes = $arguments['actual_minutes'] ?? null;
+                    $result = $this->mutation->read($owner, (string) $arguments['study_session_id'],
+                        function ($currentOwner, $source, $task, $child, $interval, $now, $chain) use ($action, $actualMinutes): array {
+                            $transition = $this->lifecycleRules->transition($action, $source->status, $interval, $now, $actualMinutes);
+                            $this->mutation->validateChain($chain, $source->id);
+                            $reminders = $this->reminders->scheduledForSessionReadOnly($currentOwner, $source);
+                            $records = $this->lifecycleRecords($task, $child, $chain, $reminders);
+
+                            return ['source' => $source, 'records' => $records, 'reminders' => $reminders,
+                                'proposed_status' => $transition['status']->value];
+                        });
+                    $hash = $this->fingerprints->hash($result['records']);
+                    $review = ['study_session_id' => $result['source']->id, 'task_id' => $result['source']->task_id,
+                        'subtask_id' => $result['source']->subtask_id, 'current_status' => $result['source']->status->value,
+                        'starts_at' => $this->session($result['source'])['starts_at'], 'ends_at' => $this->session($result['source'])['ends_at'],
+                        'proposed_status' => $result['proposed_status'],
+                        ...($action === 'complete' ? ['actual_minutes' => $actualMinutes] : []),
+                        'dependent_reminders' => ['scheduled_count' => $result['reminders']->count(),
+                            'scheduled_reminder_ids' => $result['reminders']->modelKeys(), 'effect_on_confirmation' => 'cancel_scheduled'],
+                        'confirmation_required' => true];
+                    $actionable = true;
+                    $required = [];
                 } else {
                     $result = ($name === 'propose_study_plan_create' ? $this->plans : $this->replanning)->preview($owner,
                         $arguments['start_date'], $arguments['end_date'], $arguments['task_id'] ?? null, $arguments['subtask_id'] ?? null);
@@ -81,7 +109,9 @@ class PlanningActionService
                     'required_consent' => $required, 'effects' => [match ($name) {
                         'propose_study_plan_create' => 'Create only the reviewed planned sessions. A partial allocation needs explicit accept_partial consent.',
                         'propose_adaptive_replanning' => 'Preserve valid and cannot-replan sessions. Replace affected sources one-to-one; shorter replacements need partial consent and unplaced cancellation needs separate cancellation consent. Cancel source scheduled reminders without cloning them.',
-                        default => 'Preliminary lifecycle and duration review only. Confirmation revalidates remaining effort and all planning constraints; the interval is not guaranteed feasible. Retire the source, create one successor, cancel scheduled source reminders, preserve history and do not clone reminders.',
+                        'propose_session_reschedule' => 'Preliminary lifecycle and duration review only. Confirmation revalidates remaining effort and all planning constraints; the interval is not guaranteed feasible. Retire the source, create one successor, cancel scheduled source reminders, preserve history and do not clone reminders.',
+                        'propose_session_mark_missed' => 'Mark the existing session missed only after authenticated confirmation. Cancel its scheduled dependent reminders; preserve the session identity and history. No replacement is created.',
+                        default => 'Mark the existing session completed only after authenticated confirmation, using only stated actual minutes. Cancel its scheduled dependent reminders; preserve the session identity and history. No replacement is created.',
                     }]];
                 // Never trim a material effect. An oversized review cannot become confirmable.
                 $this->limits->json($preview, $this->limits->get('max_tool_result_bytes'));
@@ -112,7 +142,7 @@ class PlanningActionService
     /** Pure protected-token checks; persistence additionally compares this deadline to MySQL UTC. */
     public function expiration(User $owner, array $proposal): ?string
     {
-        if ($proposal['type'] === 'propose_session_reschedule') {
+        if ($proposal['type'] === 'propose_session_reschedule' || $this->isLifecycleAction($proposal['type'])) {
             return null;
         }
         $protected = $proposal['protected_payload'] ?? null;
@@ -146,6 +176,24 @@ class PlanningActionService
         }
         $arguments = $this->validator->validate($action->type, $action->arguments);
         try {
+            if ($this->isLifecycleAction($action->type)) {
+                $transition = $action->type === 'propose_session_mark_missed' ? 'miss' : 'complete';
+                $reminderIds = [];
+                $verify = function ($currentOwner, $source, $task, $child, $interval, $now, $chain, $reminders) use ($action, &$reminderIds): void {
+                    $records = $this->lifecycleRecords($task, $child, $chain, $reminders);
+                    if (! hash_equals($action->target_hash ?? '', $this->fingerprints->hash($records))) {
+                        throw new AiAgentException('action_stale');
+                    }
+                    $reminderIds = $reminders->modelKeys();
+                };
+                $session = $transition === 'miss'
+                    ? $this->lifecycle->missWithinTransaction($owner, (string) $arguments['study_session_id'], $verify)
+                    : $this->lifecycle->completeWithinTransaction($owner, (string) $arguments['study_session_id'],
+                        $arguments['actual_minutes'] ?? null, $verify);
+
+                return ['applied' => true, 'session' => $this->session($session),
+                    'effects' => ['cancelled_scheduled_reminder_ids' => $reminderIds, 'replacement_sessions_created' => false]];
+            }
             if ($action->type === 'propose_session_reschedule') {
                 $result = $this->mutation->runWithinTransaction($owner, (string) $arguments['study_session_id'],
                     function ($currentOwner, $source, $task, $child, $interval, $now, $chain) use ($action, $arguments): array {
@@ -196,6 +244,18 @@ class PlanningActionService
     private function session($session): array
     {
         return (new StudySessionResource($session))->resolve(new Request);
+    }
+
+    private function isLifecycleAction(string $name): bool
+    {
+        return in_array($name, ['propose_session_mark_missed', 'propose_session_complete'], true);
+    }
+
+    private function lifecycleRecords($task, $child, $chain, $reminders): array
+    {
+        return ['task' => $task, 'child' => $child,
+            ...$chain->mapWithKeys(fn ($row) => ['session_'.$row->id => $row])->all(),
+            ...$reminders->mapWithKeys(fn ($row) => ['reminder_'.$row->id => $row])->all()];
     }
 
     private function error(string $name, string $code): array

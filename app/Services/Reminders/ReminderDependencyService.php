@@ -43,6 +43,20 @@ class ReminderDependencyService
         return $reminders;
     }
 
+    /** Read-only proposal snapshot; the confirmation path performs the locked preflight. */
+    public function scheduledForSessionReadOnly(User $owner, StudySession $session): Collection
+    {
+        $reminders = Reminder::where('study_session_id', $session->id)->where('status', ReminderStatus::Scheduled)
+            ->orderBy('id')->get();
+        foreach ($reminders as $reminder) {
+            if (! $this->compatible($reminder, $owner)) {
+                throw new UnexpectedValueException('Invalid study session reminder relationships.');
+            }
+        }
+
+        return $reminders;
+    }
+
     public function cancel(Collection $reminders): void
     {
         if (DB::transactionLevel() === 0) {

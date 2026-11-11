@@ -21,14 +21,19 @@ class PlanningActionArgumentValidator
         }
         foreach ($arguments as $field => $value) {
             $rule = $schema['properties'][$field];
-            if ($rule['type'] === 'integer' ? (! is_int($value) || $value < 1 || $value > PHP_INT_MAX)
-                : (! is_string($value) || ! mb_check_encoding($value, 'UTF-8'))) {
+            $types = (array) $rule['type'];
+            $validType = (in_array('integer', $types, true) && is_int($value))
+                || (in_array('string', $types, true) && is_string($value) && mb_check_encoding($value, 'UTF-8'))
+                || (in_array('null', $types, true) && $value === null);
+            if (! $validType || (is_int($value) && ($value < ($rule['minimum'] ?? PHP_INT_MIN) || $value > ($rule['maximum'] ?? PHP_INT_MAX)))) {
                 throw new InvalidArgumentException;
             }
         }
         if ($name === 'propose_session_reschedule') {
             $this->intervals->durationSeconds(['start' => $this->sessions->timestamp($arguments['starts_at']),
                 'end' => $this->sessions->timestamp($arguments['ends_at'])]);
+        } elseif (in_array($name, ['propose_session_mark_missed', 'propose_session_complete'], true)) {
+            $this->sessions->actualMinutes($arguments['actual_minutes'] ?? null);
         } else {
             $this->context->validateDates($arguments['start_date'], $arguments['end_date']);
             if (isset($arguments['subtask_id']) && ! isset($arguments['task_id'])) {
