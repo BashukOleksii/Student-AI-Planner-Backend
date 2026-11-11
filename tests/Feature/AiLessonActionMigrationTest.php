@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\AiConversation;
 use App\Models\AiPendingAction;
 use App\Services\AI\Actions\LessonActionRegistry;
-use App\Services\AI\Actions\PlanningActionRegistry;
 use App\Services\AI\Actions\SubtaskReminderActionRegistry;
 use App\Services\AI\Actions\TaskActionRegistry;
 use Illuminate\Support\Facades\DB;
@@ -35,8 +34,11 @@ class AiLessonActionMigrationTest extends TestCase
         $this->assertMysqlRejects(fn () => DB::table('ai_pending_actions')->where('id', $action->id)->update(['type' => 'propose_lesson_create']), 3819);
         $migration = require database_path('migrations/2026_11_02_000001_add_ai_lesson_actions.php');
         $migration->up();
+        foreach (['propose_session_mark_missed', 'propose_session_complete'] as $futureType) {
+            $this->assertMysqlRejects(fn () => DB::table('ai_pending_actions')->where('id', $action->id)->update(['type' => $futureType]), 3819, 'ai_actions_valid_type');
+        }
         $this->assertSame($before, $action->fresh()->getRawOriginal());
-        foreach ([...TaskActionRegistry::NAMES, ...SubtaskReminderActionRegistry::NAMES, ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES] as $type) {
+        foreach ([...TaskActionRegistry::NAMES, ...SubtaskReminderActionRegistry::NAMES, 'propose_study_plan_create', 'propose_adaptive_replanning', 'propose_session_reschedule', ...LessonActionRegistry::NAMES] as $type) {
             DB::table('ai_pending_actions')->where('id', $action->id)->update(['type' => $type]);
             $this->assertSame($type, $action->fresh()->type);
         }

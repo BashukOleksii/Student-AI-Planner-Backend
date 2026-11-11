@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\AiConversation;
 use App\Models\AiPendingAction;
-use App\Services\AI\Actions\PlanningActionRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -33,8 +32,11 @@ class AiPlanningActionMigrationTest extends TestCase
         $this->assertEquals(array_diff_key($before, ['protected_payload' => true]), $action->fresh()->getRawOriginal());
         $this->assertMysqlRejects(fn () => DB::table('ai_pending_actions')->where('id', $action->id)->update(['type' => 'propose_study_plan_create']), 3819);
         $migration->up();
+        foreach (['propose_session_mark_missed', 'propose_session_complete'] as $futureType) {
+            $this->assertMysqlRejects(fn () => DB::table('ai_pending_actions')->where('id', $action->id)->update(['type' => $futureType]), 3819, 'ai_actions_valid_type');
+        }
         $this->assertSame($before, $action->fresh()->getRawOriginal());
-        foreach (PlanningActionRegistry::NAMES as $type) {
+        foreach (['propose_study_plan_create', 'propose_adaptive_replanning', 'propose_session_reschedule'] as $type) {
             DB::table('ai_pending_actions')->where('id', $action->id)->update(['type' => $type]);
             $this->assertSame($type, $action->fresh()->type);
         }

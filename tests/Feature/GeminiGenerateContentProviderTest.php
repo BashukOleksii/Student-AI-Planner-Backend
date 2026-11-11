@@ -77,7 +77,7 @@ class GeminiGenerateContentProviderTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_request_has_official_authentication_model_budgets_and_all_31_schemas(): void
+    public function test_request_has_official_authentication_model_budgets_and_all_34_schemas(): void
     {
         config(['ai.openai_key' => 'must-not-send-openai-key', 'ai.model' => 'must-not-send-openai-model']);
         Http::fake(function ($request, $options) {
@@ -97,8 +97,8 @@ class GeminiGenerateContentProviderTest extends TestCase
                 $this->assertIsCallable($options[$callback]);
             }
             $declarations = $body['tools'][0]['functionDeclarations'];
-            $this->assertCount(31, $declarations);
-            $this->assertCount(21, array_filter($declarations, fn ($tool) => str_starts_with($tool['name'], 'propose_')));
+            $this->assertCount(34, $declarations);
+            $this->assertCount(23, array_filter($declarations, fn ($tool) => str_starts_with($tool['name'], 'propose_')));
             foreach ($declarations as $index => $declaration) {
                 $definition = $this->definitions()[$index];
                 $this->assertSame($definition['parameters'], $declaration['parametersJsonSchema']);

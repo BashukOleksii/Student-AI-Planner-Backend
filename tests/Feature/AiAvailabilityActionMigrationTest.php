@@ -6,7 +6,6 @@ use App\Models\AiConversation;
 use App\Models\AiPendingAction;
 use App\Services\AI\Actions\AvailabilityActionRegistry;
 use App\Services\AI\Actions\LessonActionRegistry;
-use App\Services\AI\Actions\PlanningActionRegistry;
 use App\Services\AI\Actions\SubtaskReminderActionRegistry;
 use App\Services\AI\Actions\TaskActionRegistry;
 use Illuminate\Support\Facades\DB;
@@ -36,7 +35,7 @@ class AiAvailabilityActionMigrationTest extends TestCase
         // Restore the 18-type predecessor only on this guarded disposable test schema.
         (require database_path('migrations/2026_11_02_000001_add_ai_lesson_actions.php'))->up();
         $old = [...TaskActionRegistry::NAMES, ...SubtaskReminderActionRegistry::NAMES,
-            ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES];
+            'propose_study_plan_create', 'propose_adaptive_replanning', 'propose_session_reschedule', ...LessonActionRegistry::NAMES];
         $this->assertCount(18, $old);
         $conversation = AiConversation::factory()->create();
         foreach ($old as $i => $type) {
@@ -56,6 +55,9 @@ class AiAvailabilityActionMigrationTest extends TestCase
         }
         $migration = require database_path('migrations/2026_11_08_000002_add_ai_availability_actions.php');
         $migration->up();
+        foreach (['propose_session_mark_missed', 'propose_session_complete'] as $futureType) {
+            $this->assertMysqlRejects(fn () => DB::table('ai_pending_actions')->where('id', $action->id)->update(['type' => $futureType]), 3819, 'ai_actions_valid_type');
+        }
         $this->assertEquals($rows, DB::table('ai_pending_actions')->orderBy('id')->get()->all());
         $this->assertSame($schema, [Schema::getColumns('ai_pending_actions'), Schema::getForeignKeys('ai_pending_actions'), Schema::getIndexes('ai_pending_actions')]);
         $after = $this->checks();

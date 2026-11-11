@@ -168,7 +168,7 @@ class AiPlanningActionConcurrencyTest extends TestCase
         $this->assertSame(200, $second['status']);
         $this->assertTrue($second['body']['replayed']);
         $this->assertEquals($first['body']['data']['receipt'], $second['body']['data']['receipt']);
-        $this->assertDatabaseCount('study_sessions', $name === 'propose_study_plan_create' ? 1 : 2);
+        $this->assertDatabaseCount('study_sessions', in_array($name, ['propose_study_plan_create', 'propose_session_mark_missed', 'propose_session_complete'], true) ? 1 : 2);
         $this->assertSame(1, $f['conversation']->messages()->where('tool_calls->version', 2)->count());
     }
 
@@ -394,7 +394,7 @@ class AiPlanningActionConcurrencyTest extends TestCase
         $this->assertSame(200, $this->outcome($two)['status']);
         $this->assertSame('executed', $f['action']->fresh()->status);
         if ($f['source'] !== null) {
-            $this->assertSame(1, StudySession::where('rescheduled_from_session_id', $f['source']->id)->count());
+            $this->assertSame(in_array($name, ['propose_session_mark_missed', 'propose_session_complete'], true) ? 0 : 1, StudySession::where('rescheduled_from_session_id', $f['source']->id)->count());
         }
     }
 

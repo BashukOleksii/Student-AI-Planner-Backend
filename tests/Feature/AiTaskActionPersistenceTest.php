@@ -62,7 +62,7 @@ class AiTaskActionPersistenceTest extends TestCase
         $message = $conversation->messages()->create(['role' => 'user', 'content' => 'Preserved'])->refresh();
         DB::table('ai_pending_actions')->insert($values);
         $before = [$conversation->getAttributes(), $message->getAttributes(), DB::table('ai_conversation_turns')->sole()];
-        $this->assertSame(3, $this->excludeForwardOnlyOverlayFromLegacyRollback());
+        $this->assertSame(4, $this->excludeForwardOnlyOverlayFromLegacyRollback());
         // Later additive migrations must not shift this test's rollback boundary.
         $steps = DB::table('migrations')->where('migration', '>=', '2026_10_17_000001_create_ai_pending_actions_table')->count();
         $this->artisan('migrate:rollback', ['--step' => $steps])->assertExitCode(0);

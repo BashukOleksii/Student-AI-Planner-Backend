@@ -60,7 +60,7 @@ class AiPlanningActionsTest extends TestCase
         $this->assertStringContainsString('Confirmation is required', $turn['content']);
         $action = AiPendingAction::findOrFail($id);
         $this->assertEquals($f['arguments'], $action->arguments);
-        if ($name !== 'propose_session_reschedule') {
+        if (in_array($name, ['propose_study_plan_create', 'propose_adaptive_replanning'], true)) {
             $token = $action->protected_payload['preview_token'];
             $this->assertStringNotContainsString($token, $action->getRawOriginal('protected_payload'));
             $this->assertStringNotContainsString($token, $response->getContent());
@@ -69,7 +69,11 @@ class AiPlanningActionsTest extends TestCase
             Http::assertSent(fn ($request) => ! str_contains(json_encode($request->data()), $token));
         } else {
             $this->assertNull($action->protected_payload);
-            $this->assertFalse($turn['action']['preview']['review']['feasibility_confirmed']);
+            if ($name === 'propose_session_reschedule') {
+                $this->assertFalse($turn['action']['preview']['review']['feasibility_confirmed']);
+            } else {
+                $this->assertTrue($turn['action']['preview']['review']['confirmation_required']);
+            }
         }
         foreach ([$response->getContent(), $this->getJson($this->planningUrl($f, $id))->assertOk()->getContent(),
             $this->getJson('/api/ai/conversations/'.$f['conversation']->id.'/messages')->assertOk()->getContent()] as $public) {
@@ -89,7 +93,11 @@ class AiPlanningActionsTest extends TestCase
         $this->assertSame($name, $receipt['type']);
         $this->assertStringNotContainsString('user_id', json_encode($receipt));
         $this->assertStringNotContainsString('preview_token', json_encode($receipt));
-        if ($f['source'] !== null) {
+        if (in_array($name, ['propose_session_mark_missed', 'propose_session_complete'], true)) {
+            $this->assertSame($name === 'propose_session_complete' ? 'completed' : 'missed', $f['source']->fresh()->status->value);
+            $this->assertSame('cancelled', $f['reminder']->fresh()->status->value);
+            $this->assertSame(0, StudySession::where('rescheduled_from_session_id', $f['source']->id)->count());
+        } elseif ($f['source'] !== null) {
             $this->assertSame('rescheduled', $f['source']->fresh()->status->value);
             $this->assertSame('cancelled', $f['reminder']->fresh()->status->value);
             $replacement = StudySession::where('rescheduled_from_session_id', $f['source']->id)->sole();
@@ -105,8 +113,8 @@ class AiPlanningActionsTest extends TestCase
         $this->assertSame($after, $this->planningSnapshot());
         $this->assertSame(1, $f['conversation']->messages()->where('tool_calls->version', 2)->count());
         // A receipt is the committed result, even after later legitimate domain changes.
-        $createdId = $receipt['sessions'][0]['id'] ?? $receipt['replacement_sessions'][0]['id'] ?? $receipt['replacement']['id'];
-        StudySession::findOrFail($createdId)->update(['status' => 'cancelled']);
+        $createdId = $receipt['sessions'][0]['id'] ?? $receipt['replacement_sessions'][0]['id'] ?? $receipt['replacement']['id'] ?? $receipt['session']['id'];
+        StudySession::findOrFail($createdId)->update(['status' => 'cancelled', 'completed_at' => null, 'actual_minutes' => null]);
         $later = $this->planningSnapshot();
         $this->confirmPlanning($f, $id)->assertOk()->assertJsonPath('data.receipt', $receipt);
         $this->assertSame($later, $this->planningSnapshot());
@@ -295,7 +303,7 @@ class AiPlanningActionsTest extends TestCase
         $count = AiMessage::count();
         $fail = fn () => throw new RuntimeException('SECRET internal write failed');
         match ($failure) {
-            'business' => StudySession::created($fail), 'receipt' => AiPendingAction::updated($fail), 'history' => AiMessage::creating($fail),
+            'business' => in_array($name, ['propose_session_mark_missed', 'propose_session_complete'], true) ? StudySession::updated($fail) : StudySession::created($fail), 'receipt' => AiPendingAction::updated($fail), 'history' => AiMessage::creating($fail),
         };
         try {
             $response = $this->confirmPlanning($f, $id)->assertStatus(500)->assertJsonPath('code', 'persistence_error');
@@ -546,7 +554,7 @@ class AiPlanningActionsTest extends TestCase
         Http::preventStrayRequests();
         Http::fake(function ($request) {
             $this->assertSame(0, DB::transactionLevel());
-            $this->assertCount(31, $request['tools'][0]['functionDeclarations'] ?? $request['tools']);
+            $this->assertCount(34, $request['tools'][0]['functionDeclarations'] ?? $request['tools']);
             $this->assertStringContainsString('action_stale', json_encode($this->aiInput($request)));
             $this->assertStringContainsString('failed', json_encode($this->aiInput($request)));
             $this->assertStringNotContainsString('preview_token', json_encode($request->data()));

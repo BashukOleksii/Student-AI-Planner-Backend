@@ -57,6 +57,7 @@ class AiToolFoundationTest extends TestCase
             ['list_study_availability_windows', []],
             ['find_free_study_slots', [...$period, 'min_slot_minutes' => 65535]],
             ['list_study_sessions', $period],
+            ['get_study_recovery_overview', $period],
             ['get_progress_statistics', $period],
             ['get_daily_progress_trends', $period],
             ['compare_progress_periods', ['baseline_start_date' => '2026-09-01', 'baseline_end_date' => '2026-09-07',
@@ -69,7 +70,7 @@ class AiToolFoundationTest extends TestCase
         $registry = new ToolRegistry;
         $definitions = $registry->definitions();
         $this->assertSame(array_column(self::validCalls(), 0), array_column($definitions, 'name'));
-        $this->assertCount(8, array_unique(array_column($definitions, 'name')));
+        $this->assertCount(9, array_unique(array_column($definitions, 'name')));
         $this->assertSame($definitions, json_decode(json_encode($definitions, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR));
         foreach ($definitions as $definition) {
             $this->assertNotEmpty($definition['description']);
@@ -81,7 +82,7 @@ class AiToolFoundationTest extends TestCase
             $this->assertTrue(array_is_list($schema['required']));
             $this->assertSame([], array_diff($schema['required'], array_keys($schema['properties'])));
             $this->assertSame(in_array($definition['name'], ['list_tasks', 'list_study_availability_windows'], true) ? [] : array_values(array_filter(array_keys($schema['properties']),
-                fn ($field) => $field !== 'min_slot_minutes')), $schema['required']);
+                fn ($field) => ! in_array($field, ['min_slot_minutes', 'task_id', 'subtask_id'], true))), $schema['required']);
             foreach ($schema['properties'] as $rule) {
                 $this->assertContains($rule['type'], ['string', 'integer']);
                 if ($rule['type'] === 'integer') {

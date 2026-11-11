@@ -35,9 +35,11 @@ use App\Services\Planning\StudyPlanPersistenceService;
 use App\Services\Planning\StudyReplanningConfirmationService;
 use App\Services\Planning\StudyReplanningPersistenceService;
 use App\Services\Planning\StudySessionLifecycleRules;
+use App\Services\Planning\StudySessionLifecycleService;
 use App\Services\Planning\StudySessionMutationContextService;
 use App\Services\Planning\StudySessionReschedulingService;
 use App\Services\Planning\TimeIntervalService;
+use App\Services\Reminders\ReminderDependencyService;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -57,14 +59,14 @@ class PlanningActionTest extends TestCase
             'max_tool_result_bytes' => 65536, 'max_turn_seconds' => 180]);
     }
 
-    public function test_definitions_are_unique_ordered_bounded_and_preserve_the_previous_twenty_contracts(): void
+    public function test_definitions_are_unique_ordered_bounded_and_preserve_other_registries(): void
     {
         $old = [...(new ToolRegistry)->definitions(), ...(new TaskActionRegistry)->definitions(),
             ...(new SubtaskReminderActionRegistry)->readDefinitions(), ...(new SubtaskReminderActionRegistry)->definitions()];
         $registry = new PlanningActionRegistry;
         $new = $registry->definitions();
         $this->assertSame(PlanningActionRegistry::NAMES, array_column($new, 'name'));
-        $this->assertCount(24, array_unique(array_column([...$old, ...$new], 'name')));
+        $this->assertCount(27, array_unique(array_column([...$old, ...$new], 'name')));
         foreach ((new OpenAiToolSchema)->definitions($new) as $i => $definition) {
             $this->assertFalse($definition['strict']);
             $this->assertSame($new[$i]['parameters'], $definition['parameters']);
@@ -84,6 +86,10 @@ class PlanningActionTest extends TestCase
     {
         return [[PlanningActionRegistry::NAMES[0], ['start_date' => '2026-10-26', 'end_date' => '2026-11-25']],
             [PlanningActionRegistry::NAMES[1], ['start_date' => '2028-02-29', 'end_date' => '2028-02-29', 'task_id' => 1, 'subtask_id' => 2]],
+            ['propose_session_mark_missed', ['study_session_id' => 1]],
+            ['propose_session_complete', ['study_session_id' => 1]],
+            ['propose_session_complete', ['study_session_id' => 1, 'actual_minutes' => null]],
+            ['propose_session_complete', ['study_session_id' => 1, 'actual_minutes' => 65535]],
             [PlanningActionRegistry::NAMES[2], ['study_session_id' => PHP_INT_MAX, 'starts_at' => '2026-10-27T14:00:00Z', 'ends_at' => '2026-10-27T14:00:01Z']]];
     }
 
@@ -132,6 +138,20 @@ class PlanningActionTest extends TestCase
         foreach (['preview_token', 'accept_partial', 'accept_unplaced_cancellation', 'task_id', 'source_ids'] as $key) {
             $cases[] = [PlanningActionRegistry::NAMES[2], [...$session, $key => true]];
         }
+
+        foreach (['propose_session_mark_missed', 'propose_session_complete'] as $name) {
+            $cases[] = [$name, []];
+            foreach ([0, -1, '1', 1.0, true, null, []] as $id) {
+                $cases[] = [$name, ['study_session_id' => $id]];
+            }
+            foreach (['start_date', 'ends_at', 'user_id', 'accept_partial'] as $key) {
+                $cases[] = [$name, ['study_session_id' => 1, $key => true]];
+            }
+        }
+        foreach ([0, -1, 65536, '30', 30.0, true, []] as $minutes) {
+            $cases[] = ['propose_session_complete', ['study_session_id' => 1, 'actual_minutes' => $minutes]];
+        }
+        $cases[] = ['propose_session_mark_missed', ['study_session_id' => 1, 'actual_minutes' => 30]];
 
         return $cases;
     }
@@ -188,7 +208,8 @@ class PlanningActionTest extends TestCase
         $service = new PlanningActionService($this->validator(), $this->createMock(StudyPlanPersistenceService::class),
             $this->createMock(StudyReplanningPersistenceService::class), $this->createMock(StudySessionReschedulingService::class),
             $this->createMock(StudySessionMutationContextService::class), $tokens, $this->createMock(StudyReplanningConfirmationService::class),
-            new ActionTargetFingerprint, $this->limits());
+            new ActionTargetFingerprint, $this->limits(), $this->createMock(StudySessionLifecycleService::class),
+            new StudySessionLifecycleRules, $this->createMock(ReminderDependencyService::class));
         $owner = new User;
         $owner->id = 42;
         $proposal = ['type' => PlanningActionRegistry::NAMES[0], 'arguments' => $arguments,

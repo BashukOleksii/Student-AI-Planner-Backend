@@ -70,7 +70,7 @@ class BackendIntegrationSmokeTest extends TestCase
                 ...array_column((new SubtaskReminderActionRegistry)->readDefinitions(), 'name'),
                 ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES, ...AvailabilityActionRegistry::NAMES];
             $this->assertSame($names, array_column($body['tools'], 'name'));
-            $this->assertCount(31, array_unique($names));
+            $this->assertCount(34, array_unique($names));
             foreach ($body['tools'] as $tool) {
                 $this->assertSame('function', $tool['type']);
                 $this->assertFalse($tool['parameters']['additionalProperties']);
@@ -114,7 +114,7 @@ class BackendIntegrationSmokeTest extends TestCase
         }
         $scope = ['start_date' => $f['day']->toDateString(), 'end_date' => $f['day']->toDateString(), 'task_id' => $f['task']['id']];
         $source = $reminder = null;
-        if (in_array($name, ['propose_adaptive_replanning', 'propose_session_reschedule'], true)) {
+        if (in_array($name, ['propose_adaptive_replanning', 'propose_session_reschedule', 'propose_session_mark_missed', 'propose_session_complete'], true)) {
             $preview = $this->browser('POST', '/api/planning/study-plans/preview', $scope)->assertOk()->json('data');
             $saved = $this->browser('POST', '/api/planning/study-plans/confirm', ['preview_token' => $preview['preview_token']])->assertCreated()->json('data');
             $source = $saved['sessions'][0];
@@ -123,6 +123,12 @@ class BackendIntegrationSmokeTest extends TestCase
                 $this->browser('POST', '/api/lessons', ['subject_id' => $f['subject']['id'], 'type' => 'lecture',
                     'starts_at' => $source['starts_at'], 'ends_at' => $source['ends_at']])->assertCreated();
             }
+        }
+        if (in_array($name, ['propose_session_mark_missed', 'propose_session_complete'], true)) {
+            $this->travelTo($f['day']->addDay());
+            // Advancing beyond the session also expires the browser login; authenticate normally again.
+            $this->browser('GET', '/sanctum/csrf-cookie')->assertNoContent();
+            $this->browser('POST', '/api/auth/login', ['email' => $f['student']['email'], 'password' => 'integration-password'])->assertOk();
         }
         if (in_array($name, ['propose_reminder_update', 'propose_reminder_cancel'], true)) {
             $reminder = $this->browser('POST', '/api/reminders', ['subtask_id' => $f['child']['id'], 'anchor' => 'subtask_deadline',
@@ -152,6 +158,7 @@ class BackendIntegrationSmokeTest extends TestCase
             'propose_reminder_update' => ['reminder_id' => $reminder['id'], 'offset_minutes' => -120],
             'propose_reminder_cancel' => ['reminder_id' => $reminder['id']],
             'propose_study_plan_create', 'propose_adaptive_replanning' => $scope,
+            'propose_session_mark_missed', 'propose_session_complete' => ['study_session_id' => $source['id']],
             'propose_session_reschedule' => ['study_session_id' => $source['id'], 'starts_at' => ($f['utc'])(14), 'ends_at' => ($f['utc'])(15)],
         };
         $this->scripted([[$this->aiCall('list_tasks', '{}', 'discover_tasks'),
@@ -200,7 +207,7 @@ class BackendIntegrationSmokeTest extends TestCase
             $this->assertSame($expectedWindow, $actualWindow);
             $this->assertSame($f['student']['timezone'], $receipt['timezone']);
         } else {
-            $row = $receipt['lesson'] ?? $receipt['task'] ?? $receipt['subtask'] ?? $receipt['reminder'] ?? $receipt['sessions'][0] ?? $receipt['replacement_sessions'][0] ?? $receipt['replacement'];
+            $row = $receipt['lesson'] ?? $receipt['task'] ?? $receipt['subtask'] ?? $receipt['reminder'] ?? $receipt['sessions'][0] ?? $receipt['replacement_sessions'][0] ?? $receipt['replacement'] ?? $receipt['session'];
             $readPath = match (true) {
                 isset($receipt['lesson']) => '/api/lessons/'.$row['id'],
                 isset($receipt['task']) => '/api/tasks/'.$row['id'],
@@ -215,9 +222,11 @@ class BackendIntegrationSmokeTest extends TestCase
             $this->browser('GET', '/api/lessons/'.$f['lesson']['id'])->assertOk()->assertJsonPath('data.status', 'replaced');
         }
         if ($source !== null) {
-            $this->browser('GET', '/api/study-sessions/'.$source['id'])->assertOk()->assertJsonPath('data.status', 'rescheduled');
+            $this->browser('GET', '/api/study-sessions/'.$source['id'])->assertOk()->assertJsonPath('data.status', match ($name) {
+                'propose_session_mark_missed' => 'missed', 'propose_session_complete' => 'completed', default => 'rescheduled',
+            });
             $this->browser('GET', '/api/reminders/'.$reminder['id'])->assertOk()->assertJsonPath('data.status', 'cancelled');
-            $this->assertDatabaseHas('study_sessions', ['id' => $row['id'], 'rescheduled_from_session_id' => $source['id']]);
+            $this->assertDatabaseHas('study_sessions', ['id' => $row['id'], 'rescheduled_from_session_id' => in_array($name, ['propose_session_mark_missed', 'propose_session_complete'], true) ? null : $source['id']]);
         }
         if ($name === 'propose_reminder_create' && $variant) {
             $this->assertSame(($f['utc'])(21), $row['trigger_at']);
@@ -249,7 +258,7 @@ class BackendIntegrationSmokeTest extends TestCase
         $this->browser('POST', $actionPath.'/confirm')->assertUnauthorized();
     }
 
-    public function test_all_ten_reads_use_native_provider_calls_and_match_ordinary_owned_rest_reads_without_business_writes(): void
+    public function test_all_eleven_reads_use_native_provider_calls_and_match_ordinary_owned_rest_reads_without_business_writes(): void
     {
         $f = $this->fixture();
         $date = $f['day']->toDateString();
@@ -257,7 +266,7 @@ class BackendIntegrationSmokeTest extends TestCase
         $baseline = $f['day']->subDay()->toDateString();
         $calls = [
             ['get_schedule_for_date', ['date' => $date]], ['list_tasks', ['status' => 'pending', 'page' => 1, 'per_page' => 20]],
-            ['find_free_study_slots', $period], ['list_study_sessions', $period], ['get_progress_statistics', $period],
+            ['find_free_study_slots', $period], ['list_study_sessions', $period], ['get_study_recovery_overview', $period], ['get_progress_statistics', $period],
             ['get_daily_progress_trends', $period], ['compare_progress_periods', ['baseline_start_date' => $baseline,
                 'baseline_end_date' => $baseline, 'current_start_date' => $date, 'current_end_date' => $date]],
             ['list_study_availability_windows', []],
@@ -282,7 +291,7 @@ class BackendIntegrationSmokeTest extends TestCase
                 }
             }
         }
-        $this->assertCount(10, $results);
+        $this->assertCount(11, $results);
         $this->assertSame($this->browser('GET', '/api/study-availability-windows')->assertOk()->json('data'), $results['list_study_availability_windows']['windows']);
         $this->assertSame($this->browser('GET', '/api/schedule/date/'.$date)->assertOk()->json('data'), $results['get_schedule_for_date']['lessons']);
         $this->assertSame($this->browser('GET', '/api/tasks')->assertOk()->json('data'), $results['list_tasks']['tasks']);

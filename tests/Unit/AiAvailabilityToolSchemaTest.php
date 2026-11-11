@@ -34,9 +34,11 @@ class AiAvailabilityToolSchemaTest extends TestCase
         $definitions = [...$registry->definitions(), ...(new TaskActionRegistry)->definitions(),
             ...(new SubtaskReminderActionRegistry)->readDefinitions(), ...(new SubtaskReminderActionRegistry)->definitions(),
             ...(new PlanningActionRegistry)->definitions(), ...(new LessonActionRegistry)->definitions()];
-        $this->assertCount(28, array_unique(array_column($definitions, 'name')));
-        $baseline = json_decode(file_get_contents(__DIR__.'/../Fixtures/AI/tool-definitions-before-stage18a.json'), true, flags: JSON_THROW_ON_ERROR);
-        $this->assertCount(27, $baseline);
+        $this->assertCount(31, array_unique(array_column($definitions, 'name')));
+        $baseline = json_decode(file_get_contents(__DIR__.'/../Fixtures/AI/tool-definitions-lifecycle-before-availability-actions.json'), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertCount(31, $baseline);
+        $baseline = array_values(array_filter($baseline, fn ($item) => $item['name'] !== $definition['name']));
+        $this->assertCount(30, $baseline);
         $this->assertSame($baseline, array_values(array_filter($definitions, fn ($item) => $item['name'] !== $definition['name'])));
     }
 

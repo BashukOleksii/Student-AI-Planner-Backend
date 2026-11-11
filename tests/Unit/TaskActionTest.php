@@ -61,7 +61,7 @@ class TaskActionTest extends TestCase
         $this->assertSame($arguments, $schema->arguments('propose_task_update', $arguments, $before));
         $this->assertSame(['task_id' => 1], $schema->arguments('propose_task_update', ['task_id' => 1], $before));
         $this->assertSame($before, $registry->definitions());
-        $this->assertCount(8, (new ToolRegistry)->definitions());
+        $this->assertCount(9, (new ToolRegistry)->definitions());
     }
 
     public static function valid(): array

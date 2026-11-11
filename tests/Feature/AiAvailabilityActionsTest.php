@@ -500,7 +500,7 @@ class AiAvailabilityActionsTest extends TestCase
         $round = 0;
         $provider = $this->createMock(LlmProvider::class);
         $provider->expects($this->exactly(3))->method('respond')->willReturnCallback(function ($instructions, $history, $definitions) use (&$round) {
-            $this->assertCount(31, $definitions);
+            $this->assertCount(34, $definitions);
             $this->assertSame(0, DB::transactionLevel());
             $this->assertDatabaseCount('ai_pending_actions', 0);
             $this->assertStringContainsString('Use list_study_availability_windows to discover exact owned window IDs', $instructions);

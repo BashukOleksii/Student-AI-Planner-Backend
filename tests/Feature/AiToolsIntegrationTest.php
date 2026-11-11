@@ -361,7 +361,7 @@ class AiToolsIntegrationTest extends TestCase
         foreach ($this->calls() as [$name, $arguments]) {
             $data = $this->data($owner, $name, $arguments);
             if ($name !== 'list_tasks') {
-                $this->assertSame('Europe/Kyiv', $data['timezone'] ?? $data['meta']['timezone'] ?? null, $name);
+                $this->assertSame('Europe/Kyiv', $data['timezone'] ?? $data['meta']['timezone'] ?? $data['period']['timezone'] ?? null, $name);
             }
             if ($name === 'get_schedule_for_date') {
                 $this->assertSame([$ownedLesson->id], array_column($data['lessons'], 'id'));
@@ -426,6 +426,7 @@ class AiToolsIntegrationTest extends TestCase
             ['list_study_availability_windows', []],
             ['find_free_study_slots', $this->period()],
             ['list_study_sessions', $this->period()],
+            ['get_study_recovery_overview', $this->period()],
             ['get_progress_statistics', $this->period()],
             ['get_daily_progress_trends', $this->period()],
             ['compare_progress_periods', ['baseline_start_date' => '2026-09-20', 'baseline_end_date' => '2026-09-20',

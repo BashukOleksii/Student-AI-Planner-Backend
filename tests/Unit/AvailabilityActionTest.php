@@ -41,15 +41,15 @@ class AvailabilityActionTest extends TestCase
         return new AvailabilityActionArgumentValidator(new AvailabilityActionRegistry, $factory);
     }
 
-    public function test_exact_schemas_preserve_previous_twenty_eight_definitions_and_both_provider_contracts(): void
+    public function test_exact_schemas_preserve_current_other_definitions_and_both_provider_contracts(): void
     {
         $old = [...(new ToolRegistry)->definitions(), ...(new TaskActionRegistry)->definitions(),
             ...(new SubtaskReminderActionRegistry)->readDefinitions(), ...(new SubtaskReminderActionRegistry)->definitions(),
             ...(new PlanningActionRegistry)->definitions(), ...(new LessonActionRegistry)->definitions()];
-        $this->assertSame(json_decode(file_get_contents(__DIR__.'/../Fixtures/AI/tool-definitions-before-stage18b.json'), true, flags: JSON_THROW_ON_ERROR), $old);
+        $this->assertSame(json_decode(file_get_contents(__DIR__.'/../Fixtures/AI/tool-definitions-lifecycle-before-availability-actions.json'), true, flags: JSON_THROW_ON_ERROR), $old);
         $definitions = (new AvailabilityActionRegistry)->definitions();
         $this->assertSame(AvailabilityActionRegistry::NAMES, array_column($definitions, 'name'));
-        $this->assertCount(31, array_unique(array_column([...$old, ...$definitions], 'name')));
+        $this->assertCount(34, array_unique(array_column([...$old, ...$definitions], 'name')));
         $fields = [
             'day_of_week' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 7],
             'starts_at' => ['type' => 'string', 'pattern' => '^(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$'],
