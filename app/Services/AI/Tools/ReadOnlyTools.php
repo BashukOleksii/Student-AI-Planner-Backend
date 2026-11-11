@@ -7,6 +7,7 @@ use App\Http\Resources\StudyAvailabilityWindowResource;
 use App\Http\Resources\StudySessionResource;
 use App\Models\User;
 use App\Services\Planning\FreeTimeService;
+use App\Services\Planning\StudyRecoveryPreviewService;
 use App\Services\Planning\StudySessionReadService;
 use App\Services\Progress\ProgressComparisonService;
 use App\Services\Progress\ProgressStatisticsService;
@@ -15,7 +16,7 @@ use App\Services\Tasks\TaskService;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 
-/** Eight thin read adapters. The match is the complete, server-controlled dispatch allowlist. */
+/** Read adapters. The match is the complete, server-controlled dispatch allowlist. */
 class ReadOnlyTools
 {
     public function __construct(
@@ -27,6 +28,7 @@ class ReadOnlyTools
         private ProgressTrendsService $trends,
         private ProgressComparisonService $comparison,
         private ToolResultPresenter $presenter,
+        private StudyRecoveryPreviewService $recovery,
     ) {}
 
     public function execute(User $owner, string $name, array $arguments): array
@@ -40,6 +42,7 @@ class ReadOnlyTools
             'list_study_availability_windows' => $this->availabilityWindows($owner, $arguments),
             'find_free_study_slots' => $this->freeSlots($owner, $arguments),
             'list_study_sessions' => $this->sessions($owner, $arguments),
+            'get_study_recovery_overview' => $this->recoveryOverview($owner, $arguments),
             'get_progress_statistics' => $this->statistics->calculate($owner, $arguments['start_date'], $arguments['end_date']),
             'get_daily_progress_trends' => $this->trends->calculate($owner, $arguments['start_date'], $arguments['end_date']),
             'compare_progress_periods' => $this->comparison->calculate($owner, $arguments['baseline_start_date'], $arguments['baseline_end_date'],
@@ -99,5 +102,27 @@ class ReadOnlyTools
 
         return ['sessions' => $sessions, 'meta' => [...$result['meta'], 'limit' => 100, 'returned' => count($sessions),
             'total' => $total, 'truncated' => $total > count($sessions)]];
+    }
+
+    private function recoveryOverview(User $owner, array $arguments): array
+    {
+        $result = $this->recovery->preview($owner, $arguments['start_date'], $arguments['end_date'],
+            $arguments['task_id'] ?? null, $arguments['subtask_id'] ?? null);
+        $plan = $result['study_plan']['plan'];
+        $recovery = $result['recovery'];
+        $limit = 50;
+        $bounded = static fn (array $rows): array => ['items' => array_slice($rows, 0, $limit), 'total' => count($rows),
+            'returned' => min(count($rows), $limit), 'truncated' => count($rows) > $limit];
+
+        return ['period' => ['start_date' => $plan['start_date'], 'end_date' => $plan['end_date'], 'timezone' => $plan['timezone']],
+            'scope' => $recovery['scope'],
+            'work' => ['eligible' => $bounded($plan['work_results']), 'excluded' => $bounded($plan['excluded_items']),
+                'warnings' => $bounded($plan['warnings'])],
+            'allocation' => ['summary' => $plan['summary'], 'proposed_sessions' => $bounded($plan['sessions']),
+                'actionable' => $recovery['summary']['actionable'],
+                'requires_lifecycle_decision' => $recovery['summary']['requires_lifecycle_decision'],
+                'safe_to_propose' => $recovery['summary']['actionable'] && ! $recovery['summary']['requires_lifecycle_decision']],
+            'history' => ['summary' => $recovery['summary'], 'missed_sessions' => $bounded($recovery['missed_sessions']),
+                'past_planned_sessions' => $bounded($recovery['past_planned_sessions'])]];
     }
 }

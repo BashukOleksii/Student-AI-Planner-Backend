@@ -42,6 +42,10 @@ class ToolArgumentValidator
         if (isset($arguments['start_date'], $arguments['end_date'])) {
             $this->context->validateDates($arguments['start_date'], $arguments['end_date']);
         }
+        if ($definition['name'] === 'get_study_recovery_overview'
+            && isset($arguments['subtask_id']) && ! isset($arguments['task_id'])) {
+            throw new InvalidArgumentException;
+        }
         if ($definition['name'] === 'compare_progress_periods') {
             $this->comparison->validatePeriods($arguments['baseline_start_date'], $arguments['baseline_end_date'],
                 $arguments['current_start_date'], $arguments['current_end_date']);

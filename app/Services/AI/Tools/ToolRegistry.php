@@ -33,6 +33,8 @@ class ToolRegistry
                 [...$period, 'min_slot_minutes' => [...$integer, 'maximum' => 65535]], array_keys($period)),
             $this->definition('list_study_sessions', 'Read original study session identities and all historical statuses overlapping at most 31 local dates. Returns at most 100 sessions with explicit truncation metadata.',
                 $period, array_keys($period)),
+            $this->definition('get_study_recovery_overview', 'Read a bounded recovery overview for 1–31 inclusive local dates using deterministic planning and recovery Services. Optional owned task scope; a subtask requires task_id. Reports eligibility, exclusions, remaining effort, deadline warnings, missed sessions and past planned sessions that require the student to decide whether they were completed or missed. It never changes data and never returns confirmation tokens. Use propose_study_plan_create separately to prepare a new plan; saving requires authenticated confirmation.',
+                [...$period, 'task_id' => $integer, 'subtask_id' => $integer], array_keys($period)),
             $this->definition('get_progress_statistics', 'Read current work counts and bounded period activity over at most 31 local dates, preserving unknown actual durations.',
                 $period, array_keys($period)),
             $this->definition('get_daily_progress_trends', 'Read zero-filled daily activity and exact totals over at most 31 local dates.',
