@@ -27,14 +27,25 @@ MySQL test database, the measured command completed in **26.12 seconds**:
 discovers 2,791 Unit and 3,900 Feature cases (6,691 total). The smoke suite
 supplements the full CI suite; it does not replace or gate it.
 
-## Full suite and CI
+## CI modes and deployment
 
-`phpunit.xml` still exposes `Unit` and `Feature`; run both with
-`vendor/bin/phpunit`. The GitHub Actions workflow continues to run the complete
-offline MySQL suite and the separate Gemini action matrix. Deployment still
-requires a successful verify job, a push to the repository's `main`, and the
-existing explicit enable variable. This task changes neither workflow commands
-nor deployment conditions.
+`phpunit.xml` still exposes all `Unit` and `Feature` tests; they are not deleted.
+Normal `main` pushes and pull requests run the focused MySQL smoke suite with
+`vendor/bin/phpunit --configuration phpunit-smoke.xml`, alongside dependency checks,
+disposable MySQL migration verification, deployment safety tests, and Pint.
+
+To run all PHPUnit tests plus the separate Gemini regression matrix, open GitHub
+Actions → **Backend verification** → **Run workflow** and enable the `full_suite`
+input. A manual workflow run never deploys, even if it passes.
+
+This is a conscious development/testing deployment mode: normal deployments are
+now gated by *smoke and infrastructure checks*, not the full 6,000+ case matrix.
+The existing deploy job still requires successful `verify`, a push to `main`,
+the configured repository enable variable, and SSH/server-side safety and health checks.
+A passing smoke run does **not** establish correctness for all schedule imports,
+edge cases, locking or migration history. Run the complete suite before declaring
+a stable production release, and do not treat a smoke-passing deploy as a verified
+business-logic release.
 
 ## Cleanup proposal for a later task
 
@@ -61,5 +72,5 @@ file size. Then consider these narrow cleanups:
    by database integrity, locking and scheduling risk; the smoke suite is the
    appropriate fast path for routine edits.
 
-The complete suite remains the release check. A passing smoke run is a fast signal,
-not evidence that migrations, race conditions or all domain edge cases passed.
+The complete suite remains available for manual deep regression checks. A passing
+smoke run is a fast signal, not evidence that all domain edge cases passed.
