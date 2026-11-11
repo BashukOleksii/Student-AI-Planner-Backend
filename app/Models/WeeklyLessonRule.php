@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\LessonType;
 use App\Models\Concerns\HasSemesterTeachers;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['user_id', 'semester_schedule_id', 'weekday', 'pair_number', 'pair_label', 'week_pattern', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'room', 'source_import_batch_id', 'semester_schedule_import_id', 'import_key', 'import_baseline', 'is_manually_managed'])]
+#[Fillable(['user_id', 'semester_schedule_id', 'weekday', 'pair_number', 'pair_label', 'week_pattern', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'room', 'lesson_type', 'source_import_batch_id', 'semester_schedule_import_id', 'import_key', 'import_baseline', 'is_manually_managed'])]
 class WeeklyLessonRule extends Model
 {
     use HasSemesterTeachers;
@@ -60,6 +61,7 @@ class WeeklyLessonRule extends Model
         return [
             'weekday' => 'integer',
             'pair_number' => 'integer',
+            'lesson_type' => LessonType::class,
             'import_baseline' => 'array',
             'is_manually_managed' => 'boolean',
         ];

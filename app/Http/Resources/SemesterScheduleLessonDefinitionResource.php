@@ -17,6 +17,7 @@ class SemesterScheduleLessonDefinitionResource extends JsonResource
             'weekday' => $this->when($weekly, fn () => $this->weekday),
             'week_pattern' => $this->when($weekly, fn () => $this->week_pattern),
             'pair_number' => $this->pair_number, 'pair_label' => $this->pair_label,
+            'lesson_type' => $this->lesson_type?->value,
             'starts_at_local' => $this->starts_at_local, 'ends_at_local' => $this->ends_at_local,
             'subject' => $this->subject->only(['id', 'name', 'code', 'color']),
             'teacher_id' => $this->teacher_id, 'teacher' => $this->teacher?->only(['id', 'name']),

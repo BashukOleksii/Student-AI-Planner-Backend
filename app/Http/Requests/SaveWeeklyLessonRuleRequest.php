@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\LessonType;
 use Illuminate\Validation\Rule;
 
 class SaveWeeklyLessonRuleRequest extends SemesterScheduleManagementRequest
@@ -31,6 +32,7 @@ class SaveWeeklyLessonRuleRequest extends SemesterScheduleManagementRequest
             $prefix.'teacher_ids.*' => ['required', 'integer:strict', 'min:1'],
             $prefix.'teachers' => ['prohibited'],
             $prefix.'room' => ['sometimes', 'nullable', 'string', 'max:100'],
+            $prefix.'lesson_type' => ['sometimes', 'nullable', Rule::in(array_column(LessonType::cases(), 'value'))],
         ];
     }
 }

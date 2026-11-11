@@ -2,6 +2,7 @@
 
 namespace App\Services\Schedule;
 
+use App\Enums\LessonType;
 use DateTimeImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
@@ -135,6 +136,7 @@ class EffectiveScheduleCalculator
                 'schedule_date_exception_id' => $snapshot['id'] ?? null,
                 'pair_number' => $row['pair_number'],
                 'pair_label' => $row['pair_label'] ?? null,
+                'lesson_type' => $row['lesson_type'] ?? null,
                 'subject_id' => $row['subject_id'],
                 'teacher_id' => $row['teacher_id'] ?? null,
                 'teacher_ids' => $row['teacher_ids'] ?? (isset($row['teacher_id']) ? [$row['teacher_id']] : []),
@@ -207,6 +209,10 @@ class EffectiveScheduleCalculator
 
     private function validateLesson(array $lesson): void
     {
+        if (($lesson['lesson_type'] ?? null) !== null
+            && (! is_string($lesson['lesson_type']) || LessonType::tryFrom($lesson['lesson_type']) === null)) {
+            throw new InvalidArgumentException('Expected a supported nullable semester lesson type.');
+        }
         foreach (['starts_at_local', 'ends_at_local'] as $field) {
             if (! is_string($lesson[$field] ?? null)
                 || ! preg_match('/\A(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\z/', $lesson[$field])) {

@@ -102,6 +102,9 @@ Imported duplicate identity is scoped to `(user_id, academic_period_id, import_f
 **BR-SCH-007 — Schedule views**  
 Today's, a specific date's, and a week's schedule are calculated using the user's timezone and return only effective schedule entries for the requested range. Implemented views use strict YYYY-MM-DD anchors, ISO Monday-first weeks, interval overlap (not starts-at-only selection), exclusive next-midnight boundaries, and starts_at/ends_at/id ordering. They are read-only and mask malformed foreign presentation relations.
 
+**BR-SCH-008 — Optional semester lesson classification**
+Semester lesson type is optional and belongs to an individual weekly rule or frozen date-snapshot lesson, never to Subject. Null means unspecified. Effective occurrences use only their exact rule/snapshot value; no classification is inferred. Date snapshots and working Saturdays freeze the copied value. Planning continues to block every lesson type. Semester workbook imports do not parse type and retain manually managed rule overrides.
+
 ## 3. Excel import rules
 
 Import A implements only deterministic workbook parsing into weekly rules;

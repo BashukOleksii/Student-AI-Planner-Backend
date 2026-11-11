@@ -2,6 +2,7 @@
 
 namespace App\Services\Schedule;
 
+use App\Enums\LessonType;
 use App\Models\ScheduleDateExceptionLesson;
 use App\Models\SemesterSchedule;
 use App\Models\User;
@@ -17,7 +18,7 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class SemesterScheduleManagementService
 {
-    private const LESSON_FIELDS = ['pair_number', 'pair_label', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'teacher_ids', 'room'];
+    private const LESSON_FIELDS = ['pair_number', 'pair_label', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'teacher_ids', 'room', 'lesson_type'];
 
     public function __construct(
         private SemesterScheduleStateService $state,
@@ -88,6 +89,7 @@ class SemesterScheduleManagementService
         return $this->write($user, $schedule, $values, function ($owner, $graph) use ($values): void {
             $this->lessonTeachers->teacherId($values);
             $fields = $this->planner->values($values);
+            $fields['lesson_type'] = $values['lesson_type'] ?? null;
             $this->references($graph, $fields);
             $this->notSuppressed($graph, $fields);
             $rule = $graph['schedule']->weeklyLessonRules()->make(['user_id' => $owner->id, ...Arr::except($fields, ['teacher_ids']), 'is_manually_managed' => true]);
@@ -106,10 +108,11 @@ class SemesterScheduleManagementService
     {
         return $this->write($user, $schedule, $values, function ($owner, $graph) use ($id, $values): bool {
             $rule = $graph['rules']->find($id) ?? abort(404);
-            $before = $this->planner->values($rule->attributesToArray());
-            $merged = $this->mergeLessonFields($before, Arr::only($values, SemesterScheduleImportPlanner::FIELDS));
+            $before = [...$this->planner->values($rule->attributesToArray()), 'lesson_type' => $rule->lesson_type?->value];
+            $merged = $this->mergeLessonFields($before, Arr::only($values, [...SemesterScheduleImportPlanner::FIELDS, 'lesson_type']));
             $this->lessonTeachers->teacherId($merged);
             $fields = $this->planner->values($merged);
+            $fields['lesson_type'] = $merged['lesson_type'] ?? null;
             $this->references($graph, $fields);
             if ($this->planner->key($before) !== $this->planner->key($fields)) {
                 $this->notSuppressed($graph, $fields);
@@ -189,6 +192,9 @@ class SemesterScheduleManagementService
                 $old = isset($row['id']) ? $oldLessons->find($row['id']) : null;
                 if (isset($row['id']) && ($old === null || $values['mode'] !== 'replace')) {
                     $this->invalid('lessons', 'A lesson ID must belong to this saved date snapshot.');
+                }
+                if ($old !== null && ! array_key_exists('lesson_type', $row)) {
+                    $row['lesson_type'] = $old->lesson_type?->value;
                 }
                 $lessons[] = [...$this->lessonFields($row), 'id' => $old?->id,
                     'source_weekly_rule_id' => $old?->source_weekly_rule_id, 'created_at' => $old?->getRawOriginal('created_at')];
@@ -295,7 +301,10 @@ class SemesterScheduleManagementService
 
     private function lessonFields(array $row): array
     {
-        $fields = array_replace(['pair_label' => null, 'teacher_id' => null, 'room' => null], Arr::only($row, self::LESSON_FIELDS));
+        $fields = array_replace(['pair_label' => null, 'teacher_id' => null, 'room' => null, 'lesson_type' => null], Arr::only($row, self::LESSON_FIELDS));
+        if ($fields['lesson_type'] instanceof LessonType) {
+            $fields['lesson_type'] = $fields['lesson_type']->value;
+        }
         $fields['teacher_id'] = $this->lessonTeachers->teacherId($fields);
         $fields['teacher_ids'] = [$fields['teacher_id']];
 
