@@ -8,7 +8,9 @@ use InvalidArgumentException;
 /** Pure reconciliation; catalogs/ownership/locking belong to the import service. */
 class SemesterScheduleImportPlanner
 {
-    public const FIELDS = ['weekday', 'pair_number', 'pair_label', 'week_pattern', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'room'];
+    public const FIELDS = ['weekday', 'pair_number', 'pair_label', 'week_pattern', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'room', 'teacher_ids'];
+
+    public const LEGACY_FIELDS = ['weekday', 'pair_number', 'pair_label', 'week_pattern', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'room'];
 
     public function __construct(private EffectiveScheduleCalculator $calculator) {}
 
@@ -19,7 +21,19 @@ class SemesterScheduleImportPlanner
             $values[$field] = $rule[$field] ?? null;
         }
 
+        $values['teacher_ids'] = $this->teacherIds($rule);
+        $values['teacher_id'] = $values['teacher_ids'][0] ?? null;
+
         return $values;
+    }
+
+    public function teacherIds(array $row): array
+    {
+        $ids = $row['teacher_ids'] ?? (isset($row['teacher_id']) ? [$row['teacher_id']] : []);
+        $ids = array_values(array_unique($ids));
+        sort($ids, SORT_NUMERIC);
+
+        return $ids;
     }
 
     public function key(array $rule): string

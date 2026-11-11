@@ -16,22 +16,23 @@ class SemesterScheduleStateService
     public function load(User $owner, int $periodId, bool $lock = false): array
     {
         $period = $this->period($owner, $periodId, $lock);
-        $subjects = $owner->subjects()->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get();
+        $subjects = $owner->subjects()->with(['teachers' => fn ($query) => $query->when($lock, fn ($q) => $q->lockForUpdate())])->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get();
         $teachers = $owner->teachers()->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get();
         $schedule = $owner->semesterSchedules()->where('academic_period_id', $period->id)->when($lock, fn ($query) => $query->lockForUpdate())->first();
-        $rules = $schedule?->weeklyLessonRules()->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get() ?? collect();
+        $rules = $schedule?->weeklyLessonRules()->with(['teachers' => fn ($query) => $query->when($lock, fn ($q) => $q->lockForUpdate())])->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get() ?? collect();
         $exceptions = $schedule?->dateExceptions()->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get() ?? collect();
         foreach ($exceptions as $exception) {
             if ($exception->user_id !== $owner->id) {
                 $this->invalidGraph();
             }
         }
-        $lessons = ScheduleDateExceptionLesson::whereIn('schedule_date_exception_id', $exceptions->pluck('id'))
+        $lessons = ScheduleDateExceptionLesson::with(['teachers' => fn ($query) => $query->when($lock, fn ($q) => $q->lockForUpdate())])->whereIn('schedule_date_exception_id', $exceptions->pluck('id'))
             ->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get();
         foreach ($rules->concat($lessons) as $rule) {
             if ($rule->user_id !== $owner->id || $rule->semester_schedule_id !== $schedule->id
                 || ! $subjects->contains('id', $rule->subject_id)
-                || ($rule->teacher_id !== null && ! $teachers->contains('id', $rule->teacher_id))) {
+                || array_diff($rule->teacher_ids, $teachers->modelKeys()) !== []
+                || $rule->teachers->contains(fn ($teacher) => $teacher->pivot->user_id !== $owner->id)) {
                 $this->invalidGraph();
             }
         }
@@ -50,8 +51,7 @@ class SemesterScheduleStateService
             if ($rule->semester_schedule_import_id !== null) {
                 $source = $sources->get($rule->semester_schedule_import_id);
                 if ($source === null || $source->academic_period_id !== $period->id || $source->status !== 'committed'
-                    || ! is_array($rule->import_baseline) || count($rule->import_baseline) !== count(SemesterScheduleImportPlanner::FIELDS)
-                    || array_diff(array_keys($rule->import_baseline), SemesterScheduleImportPlanner::FIELDS) !== []
+                    || ! $this->validBaseline($rule->import_baseline)
                     || $rule->import_key !== $this->planner->key($rule->import_baseline)) {
                     $this->invalidGraph();
                 }
@@ -94,8 +94,9 @@ class SemesterScheduleStateService
         return $this->hash(['timezone' => $owner->timezone, 'period' => $state['period']->getAttributes(),
             'institution' => $state['period']->educationInstitution->getAttributes(),
             'subjects' => $state['subjects']->map->getAttributes()->all(), 'teachers' => $state['teachers']->map->getAttributes()->all(),
-            'schedule' => $state['schedule']?->getAttributes(), 'rules' => $state['rules']->map->getAttributes()->all(),
-            'exceptions' => $state['exceptions']->map->getAttributes()->all(), 'lessons' => $state['lessons']->map->getAttributes()->all(),
+            'subject_teachers' => $state['subjects']->map(fn ($subject) => [$subject->id, $subject->teachers->modelKeys()])->all(),
+            'schedule' => $state['schedule']?->getAttributes(), 'rules' => $state['rules']->map(fn ($rule) => [...$rule->getAttributes(), 'teacher_ids' => $rule->teacher_ids])->all(),
+            'exceptions' => $state['exceptions']->map->getAttributes()->all(), 'lessons' => $state['lessons']->map(fn ($lesson) => [...$lesson->getAttributes(), 'teacher_ids' => $lesson->teacher_ids])->all(),
             'suppressions' => $state['suppressions']->map->getAttributes()->all(), 'provenance' => $state['provenance']]);
     }
 
@@ -127,6 +128,19 @@ class SemesterScheduleStateService
         };
 
         return hash('sha256', json_encode($canonical($value), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function validBaseline(mixed $baseline): bool
+    {
+        if (! is_array($baseline)) {
+            return false;
+        }
+        $fields = array_key_exists('teacher_ids', $baseline) ? SemesterScheduleImportPlanner::FIELDS : SemesterScheduleImportPlanner::LEGACY_FIELDS;
+
+        return count($baseline) === count($fields) && array_diff(array_keys($baseline), $fields) === []
+            && (! array_key_exists('teacher_ids', $baseline) || (is_array($baseline['teacher_ids'])
+                && array_is_list($baseline['teacher_ids'])
+                && collect($baseline['teacher_ids'])->every(fn ($id) => is_int($id) && $id > 0)));
     }
 
     private function invalidGraph(): never

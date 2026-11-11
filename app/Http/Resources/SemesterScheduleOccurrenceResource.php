@@ -11,7 +11,7 @@ class SemesterScheduleOccurrenceResource extends JsonResource
     {
         return array_intersect_key($this->resource, array_flip([
             'occurrence_id', 'occurs_on', 'source', 'pair_number', 'pair_label',
-            'subject', 'teacher', 'room', 'starts_at', 'ends_at',
+            'subject', 'teacher_id', 'teacher', 'teacher_ids', 'teachers', 'room', 'starts_at', 'ends_at',
             'weekly_lesson_rule_id', 'schedule_date_exception_id',
         ]));
     }

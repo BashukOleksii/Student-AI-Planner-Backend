@@ -6,9 +6,11 @@ use App\Exceptions\ScheduleWorkbookParserException;
 use App\Models\SemesterScheduleImport;
 use App\Models\User;
 use App\Services\Schedule\EffectiveScheduleCalculator;
+use App\Services\Schedule\SemesterLessonTeacherService;
 use App\Services\Schedule\SemesterScheduleStateService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -22,6 +24,7 @@ class SemesterScheduleImportService
         private SemesterScheduleImportPlanner $planner,
         private EffectiveScheduleCalculator $calculator,
         private SemesterScheduleStateService $state,
+        private SemesterLessonTeacherService $lessonTeachers,
     ) {}
 
     public function create(User $user, array $options, UploadedFile $file): SemesterScheduleImport
@@ -30,7 +33,7 @@ class SemesterScheduleImportService
         $template = null;
         $error = null;
         try {
-            $template = $this->parser->parse($file->getPathname());
+            $template = $this->parser->parse($file->getPathname(), semester: true);
         } catch (ScheduleWorkbookParserException $exception) {
             $error = $exception->getMessage();
         }
@@ -43,10 +46,10 @@ class SemesterScheduleImportService
 
         return DB::transaction(function () use ($user, $options, $template, $error, $hash, $filename): SemesterScheduleImport {
             $owner = $this->owner($user);
-            $this->state->period($owner, $options['academic_period_id'], true);
+            $period = $this->state->period($owner, $options['academic_period_id'], true);
             $import = $owner->semesterScheduleImports()->create([
-                'academic_period_id' => $options['academic_period_id'], 'parity_anchor_on' => $options['parity_anchor_on'],
-                'first_week_parity' => $options['first_week_parity'], 'original_filename' => $filename, 'file_hash' => $hash,
+                'academic_period_id' => $period->id, 'parity_anchor_on' => $this->calculator->weekDates($period->starts_on->format('Y-m-d'))[0],
+                'first_week_parity' => 'numerator', 'original_filename' => $filename, 'file_hash' => $hash,
                 'template' => $template, 'status' => $error === null ? 'invalid' : 'failed',
                 'review' => ['rows' => [], 'operations' => [], 'counts' => [], 'errors' => $error === null ? [] : ['file' => [$error]]],
                 'preview_token' => bin2hex(random_bytes(32)),
@@ -100,6 +103,8 @@ class SemesterScheduleImportService
             if ($this->hasErrors($review)) {
                 $this->invalid('This import preview is not ready to commit.');
             }
+            // Only after locked revalidation and token comparison may catalog writes begin.
+            [$catalog, $identities] = $this->commitCatalog($owner, $review['catalog'], $graph['period']->education_institution_id);
             $schedule = $graph['schedule'];
             $values = $review['impact']['schedule']['after'];
             if ($schedule === null) {
@@ -123,13 +128,20 @@ class SemesterScheduleImportService
                 if (! in_array($operation['operation'], ['create', 'update'], true)) {
                     continue;
                 }
-                $fields = [...$operation['after'], 'user_id' => $owner->id, 'semester_schedule_import_id' => $import->id,
-                    'import_key' => $operation['import_key'], 'import_baseline' => $operation['after']];
+                $after = $operation['after'];
+                $after['subject_id'] = $identities['subjects'][$after['subject_id']];
+                $after['teacher_ids'] = array_map(fn ($id) => $identities['teachers'][$id], $after['teacher_ids']);
+                $after = $this->planner->values($after);
+                $fields = [...Arr::except($after, ['teacher_ids']), 'user_id' => $owner->id, 'semester_schedule_import_id' => $import->id,
+                    'import_key' => $operation['import_key'], 'import_baseline' => $after];
                 if ($operation['operation'] === 'create') {
-                    $this->check($schedule->weeklyLessonRules()->create($fields)->exists);
+                    $rule = $schedule->weeklyLessonRules()->create($fields);
+                    $this->check($rule->exists);
                 } else {
-                    $this->check($graph['rules']->find($operation['rule_id'])->update($fields));
+                    $rule = $graph['rules']->find($operation['rule_id']);
+                    $this->check($rule->update($fields));
                 }
+                $this->lessonTeachers->sync($rule, $after['teacher_ids']);
             }
             if ($graph['schedule'] !== null && ($review['impact']['schedule']['before'] !== $values
                 || $review['counts']['create'] + $review['counts']['update'] + $review['counts']['delete'] > 0)) {
@@ -137,7 +149,8 @@ class SemesterScheduleImportService
                 $this->check($schedule->save());
             }
             $now = CarbonImmutable::now('UTC');
-            $receipt = ['semester_schedule_id' => $schedule->id, 'counts' => $review['counts'],
+            $receipt = ['semester_schedule_id' => $schedule->id, 'counts' => $review['counts'], 'catalog' => $catalog,
+                'parity_anchor_on' => $values['parity_anchor_on'], 'first_week_parity' => $values['first_week_parity'],
                 'rule_ids' => $schedule->weeklyLessonRules()->orderBy('id')->pluck('id')->all(),
                 'committed_at' => $now->format('Y-m-d\TH:i:s.u\Z')];
             $this->check($import->update(['status' => 'committed', 'receipt' => $receipt, 'committed_at' => $now]));
@@ -156,31 +169,44 @@ class SemesterScheduleImportService
         if (! is_array($template) || ! is_string($template['group'] ?? null) || ! is_array($template['rules'] ?? null)) {
             $this->invalidGraph();
         }
-        $references = $this->resolver->resolveNames($owner, array_column($template['rules'], 'subject_name'), array_column($template['rules'], 'teacher_name'), true);
+        $teacherNames = [];
+        foreach ($template['rules'] as &$raw) {
+            // Old saved templates retain their original shape and are upgraded only in memory.
+            $raw['teacher_names'] ??= $this->parser->teacherNames($raw['teacher_name'] ?? null);
+            array_push($teacherNames, ...$raw['teacher_names']);
+        }
+        unset($raw);
+        $references = $this->resolver->resolveSemesterNames(array_column($template['rules'], 'subject_name'), $teacherNames, $subjects, $teachers);
+        $catalog = [];
+        foreach ($references as $kind => $entries) {
+            $catalog[$kind] = collect($entries)->unique('id')->values()->all();
+        }
         $incoming = [];
         foreach ($template['rules'] as $index => $raw) {
             $subject = $references['subjects'][$raw['subject_name']];
-            $teacher = $references['teachers'][$raw['teacher_name']];
+            $rowTeachers = collect($raw['teacher_names'])->map(fn ($name) => $references['teachers'][$name])->unique('id')->sortBy('id')->values();
             $errors = [];
             if ($subject['errors'] !== []) {
                 $errors['subject_name'] = $subject['errors'];
             }
-            if ($teacher['errors'] !== []) {
-                $errors['teacher_name'] = $teacher['errors'];
+            foreach ($rowTeachers as $teacher) {
+                if ($teacher['errors'] !== []) {
+                    $errors['teacher_names'][] = ['name' => $teacher['name'], 'errors' => $teacher['errors']];
+                }
             }
             if ($raw['room'] !== null && mb_strlen($raw['room']) > 100) {
                 $errors['room'] = ['The room must not exceed 100 characters.'];
             }
             $incoming[] = [...$raw, 'row_number' => $index + 1, 'pair_number' => $this->planner->pairNumber($raw['pair_label']),
-                'week_pattern' => $raw['parity'], 'subject_id' => $subject['id'], 'teacher_id' => $teacher['id'],
-                'subject' => $subjects->find($subject['id'])?->only(['id', 'name', 'code', 'color']),
-                'teacher' => $teachers->find($teacher['id'])?->only(['id', 'name']), 'errors' => $errors];
+                'week_pattern' => $raw['parity'], 'subject_id' => $subject['id'],
+                'teacher_id' => $rowTeachers->first()['id'] ?? null, 'teacher_ids' => $rowTeachers->pluck('id')->all(),
+                'subject' => $subject, 'teacher' => $rowTeachers->first(), 'teachers' => $rowTeachers->all(), 'errors' => $errors];
         }
         $plan = $this->planner->plan($incoming, $rules->map->attributesToArray()->all(), $suppressions->map->attributesToArray()->all());
         if (mb_strlen($template['group']) > 255) {
             $plan['errors']['group_name'] = ['The group name must not exceed 255 characters.'];
         }
-        $after = ['group_name' => $template['group'], 'parity_anchor_on' => $import->parity_anchor_on->format('Y-m-d'), 'first_week_parity' => $import->first_week_parity];
+        $after = ['group_name' => $template['group'], 'parity_anchor_on' => $this->calculator->weekDates($period->starts_on->format('Y-m-d'))[0], 'first_week_parity' => 'numerator'];
         $before = $schedule === null ? null : ['group_name' => $schedule->group_name,
             'parity_anchor_on' => $schedule->parity_anchor_on->format('Y-m-d'), 'first_week_parity' => $schedule->first_week_parity];
         try {
@@ -194,7 +220,7 @@ class SemesterScheduleImportService
             'snapshot_lesson_id' => $lesson->id, 'source_weekly_rule_id' => $lesson->source_weekly_rule_id,
             'occurs_on' => $exceptions->find($lesson->schedule_date_exception_id)->occurs_on->format('Y-m-d'),
         ])->values()->all();
-        $review = ['rows' => $plan['rows'], 'operations' => $plan['operations'], 'counts' => $plan['counts'], 'errors' => $plan['errors'],
+        $review = ['catalog' => $catalog, 'rows' => $plan['rows'], 'operations' => $plan['operations'], 'counts' => $plan['counts'], 'errors' => $plan['errors'],
             'impact' => ['schedule' => ['id' => $schedule?->id, 'before' => $before, 'after' => $after],
                 'preserved_rule_ids' => $rules->filter(fn ($rule) => ! $this->planner->managed($rule->attributesToArray()))->pluck('id')->values()->all(),
                 'preserved_exception_dates' => array_keys($snapshots),
@@ -202,12 +228,33 @@ class SemesterScheduleImportService
         $context = $this->state->hash(['template' => $template, 'options' => $after,
             'graph' => $this->state->fingerprint($owner, $graph)]);
 
-        return [$review, $context, compact('schedule', 'rules', 'lessons')];
+        return [$review, $context, compact('schedule', 'rules', 'lessons', 'period')];
+    }
+
+    private function commitCatalog(User $owner, array $catalog, int $institutionId): array
+    {
+        $receipt = $identities = ['subjects' => [], 'teachers' => []];
+        foreach ($catalog as $kind => $entries) {
+            foreach ($entries as $entry) {
+                $id = $entry['id'];
+                if ($entry['resolution'] === 'create') {
+                    $record = $owner->{$kind}()->create(['name' => $entry['name'], 'education_institution_id' => $institutionId]);
+                    $this->check($record->exists);
+                    $id = $record->id;
+                }
+                $identities[$kind][$entry['id']] = $id;
+                $receipt[$kind][] = [...Arr::except($entry, ['errors']), 'id' => $id,
+                    'resolution' => $entry['resolution'] === 'create' ? 'created' : 'reused'];
+            }
+        }
+
+        return [$receipt, $identities];
     }
 
     private function saveReview(SemesterScheduleImport $import, array $review, string $context): void
     {
         $this->check($import->update(['review' => $review, 'context_hash' => $context,
+            'parity_anchor_on' => $review['impact']['schedule']['after']['parity_anchor_on'], 'first_week_parity' => 'numerator',
             'status' => $this->hasErrors($review) ? 'invalid' : 'ready', 'preview_token' => bin2hex(random_bytes(32))]));
     }
 

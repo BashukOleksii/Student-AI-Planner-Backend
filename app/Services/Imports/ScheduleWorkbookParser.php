@@ -25,12 +25,12 @@ class ScheduleWorkbookParser
      *   rules: list<array{
      *     weekday: int, pair_label: string, starts_at_local: string, ends_at_local: string,
      *     parity: 'all'|'numerator'|'denominator', subject_name: string,
-     *     teacher_name: string, room: ?string,
+     *     teacher_name: ?string, teacher_names?: list<string>, room: ?string,
      *     source: array{worksheet: string, rows: array{int, int}, range: string, pair_range: string}
      *   }>
      * }
      */
-    public function parse(string $path): array
+    public function parse(string $path, bool $semester = false): array
     {
         try {
             // Keep merges; never calculate formulas or use formatted cell values.
@@ -67,7 +67,7 @@ class ScheduleWorkbookParser
             foreach (self::WEEKDAYS as $day => $name) {
                 foreach (self::PAIRS as $pair => $label) {
                     $row = $top + 1 + $day * 16 + $pair * 4;
-                    array_push($rules, ...$this->parseSlot($sheet, $merges, $left, $row, $day + 1, $label));
+                    array_push($rules, ...$this->parseSlot($sheet, $merges, $left, $row, $day + 1, $label, $semester));
                 }
             }
 
@@ -151,7 +151,7 @@ class ScheduleWorkbookParser
         }
     }
 
-    private function parseSlot(Worksheet $sheet, array $merges, int $left, int $row, int $weekday, string $label): array
+    private function parseSlot(Worksheet $sheet, array $merges, int $left, int $row, int $weekday, string $label, bool $semester): array
     {
         $start = $this->time($sheet, $left + 2, $row + 1);
         $end = $this->time($sheet, $left + 2, $row + 2);
@@ -166,6 +166,14 @@ class ScheduleWorkbookParser
             }
         }
         $lessons = match ($occupied) {
+            // Semester definitions permit a blank teacher cell; legacy parsing stays strict.
+            [0], [0, 1] => $semester ? [[$row, 'numerator']]
+                : $this->fail($sheet, $left + 3, $row, 'Unsupported subject/teacher row structure'),
+            [2], [2, 3] => $semester ? [[$row + 2, 'denominator']]
+                : $this->fail($sheet, $left + 3, $row, 'Unsupported subject/teacher row structure'),
+            [1] => $semester ? [[$row + 1, 'all']] : $this->fail($sheet, $left + 3, $row, 'Unsupported subject/teacher row structure'),
+            [0, 2], [0, 1, 2], [0, 2, 3] => $semester ? [[$row, 'numerator'], [$row + 2, 'denominator']]
+                : $this->fail($sheet, $left + 3, $row, 'Unsupported subject/teacher row structure'),
             [] => [],
             [1, 2] => [[$row + 1, 'all']],
             // A four-row pair containing two subject/teacher rows is upper/lower parity.
@@ -192,6 +200,7 @@ class ScheduleWorkbookParser
                 'parity' => $parity,
                 'subject_name' => $this->text($this->value($sheet, $merges, $left + 3, $subjectRow)),
                 'teacher_name' => $this->text($this->value($sheet, $merges, $left + 3, $subjectRow + 1)),
+                ...($semester ? ['teacher_names' => $this->teacherNames($this->value($sheet, $merges, $left + 3, $subjectRow + 1))] : []),
                 'room' => $this->text($this->value($sheet, $merges, $left + 5, $subjectRow + 1)),
                 'source' => [
                     'worksheet' => $sheet->getTitle(),
@@ -203,6 +212,37 @@ class ScheduleWorkbookParser
         }
 
         return $rules;
+    }
+
+    /** Split before whitespace normalization; never split periods inside initials. */
+    public function teacherNames(mixed $value): array
+    {
+        if ($value instanceof RichText) {
+            $value = $value->getPlainText();
+        }
+        if ($value === null || trim((string) $value) === '') {
+            return [];
+        }
+        $names = [];
+        foreach (preg_split('/\r\n|[\r\n;\x{2028}\x{2029}]/u', (string) $value) as $line) {
+            $parts = preg_split('/\s*[,\/]\s*/u', $line);
+            // Commas/slashes are names only when BOTH sides identify a person.
+            // For example "Smith, John" is ambiguous and remains an invalid name.
+            if (count($parts) > 1 && count(array_filter($parts, fn ($part) => $this->clearlyNamedTeacher($part))) !== count($parts)) {
+                $parts = [$line];
+            }
+            foreach ($parts as $part) {
+                $names[] = $this->text($part) ?? '';
+            }
+        }
+
+        return $names;
+    }
+
+    private function clearlyNamedTeacher(string $name): bool
+    {
+        return preg_match('/^\s*[\p{L}\p{M}’ʼ\x{0027}-]+\s+(?:\p{L}\.\s*){1,3}$/u', $name) === 1
+            || preg_match('/^\s*[\p{L}\p{M}’ʼ\x{0027}-]{2,}(?:\s+[\p{L}\p{M}’ʼ\x{0027}-]{2,}){1,2}\s*$/u', $name) === 1;
     }
 
     private function time(Worksheet $sheet, int $column, int $row): string

@@ -1,5 +1,11 @@
 # Stage 2: Semester Schedule Read API
 
+Multi-teacher extension: occurrences additionally expose canonical `teacher_ids`
+and `teachers: [{id, name}, ...]`, including empty lists, and the legacy-compatible
+`teacher_id`/`teacher` scalar view. Teacher lists are ordered by ID. Weekly and
+snapshot occurrences retain all associated teachers; room remains a string.
+The earlier examples below omit these additive fields.
+
 Stage 4 adds separate [management endpoints](semester-schedule-management.md). These original Stage 2 list/detail/date/week JSON contracts remain unchanged; new management responses supply the graph token needed for writes.
 
 Stage 3 can populate these existing read endpoints through the separate [semester Excel import](semester-schedule-import.md). This read API contract and its legacy separation remain unchanged.
@@ -133,8 +139,7 @@ ID, even when its lesson still references a source rule internally. A base
 occurrence exposes its rule ID and a null exception ID. Optional teacher, room and
 pair label remain explicit nulls. Subject always includes id/name/code/color;
 teacher includes only id/name. No `id`, `type` or `lesson_type` is emitted for an
-occurrence. Internal subject/teacher IDs and UTC epoch endpoints are not separately
-exposed. `SemesterScheduleOccurrenceResource` is independent of the unchanged
+occurrence. Internal subject IDs and UTC epoch endpoints are not separately exposed. `SemesterScheduleOccurrenceResource` is independent of the unchanged
 legacy `ScheduleLessonResource`.
 
 Occurrence identity is stable across reads and metadata edits to the same source

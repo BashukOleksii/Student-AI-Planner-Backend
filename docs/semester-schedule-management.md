@@ -1,5 +1,15 @@
 # Stage 4: Semester schedule management API
 
+Multi-teacher extension: weekly rules, `lessons` and `changes` accept canonical
+`teacher_ids: [id, ...]` (unique owned IDs), including `[]` for no teacher. When
+supplied, this list takes precedence over `teacher_id`. A legacy `teacher_id`
+patch alone replaces the list with zero or one teacher; omitting both preserves
+the list on partial updates. Resources add `teacher_id`, `teacher_ids`, `teachers`
+and retain `teacher`; the scalar represents the lowest canonical teacher ID.
+Complete lists are copied into date replacements and working Saturdays, including
+copies of saved effective replacements. Teacher link changes enter graph tokens.
+See [ADR-009](decisions/ADR-009-automatic-semester-import-and-teachers.md).
+
 Implemented against `main` at `9a00da6abcaa43d7acd67f534c3b4ececee0b86b`.
 [ADR-008](decisions/ADR-008-semester-schedule-management.md) records the decisions
 made before schema/import reconciliation changes. See [verification](semester-schedule-stage4-verification.md)

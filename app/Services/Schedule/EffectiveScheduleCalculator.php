@@ -126,6 +126,7 @@ class EffectiveScheduleCalculator
                 'pair_label' => $row['pair_label'] ?? null,
                 'subject_id' => $row['subject_id'],
                 'teacher_id' => $row['teacher_id'] ?? null,
+                'teacher_ids' => $row['teacher_ids'] ?? (isset($row['teacher_id']) ? [$row['teacher_id']] : []),
                 'room' => $row['room'] ?? null,
                 'starts_at' => $from->format('Y-m-d\TH:i:sP'),
                 'ends_at' => $to->format('Y-m-d\TH:i:sP'),

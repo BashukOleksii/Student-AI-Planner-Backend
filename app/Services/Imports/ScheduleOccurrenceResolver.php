@@ -6,6 +6,7 @@ use App\Enums\LessonType;
 use App\Models\AcademicPeriod;
 use App\Models\User;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class ScheduleOccurrenceResolver
@@ -71,6 +72,73 @@ class ScheduleOccurrenceResolver
             'group' => $materialized['group'], 'source' => $materialized['source'],
             'academic_period_id' => $period->getKey(), 'occurrences' => $occurrences,
         ];
+    }
+
+    /** Read-only semester resolution against the already loaded, owned catalogs.
+     * Negative reference IDs are internal preview identities, never persisted record IDs.
+     * Legacy dated import resolution below intentionally remains exact and unchanged.
+     */
+    public function resolveSemesterNames(array $subjectNames, array $teacherNames, Collection $subjects, Collection $teachers): array
+    {
+        $result = ['subjects' => [], 'teachers' => []];
+        foreach (['subjects' => [$subjectNames, $subjects], 'teachers' => [$teacherNames, $teachers]] as $kind => [$names, $records]) {
+            $existing = $records->groupBy(fn ($record) => $this->normalizedName($record->name));
+            $prepared = [];
+            foreach ($names as $name) {
+                $name = (string) $name;
+                $normalized = $this->normalizedName($name);
+                if (! isset($prepared[$normalized])) {
+                    $display = $this->displayName($name);
+                    $errors = [];
+                    if (! $this->validSemesterName($display, $kind === 'teachers')) {
+                        $errors[] = 'The imported name is empty, malformed or ambiguous. Use explicit teacher separators.';
+                    }
+                    $matches = $existing->get($normalized, collect());
+                    if ($matches->count() > 1) {
+                        $errors[] = 'Multiple owned '.$kind.' match this normalized name.';
+                    }
+                    $record = $matches->count() === 1 ? $matches->first() : null;
+                    $prepared[$normalized] = [
+                        'id' => $record?->id ?? -(count($prepared) + 1),
+                        'name' => $record?->name ?? $display,
+                        ...($kind === 'subjects' ? ['code' => $record?->code, 'color' => $record?->color] : []),
+                        'resolution' => $errors !== [] ? 'invalid' : ($record === null ? 'create' : 'reuse'),
+                        'errors' => $errors,
+                    ];
+                }
+                $result[$kind][$name] = $prepared[$normalized];
+            }
+        }
+
+        return $result;
+    }
+
+    private function displayName(string $name): string
+    {
+        return trim(preg_replace('/[\s\p{Z}]+/u', ' ', $name) ?? '');
+    }
+
+    private function normalizedName(string $name): string
+    {
+        $name = mb_strtolower(str_replace(['’', 'ʼ', '`'], "'", $this->displayName($name)));
+
+        // Whitespace around initials is presentation, not identity.
+        return preg_replace('/\s*\.\s*/u', '.', $name);
+    }
+
+    private function validSemesterName(string $name, bool $teacher): bool
+    {
+        if ($name === '' || mb_strlen($name) > 255 || preg_match('/\p{L}/u', $name) !== 1
+            || preg_match('/[\p{Cc}\p{Cf}]/u', $name) === 1) {
+            return false;
+        }
+        if (! $teacher) {
+            return preg_match('/^[\p{L}\p{M}\p{N}\p{Zs}.,:()\[\]’ʼ\x{0027}"&+\/\-–—]+$/u', $name) === 1;
+        }
+
+        // A surname alone, a full name, or surname + initials. Two unsplit people fail.
+        return preg_match('/^[\p{L}\p{M}’ʼ\x{0027}-]{2,}(?:\s+[\p{L}\p{M}’ʼ\x{0027}-]{2,}){0,2}$/u', $name) === 1
+            || preg_match('/^[\p{L}\p{M}’ʼ\x{0027}-]{2,}\s+(?:\p{L}\.\s*){1,3}$/u', $name) === 1;
     }
 
     /**

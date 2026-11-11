@@ -66,14 +66,17 @@ class EffectiveScheduleService
             $owner = User::query()->findOrFail($user->getKey());
             $schedule = $this->ownedSchedule($owner, $schedule);
             $period = $schedule->academicPeriod;
-            $rules = $schedule->weeklyLessonRules()->with(['subject', 'teacher', 'sourceImportBatch'])->get();
+            $rules = $schedule->weeklyLessonRules()->with(['subject', 'teacher', 'teachers', 'sourceImportBatch'])->get();
             $exceptions = $schedule->dateExceptions()->whereBetween('occurs_on', [$start, $end])
-                ->with(['lessons.subject', 'lessons.teacher', 'lessons.sourceWeeklyRule'])->get();
+                ->with(['lessons.subject', 'lessons.teacher', 'lessons.teachers', 'lessons.sourceWeeklyRule'])->get();
             $subjects = [];
             $teachers = [];
             $remember = function (WeeklyLessonRule|ScheduleDateExceptionLesson $lesson) use ($owner, &$subjects, &$teachers): void {
                 $this->validateAssociations($owner, $lesson);
                 $subjects[$lesson->subject_id] = $lesson->subject->only(['id', 'name', 'code', 'color']);
+                foreach ($lesson->teachers as $teacher) {
+                    $teachers[$teacher->id] = $teacher->only(['id', 'name']);
+                }
                 if ($lesson->teacher_id !== null) {
                     $teachers[$lesson->teacher_id] = $lesson->teacher->only(['id', 'name']);
                 }
@@ -119,6 +122,7 @@ class EffectiveScheduleService
                 foreach ($this->calculator->calculate($config, $rules, $snapshots[$date] ?? null, $date, $owner->timezone) as $row) {
                     $row['subject'] = $subjects[$row['subject_id']];
                     $row['teacher'] = $teachers[$row['teacher_id']] ?? null;
+                    $row['teachers'] = array_map(fn ($id) => $teachers[$id], $row['teacher_ids']);
                     $lessons[] = $row;
                 }
             }
@@ -150,7 +154,8 @@ class EffectiveScheduleService
     private function validateAssociations(User $owner, WeeklyLessonRule|ScheduleDateExceptionLesson $lesson): void
     {
         if ($lesson->user_id !== $owner->id || $lesson->subject === null || $lesson->subject->user_id !== $owner->id
-            || ($lesson->teacher_id !== null && ($lesson->teacher === null || $lesson->teacher->user_id !== $owner->id))) {
+            || ($lesson->teacher_id !== null && ($lesson->teacher === null || $lesson->teacher->user_id !== $owner->id))
+            || $lesson->teachers->contains(fn ($teacher) => $teacher->user_id !== $owner->id || $teacher->pivot->user_id !== $owner->id)) {
             throw new InvalidArgumentException('Invalid semester lesson ownership or academic references.');
         }
     }

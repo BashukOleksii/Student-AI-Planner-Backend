@@ -2,14 +2,24 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasSemesterTeachers;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['user_id', 'semester_schedule_id', 'weekday', 'pair_number', 'pair_label', 'week_pattern', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'room', 'source_import_batch_id', 'semester_schedule_import_id', 'import_key', 'import_baseline', 'is_manually_managed'])]
 class WeeklyLessonRule extends Model
 {
+    use HasSemesterTeachers;
+
+    public function teachers(): BelongsToMany
+    {
+        return $this->belongsToMany(Teacher::class, 'weekly_lesson_rule_teacher', 'weekly_lesson_rule_id')
+            ->withPivot('user_id')->orderBy('teachers.id');
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

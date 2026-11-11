@@ -17,12 +17,13 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class SemesterScheduleManagementService
 {
-    private const LESSON_FIELDS = ['pair_number', 'pair_label', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'room'];
+    private const LESSON_FIELDS = ['pair_number', 'pair_label', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'teacher_ids', 'room'];
 
     public function __construct(
         private SemesterScheduleStateService $state,
         private EffectiveScheduleCalculator $calculator,
         private SemesterScheduleImportPlanner $planner,
+        private SemesterLessonTeacherService $lessonTeachers,
     ) {}
 
     public function read(User $user, SemesterSchedule $schedule): array
@@ -88,13 +89,15 @@ class SemesterScheduleManagementService
             $fields = $this->planner->values($values);
             $this->references($graph, $fields);
             $this->notSuppressed($graph, $fields);
-            $rule = $graph['schedule']->weeklyLessonRules()->make(['user_id' => $owner->id, ...$fields, 'is_manually_managed' => true]);
+            $rule = $graph['schedule']->weeklyLessonRules()->make(['user_id' => $owner->id, ...Arr::except($fields, ['teacher_ids']), 'is_manually_managed' => true]);
+            $rule->setRelation('teachers', $graph['teachers']->whereIn('id', $fields['teacher_ids'])->values());
             $rule->id = -1;
             $candidate = $graph;
             $candidate['rules'] = $graph['rules']->concat([$rule]);
             $this->validate($owner, $candidate);
             unset($rule->id);
             $this->check($rule->save());
+            $this->lessonTeachers->sync($rule, $fields['teacher_ids']);
         });
     }
 
@@ -103,12 +106,13 @@ class SemesterScheduleManagementService
         return $this->write($user, $schedule, $values, function ($owner, $graph) use ($id, $values): bool {
             $rule = $graph['rules']->find($id) ?? abort(404);
             $before = $this->planner->values($rule->attributesToArray());
-            $fields = array_replace($before, Arr::only($values, SemesterScheduleImportPlanner::FIELDS));
+            $fields = $this->planner->values($this->mergeLessonFields($before, Arr::only($values, SemesterScheduleImportPlanner::FIELDS)));
             $this->references($graph, $fields);
             if ($this->planner->key($before) !== $this->planner->key($fields)) {
                 $this->notSuppressed($graph, $fields);
             }
-            $rule->fill($fields);
+            $rule->fill(Arr::except($fields, ['teacher_ids']));
+            $rule->setRelation('teachers', $graph['teachers']->whereIn('id', $fields['teacher_ids'])->values());
             $this->validate($owner, $graph);
             if ($before !== $fields) {
                 if ($rule->semester_schedule_import_id !== null && $this->planner->key($fields) !== $rule->import_key) {
@@ -116,6 +120,7 @@ class SemesterScheduleManagementService
                 }
                 $rule->is_manually_managed = true;
                 $this->check($rule->save());
+                $this->lessonTeachers->sync($rule, $fields['teacher_ids']);
 
                 return true;
             }
@@ -170,7 +175,7 @@ class SemesterScheduleManagementService
                     if ($change['cancelled'] ?? false) {
                         continue;
                     }
-                    $lessons[] = [...array_replace($rule->only(self::LESSON_FIELDS), Arr::only($change, self::LESSON_FIELDS)),
+                    $lessons[] = [...$this->lessonFields($this->mergeLessonFields($rule->only(self::LESSON_FIELDS), Arr::only($change, self::LESSON_FIELDS))),
                         'source_weekly_rule_id' => $rule->id];
                 }
                 if ($changes->isNotEmpty()) {
@@ -249,19 +254,34 @@ class SemesterScheduleManagementService
         }
         foreach ($lessons as $lesson) {
             $model = new ScheduleDateExceptionLesson(['user_id' => $owner->id, 'semester_schedule_id' => $graph['schedule']->id,
-                'schedule_date_exception_id' => $exception->id, ...$this->lessonFields($lesson),
+                'schedule_date_exception_id' => $exception->id, ...Arr::except($this->lessonFields($lesson), ['teacher_ids']),
                 'source_weekly_rule_id' => $lesson['source_weekly_rule_id'] ?? null]);
             if ($lesson['id'] > 0) {
                 $model->id = $lesson['id'];
                 $model->created_at = $lesson['created_at'];
             }
             $this->check($model->save());
+            $this->lessonTeachers->sync($model, $lesson['teacher_ids']);
         }
     }
 
     private function lessonFields(array $row): array
     {
-        return array_replace(['pair_label' => null, 'teacher_id' => null, 'room' => null], Arr::only($row, self::LESSON_FIELDS));
+        $fields = array_replace(['pair_label' => null, 'teacher_id' => null, 'room' => null], Arr::only($row, self::LESSON_FIELDS));
+        $fields['teacher_ids'] = $this->planner->teacherIds($fields);
+        $fields['teacher_id'] = $fields['teacher_ids'][0] ?? null;
+
+        return $fields;
+    }
+
+    private function mergeLessonFields(array $before, array $patch): array
+    {
+        // A legacy teacher_id patch replaces the list; teacher_ids is authoritative when supplied.
+        if (array_key_exists('teacher_id', $patch) && ! array_key_exists('teacher_ids', $patch)) {
+            unset($before['teacher_ids']);
+        }
+
+        return array_replace($before, $patch);
     }
 
     private function within(array $graph, string $date): void
@@ -311,8 +331,8 @@ class SemesterScheduleManagementService
         if (! $graph['subjects']->contains('id', $row['subject_id'])) {
             $this->invalid('subject_id', 'The selected subject must belong to you.');
         }
-        if (($row['teacher_id'] ?? null) !== null && ! $graph['teachers']->contains('id', $row['teacher_id'])) {
-            $this->invalid('teacher_id', 'The selected teacher must belong to you.');
+        if (array_diff($this->planner->teacherIds($row), $graph['teachers']->modelKeys()) !== []) {
+            $this->invalid('teacher_ids', 'Every selected teacher must belong to you.');
         }
     }
 
