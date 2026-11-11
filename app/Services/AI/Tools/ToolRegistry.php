@@ -15,7 +15,7 @@ class ToolRegistry
         $period = ['start_date' => $date, 'end_date' => $date];
 
         return [
-            $this->definition('get_schedule_for_date', 'Read the complete effective class schedule for one authenticated-user local date. Includes semester weekly rules and parity, date replacements, cancellations, extra lessons and working Saturdays, plus independent active legacy Lessons. Semester occurrences use read-only virtual string identities; lesson type is null where semester data has no classification. Results are ordered by actual local start/end and stable identity, limited to 100 with truncation metadata. This read never changes data.',
+            $this->definition('get_schedule_for_date', 'Read the complete effective class schedule for one authenticated-user local date. Includes semester weekly rules and parity, date replacements, cancellations, extra lessons and working Saturdays, plus independent active legacy Lessons. Semester occurrences include their saved optional lesson classification in type; null means the student has not classified the lesson. Semester occurrences use read-only virtual string identities. Results are ordered by actual local start/end and stable identity, limited to 100 with truncation metadata. This read never changes data.',
                 ['date' => $date], ['date']),
             $this->definition('list_tasks', 'Read active tasks with optional AND filters and bounded pagination, ordered by deadline then ID.', [
                 'status' => ['type' => 'string', 'enum' => array_column(TaskStatus::cases(), 'value')],
