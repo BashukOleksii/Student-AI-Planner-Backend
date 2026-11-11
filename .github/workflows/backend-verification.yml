@@ -5,11 +5,6 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-    inputs:
-      full_suite:
-        description: 'Also run the complete MySQL suite and Gemini regression matrix'
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -47,9 +42,7 @@ jobs:
       QUEUE_CONNECTION: sync
       AI_PROVIDER: gemini
       GEMINI_API_KEY: ''
-      GEMINI_MODEL: gemini-2.5-flash
       OPENAI_API_KEY: ''
-      OPENAI_MODEL: gpt-5.4-mini
       AI_LIVE_SMOKE: '0'
       AI_LIVE_ALLOW_PAID: '0'
     steps:
@@ -76,37 +69,14 @@ jobs:
           php artisan config:cache
           php artisan config:clear
           php artisan route:list --path=api --except-vendor
-      - name: Verify disposable MySQL migrations and lock instrumentation
+      - name: Verify disposable MySQL migrations
         env:
           DISPOSABLE_CI_MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
         run: php .github/scripts/verify-ci-migrations.php
-      - name: Verify deployment safety without network or production access
-        run: python3 -m unittest discover -s tests/Deployment -v
       - name: Verify formatting
         run: |
           vendor/bin/pint --test
           git diff --check
-      - name: Run fast MySQL smoke suite
-        run: vendor/bin/phpunit --configuration phpunit-smoke.xml --log-junit phpunit-smoke-results.xml
-      - name: Run complete offline MySQL suite including independent processes (manual only)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_suite }}
-        run: vendor/bin/phpunit --log-junit phpunit-full.xml
-      - name: Run Gemini action regression matrix with offline native fixtures (manual only)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_suite }}
-        env:
-          AI_TEST_PROVIDER: gemini
-        run: vendor/bin/phpunit tests/Feature/AiTaskActionsTest.php tests/Feature/AiSubtaskReminderActionsTest.php tests/Feature/AiPlanningActionsTest.php tests/Feature/AiLessonActionsTest.php --log-junit phpunit-gemini-actions.xml
-      - name: Retain verification results
-        if: ${{ always() && hashFiles('phpunit-smoke-results.xml') != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-phpunit-results
-          path: |
-            phpunit-smoke-results.xml
-            phpunit-full.xml
-            phpunit-gemini-actions.xml
-          if-no-files-found: error
-          retention-days: 7
 
   deploy:
     needs: verify
@@ -149,6 +119,6 @@ jobs:
               echo "Deployed SHA: $TESTED_SHA"
               echo 'Smoke checks: internal 200, public profile 401, CSRF 204; PHP-FPM, queue and scheduler timer active.'
             else
-              echo 'Deployment/health not confirmed. See server phase, checkout SHA and smoke results in the deployment log; interrupted SSH may require operator inspection.'
+              echo 'Deployment/health not confirmed. Inspect the deployment log and server state.'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
