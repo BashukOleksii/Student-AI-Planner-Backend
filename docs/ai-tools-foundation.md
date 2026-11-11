@@ -80,7 +80,7 @@ The following notation specifies every accepted property:
 
 | Stable name | Purpose and properties | Required | Service method |
 | --- | --- | --- | --- |
-| `get_schedule_for_date` | Active effective lessons; `date: D` | `date` | `ScheduleService::date()` |
+| `get_schedule_for_date` | Effective semester and independent legacy classes; `date: D` | `date` | `EffectiveScheduleReadService::date()` via `CalendarBusyIntervalService` |
 | `list_tasks` | Active Task list; `status: string enum [pending, completed]`, `priority: I enum [1, 2, 3]`, `subject_id: I`, `page: I`, `per_page: I` with maximum 50 | none | `TaskService::paginate()` |
 | `find_free_study_slots` | Available UTC intervals; Period plus optional `min_slot_minutes: I` with maximum 65535 | `start_date`, `end_date` | `FreeTimeService::calculate()` |
 | `list_study_sessions` | Existing overlapping sessions and history; Period | `start_date`, `end_date` | `StudySessionReadService::range()` |

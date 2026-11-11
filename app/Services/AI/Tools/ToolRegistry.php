@@ -15,7 +15,7 @@ class ToolRegistry
         $period = ['start_date' => $date, 'end_date' => $date];
 
         return [
-            $this->definition('get_schedule_for_date', 'Read active lessons for one local calendar date, including effective replacements.',
+            $this->definition('get_schedule_for_date', 'Read the complete effective class schedule for one authenticated-user local date. Includes semester weekly rules and parity, date replacements, cancellations, extra lessons and working Saturdays, plus independent active legacy Lessons. Semester occurrences use read-only virtual string identities; lesson type is null where semester data has no classification. Results are ordered by actual local start/end and stable identity, limited to 100 with truncation metadata. This read never changes data.',
                 ['date' => $date], ['date']),
             $this->definition('list_tasks', 'Read active tasks with optional AND filters and bounded pagination, ordered by deadline then ID.', [
                 'status' => ['type' => 'string', 'enum' => array_column(TaskStatus::cases(), 'value')],
@@ -29,7 +29,7 @@ class ToolRegistry
                 'page' => $integer,
                 'per_page' => [...$integer, 'maximum' => 50],
             ], []),
-            $this->definition('find_free_study_slots', 'Read free UTC intervals over at most 31 inclusive local dates. Free time does not guarantee a feasible study plan.',
+            $this->definition('find_free_study_slots', 'Read free UTC intervals over at most 31 inclusive local dates after subtracting the same authoritative effective class calendar used by get_schedule_for_date, plus planned study sessions. All classes currently occupy time. Free time does not guarantee a feasible study plan.',
                 [...$period, 'min_slot_minutes' => [...$integer, 'maximum' => 65535]], array_keys($period)),
             $this->definition('list_study_sessions', 'Read original study session identities and all historical statuses overlapping at most 31 local dates. Returns at most 100 sessions with explicit truncation metadata.',
                 $period, array_keys($period)),

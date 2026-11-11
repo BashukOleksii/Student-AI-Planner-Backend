@@ -11,7 +11,6 @@ use App\Services\Planning\StudySessionReadService;
 use App\Services\Progress\ProgressComparisonService;
 use App\Services\Progress\ProgressStatisticsService;
 use App\Services\Progress\ProgressTrendsService;
-use App\Services\Schedule\ScheduleService;
 use App\Services\Tasks\TaskService;
 use Illuminate\Validation\ValidationException;
 use LogicException;
@@ -20,7 +19,7 @@ use LogicException;
 class ReadOnlyTools
 {
     public function __construct(
-        private ScheduleService $schedule,
+        private EffectiveScheduleReadService $schedule,
         private TaskService $tasks,
         private FreeTimeService $freeTime,
         private StudySessionReadService $sessions,
@@ -51,9 +50,7 @@ class ReadOnlyTools
 
     private function schedule(User $owner, array $arguments): array
     {
-        $result = $this->schedule->date($owner, $arguments['date']);
-
-        return ['lessons' => $result['lessons']->map(fn ($lesson) => $this->presenter->lesson($owner, $lesson))->all(), 'meta' => $result['meta']];
+        return $this->schedule->date($owner, $arguments['date']);
     }
 
     private function tasks(User $owner, array $arguments): array
