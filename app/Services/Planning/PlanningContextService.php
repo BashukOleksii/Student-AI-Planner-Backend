@@ -2,7 +2,6 @@
 
 namespace App\Services\Planning;
 
-use App\Enums\LessonStatus;
 use App\Enums\StudySessionStatus;
 use App\Models\User;
 use DateTimeImmutable;
@@ -29,6 +28,7 @@ class PlanningContextService
     public function load(User $user, string $startDate, string $endDate, ?array $anchorEnvelope = null, bool $includeSources = false): array
     {
         $this->validateDates($startDate, $endDate);
+        $user = $user->newQuery()->findOrFail($user->getKey(), ['id', 'timezone']);
         $range = $this->dateRange($startDate, $endDate, $user->timezone);
         if ($anchorEnvelope !== null) {
             $this->intervals->durationSeconds($anchorEnvelope);
@@ -58,9 +58,9 @@ class PlanningContextService
             ->where('starts_at', '<', $anchorEnd)->where('ends_at', '>', $anchorStart)
             ->get(['id', 'task_id', 'subtask_id', 'starts_at', 'ends_at']);
         $this->validateSessionReferences($user, $workload->concat($sessions)->unique('id'));
-        $lessons = $envelope === null ? new Collection : $user->lessons()->where('status', LessonStatus::Active)
-            ->where('starts_at', '<', $anchorEnd)->where('ends_at', '>', $anchorStart)
-            ->get(['id', 'starts_at', 'ends_at']);
+        $lessons = $envelope === null ? [] : $this->freeTime->calendarSources($user,
+            $envelope['start'] - $buffer, $envelope['end'] + $buffer);
+        $lessonIntervals = array_map(fn ($record) => ['start' => $record['start'], 'end' => $record['end']], $lessons);
         $sources = $includeSources ? $this->freeTime->sources($user, $startDate, $endDate) : null;
         $free = $includeSources ? $this->intervals->subtract($sources['allowed_intervals'],
             array_map(fn ($record) => ['start' => $record['start'], 'end' => $record['end']],
@@ -68,11 +68,11 @@ class PlanningContextService
             : $this->freeTime->calculate($user, $startDate, $endDate, null);
 
         $context = ['range' => $range, 'timezone' => $user->timezone, 'preferences' => $preferences,
-            'free_intervals' => $free, 'break_anchors' => $this->eventIntervals($lessons->concat($sessions)),
+            'free_intervals' => $free, 'break_anchors' => [...$lessonIntervals, ...$this->eventIntervals($sessions)],
             'workload_sessions' => $this->eventIntervals($workload)];
 
         return $includeSources ? [...$context, ...$sources,
-            'lesson_anchors' => $this->eventRecords($lessons), 'session_anchors' => $this->eventRecords($sessions),
+            'lesson_anchors' => $lessons, 'session_anchors' => $this->eventRecords($sessions),
             'workload_records' => $this->eventRecords($workload, true)] : $context;
     }
 

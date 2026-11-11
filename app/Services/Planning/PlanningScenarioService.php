@@ -52,7 +52,13 @@ class PlanningScenarioService
             }
             $seen = [];
             foreach ($snapshot[$key] as $record) {
-                if (! is_array($record) || ! is_int($record['id'] ?? null) || $record['id'] < 1 || isset($seen[$record['id']])) {
+                $id = is_array($record) ? ($record['id'] ?? null) : null;
+                $lesson = in_array($key, ['blocking_lessons', 'lesson_anchors'], true);
+                $validId = is_int($id) && $id > 0;
+                if ($lesson && is_string($id)) {
+                    $validId = preg_match('/\A(?:legacy_lesson:[1-9][0-9]*(?::segment:-?[0-9]+:-?[0-9]+)?|semester:[1-9][0-9]*:[0-9]{4}-[0-9]{2}-[0-9]{2}:(?:rule|snapshot):[1-9][0-9]*)\z/', $id) === 1;
+                }
+                if (! $validId || isset($seen[$id])) {
                     throw new InvalidArgumentException('Invalid or duplicate source identity.');
                 }
                 $seen[$record['id']] = true;

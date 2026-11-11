@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
-/** Owned semester reads; legacy Lesson/planning/import/AI consumers stay separate. */
+/** Owned effective semester reads shared by schedule presentation and planning. */
 class EffectiveScheduleService
 {
     public function __construct(private EffectiveScheduleCalculator $calculator, private SemesterLessonTeacherService $lessonTeachers) {}
@@ -21,6 +21,25 @@ class EffectiveScheduleService
     {
         return DB::transaction(function () use ($user): Collection {
             $schedules = $user->semesterSchedules()->with('academicPeriod.educationInstitution')->orderBy('id')->get();
+            foreach ($schedules as $schedule) {
+                $this->validatePeriod($user, $schedule);
+            }
+
+            return $schedules;
+        });
+    }
+
+    /** Date-bounded metadata, plus exact periods needed to classify selected legacy history. */
+    public function schedulesInRange(User $user, string $start, string $end, array $periodIds = []): Collection
+    {
+        $this->validateRange($start, $end);
+
+        return DB::transaction(function () use ($user, $start, $end, $periodIds): Collection {
+            $schedules = $user->semesterSchedules()->with('academicPeriod.educationInstitution')
+                ->where(fn ($query) => $query->whereHas('academicPeriod', fn ($period) => $period
+                    ->where('starts_on', '<=', $end)->where('ends_on', '>=', $start))
+                    ->orWhereIn('academic_period_id', $periodIds))
+                ->orderBy('id')->get();
             foreach ($schedules as $schedule) {
                 $this->validatePeriod($user, $schedule);
             }
@@ -57,6 +76,26 @@ class EffectiveScheduleService
         [$start, $end] = $this->calculator->weekDates($date);
 
         return $this->range($user, $schedule, $start, $end);
+    }
+
+    /** Bounded inclusive calendar read; load the graph once, never once per day. */
+    public function forRange(User $user, SemesterSchedule $schedule, string $start, string $end): array
+    {
+        $this->validateRange($start, $end);
+
+        return $this->range($user, $schedule, $start, $end);
+    }
+
+    private function validateRange(string $start, string $end): void
+    {
+        $this->calculator->validateDate($start);
+        $this->calculator->validateDate($end);
+        $first = new DateTimeImmutable($start.' UTC');
+        $last = new DateTimeImmutable($end.' UTC');
+        // Planning's 31 dates plus the maximum configured break on both sides.
+        if ($last < $first || $first->diff($last)->days >= 128) {
+            throw new InvalidArgumentException('Expected an inclusive range of at most 128 calendar dates.');
+        }
     }
 
     private function range(User $user, SemesterSchedule $schedule, string $start, string $end): array

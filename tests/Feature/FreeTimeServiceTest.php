@@ -326,17 +326,24 @@ class FreeTimeServiceTest extends TestCase
         } finally {
             DB::disableQueryLog();
         }
-        $this->assertCount(9, $queries);
-        foreach ($queries as $index => $query) {
-            $table = ['study_availability_windows', 'lessons', 'study_sessions'][$index % 3];
+        // Calendar reads now include semester metadata and batched legacy provenance.
+        // Every invocation still has the same bounded, SELECT-only query shape.
+        $this->assertCount(27, $queries);
+        $perRead = intdiv(count($queries), 3);
+        $this->assertSame(array_column(array_slice($queries, 0, $perRead), 'query'),
+            array_column(array_slice($queries, $perRead, $perRead), 'query'));
+        foreach ($queries as $query) {
             $this->assertStringStartsWith('select ', $query['query']);
-            $this->assertStringContainsString('from `'.$table.'`', $query['query']);
-            $this->assertStringContainsString('`user_id` = ?', $query['query']);
-            $this->assertSame($user->id, $query['bindings'][0]);
             $this->assertStringNotContainsString('for update', $query['query']);
-            if ($table !== 'study_availability_windows') {
-                $this->assertStringContainsString('`starts_at` < ?', $query['query']);
-                $this->assertStringContainsString('`ends_at` > ?', $query['query']);
+            foreach (['study_availability_windows', 'lessons', 'study_sessions', 'semester_schedules', 'academic_periods', 'schedule_import_batches'] as $table) {
+                if (str_contains($query['query'], 'from `'.$table.'`')) {
+                    $this->assertStringContainsString('`user_id` = ?', $query['query']);
+                    $this->assertSame($user->id, $query['bindings'][0]);
+                    if (in_array($table, ['lessons', 'study_sessions'], true) && str_contains($query['query'], '`status` = ?')) {
+                        $this->assertStringContainsString('`starts_at` < ?', $query['query']);
+                        $this->assertStringContainsString('`ends_at` > ?', $query['query']);
+                    }
+                }
             }
         }
         $this->assertSame($level, DB::transactionLevel());

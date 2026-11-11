@@ -1,5 +1,7 @@
 # Semester schedule foundation
 
+Current planning source selection is documented in [Calendar occupancy in study planning](calendar-planning.md). It supersedes the earlier legacy-only planning boundary below.
+
 Stage 4 now writes this foundation through the [semester management API](semester-schedule-management.md). Original foundation-only scope statements below are historical. ADR-006 parity/snapshot rules remain authoritative; ADR-008 adds optimistic writes and explicit import protections.
 
 Stage 3 now provides the separate [confirmed recurring import workflow](semester-schedule-import.md). Original foundation scope statements below are historical; parity/snapshot decisions remain unchanged, with additive import provenance defined in ADR-007.

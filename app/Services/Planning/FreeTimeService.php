@@ -2,7 +2,6 @@
 
 namespace App\Services\Planning;
 
-use App\Enums\LessonStatus;
 use App\Enums\StudySessionStatus;
 use App\Models\User;
 use DateTimeImmutable;
@@ -14,6 +13,7 @@ class FreeTimeService
     public function __construct(
         private AvailabilityOccurrenceService $availability,
         private TimeIntervalService $intervals,
+        private ?CalendarBusyIntervalService $calendar = null,
     ) {}
 
     /**
@@ -47,6 +47,7 @@ class FreeTimeService
             throw new InvalidArgumentException('Expected an increasing inclusive range of at most 31 calendar dates.');
         }
 
+        $user = $user->newQuery()->findOrFail($user->getKey(), ['id', 'timezone']);
         $windows = $user->studyAvailabilityWindows()->get(['day_of_week', 'starts_at', 'ends_at'])
             ->map(fn ($window): array => $window->only(['day_of_week', 'starts_at', 'ends_at']))->all();
         $allowed = $this->availability->expand($windows, $startDate, $endDate, $user->timezone);
@@ -57,9 +58,7 @@ class FreeTimeService
         // C2's normalized union provides a safe envelope without resolving ambiguous local boundaries.
         $rangeStart = gmdate('Y-m-d H:i:s', $allowed[0]['start']);
         $rangeEnd = gmdate('Y-m-d H:i:s', $allowed[count($allowed) - 1]['end']);
-        $lessons = $user->lessons()->where('status', LessonStatus::Active)
-            ->where('starts_at', '<', $rangeEnd)->where('ends_at', '>', $rangeStart)
-            ->get(['id', 'starts_at', 'ends_at']);
+        $lessons = $this->calendarSources($user, $allowed[0]['start'], $allowed[count($allowed) - 1]['end']);
         $sessions = $user->studySessions()->where('status', StudySessionStatus::Planned)
             ->where('starts_at', '<', $rangeEnd)->where('ends_at', '>', $rangeStart)
             ->get(['id', 'starts_at', 'ends_at']);
@@ -73,7 +72,13 @@ class FreeTimeService
             })->all();
         };
 
-        return ['allowed_intervals' => $allowed, 'blocking_lessons' => $records($lessons), 'blocking_sessions' => $records($sessions)];
+        return ['allowed_intervals' => $allowed, 'blocking_lessons' => $lessons, 'blocking_sessions' => $records($sessions)];
+    }
+
+    /** Full source endpoints keep identities consistent across replanning chunks and break envelopes. */
+    public function calendarSources(User $user, int $start, int $end): array
+    {
+        return ($this->calendar ??= app(CalendarBusyIntervalService::class))->between($user, $start, $end, false);
     }
 
     private function calendarDate(string $value): DateTimeImmutable

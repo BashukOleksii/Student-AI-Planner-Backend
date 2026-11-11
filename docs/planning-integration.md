@@ -1,5 +1,7 @@
 # Planning Integration — C9 / C10
 
+Current planning source selection is documented in [Calendar occupancy in study planning](calendar-planning.md). It supersedes the earlier legacy-only planning boundary below.
+
 C9 V1 policies are developer-approved. C10 implements the read-only
 `App\Services\Planning\PlanningCandidateEvaluationService`, integrating existing
 MySQL persistence with unchanged PF1 and pure C1–C8. The original local proposal
