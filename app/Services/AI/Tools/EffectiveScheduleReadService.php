@@ -24,13 +24,20 @@ class EffectiveScheduleReadService
 
     public function date(User $user, string $date): array
     {
-        return DB::transaction(fn () => $this->readDate($user, $date));
+        return $this->range($user, $date, $date);
     }
 
-    private function readDate(User $user, string $date): array
+    public function range(User $user, string $start, string $end, bool $editingMetadata = false): array
+    {
+        $this->context->validateDates($start, $end);
+
+        return DB::transaction(fn () => $this->readRange($user, $start, $end, $editingMetadata));
+    }
+
+    private function readRange(User $user, string $start, string $end, bool $editingMetadata): array
     {
         $owner = $user->newQuery()->findOrFail($user->getKey(), ['id', 'timezone']);
-        $coverage = $this->context->dateIntervals($date, $date, $owner->timezone);
+        $coverage = $this->context->dateIntervals($start, $end, $owner->timezone);
         $occupancy = [];
         foreach ($coverage as $part) {
             foreach ($this->calendar->between($owner, $part['start'], $part['end'], false) as $record) {
@@ -42,8 +49,8 @@ class EffectiveScheduleReadService
 
         $semesters = [];
         if ($coverage !== []) {
-            foreach ($this->effective->schedulesInRange($owner, $date, $date) as $schedule) {
-                $semesters[$schedule->id] = $this->effective->forRange($owner, $schedule, $date, $date)['lessons'];
+            foreach ($this->effective->schedulesInRange($owner, $start, $end) as $schedule) {
+                $semesters[$schedule->id] = $this->effective->forRange($owner, $schedule, $start, $end)['lessons'];
             }
         }
         $legacyIds = array_values(array_unique(array_filter(array_map(fn ($row) => $row['lesson_id'] ?? null, $occupancy), 'is_int')));
@@ -54,7 +61,13 @@ class EffectiveScheduleReadService
             if ($record['source_type'] === 'legacy_lesson') {
                 $lesson = $legacy->get($record['lesson_id']);
                 if ($lesson !== null) {
-                    $lessons[] = $this->legacy($owner, $lesson, $record);
+                    $lessons[] = [...$this->legacy($owner, $lesson, $record), ...($editingMetadata ? [
+                        'occurs_on' => CarbonImmutable::createFromTimestampUTC($record['start'])->setTimezone($owner->timezone)->toDateString(),
+                        'source' => 'legacy_lesson', 'occurrence_id' => null, 'lesson_id' => $lesson->id,
+                        'academic_period_id' => $lesson->academic_period_id,
+                        'semester_schedule_id' => null, 'weekly_lesson_rule_id' => null,
+                        'schedule_date_exception_id' => null, 'schedule_date_exception_lesson_id' => null,
+                    ] : [])];
                 }
 
                 continue;
@@ -71,6 +84,13 @@ class EffectiveScheduleReadService
                     'semester_schedule_id' => $record['semester_schedule_id'],
                     'weekly_lesson_rule_id' => $record['weekly_lesson_rule_id'],
                     'schedule_date_exception_id' => $record['schedule_date_exception_id'],
+                    ...($editingMetadata ? ['occurs_on' => $row['occurs_on'], 'source' => $row['source'],
+                        'occurrence_id' => $row['occurrence_id'],
+                        'lesson_id' => null, 'academic_period_id' => $record['academic_period_id'],
+                        'schedule_date_exception_lesson_id' => $row['schedule_date_exception_id'] === null ? null
+                            : (int) substr($row['occurrence_id'], strrpos($row['occurrence_id'], ':') + 1),
+                        'replaces_lesson_id' => null,
+                    ] : []),
                 ];
             }
         }
@@ -79,7 +99,7 @@ class EffectiveScheduleReadService
         $total = count($lessons);
 
         return ['lessons' => array_slice($lessons, 0, self::LIMIT), 'meta' => [
-            'timezone' => $owner->timezone, 'start_date' => $date, 'end_date' => $date,
+            'timezone' => $owner->timezone, 'start_date' => $start, 'end_date' => $end,
             'limit' => self::LIMIT, 'returned' => min($total, self::LIMIT), 'total' => $total, 'truncated' => $total > self::LIMIT,
         ]];
     }

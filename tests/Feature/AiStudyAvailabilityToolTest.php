@@ -202,7 +202,7 @@ class AiStudyAvailabilityToolTest extends TestCase
         Http::assertSentCount(2);
         Http::assertSent(function ($request) use ($provider) {
             $definitions = $provider === 'openai' ? $request['tools'] : $request['tools'][0]['functionDeclarations'];
-            $this->assertCount(34, $definitions);
+            $this->assertCount(46, $definitions);
             $this->assertContains(self::TOOL, array_column($definitions, 'name'));
             $instructions = $provider === 'openai' ? $request['instructions'] : $request['systemInstruction']['parts'][0]['text'];
             $this->assertStringContainsString('Configured weekly availability is different from calculated free study slots.', $instructions);

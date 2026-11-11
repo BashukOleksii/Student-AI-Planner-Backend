@@ -558,7 +558,7 @@ class AiPlanningActionsTest extends TestCase
         Http::preventStrayRequests();
         Http::fake(function ($request) {
             $this->assertSame(0, DB::transactionLevel());
-            $this->assertCount(34, $request['tools'][0]['functionDeclarations'] ?? $request['tools']);
+            $this->assertCount(46, $request['tools'][0]['functionDeclarations'] ?? $request['tools']);
             $this->assertStringContainsString('action_stale', json_encode($this->aiInput($request)));
             $this->assertStringContainsString('failed', json_encode($this->aiInput($request)));
             $this->assertStringNotContainsString('preview_token', json_encode($request->data()));

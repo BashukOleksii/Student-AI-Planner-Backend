@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Services\AI\Actions\AvailabilityActionRegistry;
 use App\Services\AI\Actions\LessonActionRegistry;
 use App\Services\AI\Actions\PlanningActionRegistry;
+use App\Services\AI\Actions\SemesterActionRegistry;
 use App\Services\AI\Actions\SubtaskReminderActionRegistry;
 use App\Services\AI\Actions\TaskActionRegistry;
 use App\Services\AI\Tools\ToolRegistry;
@@ -68,9 +69,10 @@ class BackendIntegrationSmokeTest extends TestCase
             $body = $request->data();
             $names = [...array_column((new ToolRegistry)->definitions(), 'name'), ...array_column((new TaskActionRegistry)->definitions(), 'name'),
                 ...array_column((new SubtaskReminderActionRegistry)->readDefinitions(), 'name'),
-                ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES, ...AvailabilityActionRegistry::NAMES];
+                ...array_column((new SubtaskReminderActionRegistry)->definitions(), 'name'), ...PlanningActionRegistry::NAMES, ...LessonActionRegistry::NAMES, ...AvailabilityActionRegistry::NAMES,
+                ...array_column((new SemesterActionRegistry)->readDefinitions(), 'name'), ...SemesterActionRegistry::NAMES];
             $this->assertSame($names, array_column($body['tools'], 'name'));
-            $this->assertCount(34, array_unique($names));
+            $this->assertCount(46, array_unique($names));
             foreach ($body['tools'] as $tool) {
                 $this->assertSame('function', $tool['type']);
                 $this->assertFalse($tool['parameters']['additionalProperties']);

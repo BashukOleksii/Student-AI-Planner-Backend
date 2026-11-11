@@ -1,5 +1,7 @@
 # Conceptual Domain Model
 
+The unified academic calendar is a read projection of semester occurrences plus independent legacy Lessons, never StudySessions. Semester AI actions add proposal types to existing AiPendingAction, not a new approval domain. See [the contract](unified-academic-calendar.md).
+
 Stage 4 adds owned SemesterScheduleSuppressedSlot records for intentional deletions, a permanent WeeklyLessonRule manual-management flag and a monotonic schedule revision. Manual CRUD, full-date snapshots and effective-day Saturday copies use the [management API](semester-schedule-management.md), independently of concrete Lessons.
 
 Stage 3 adds `SemesterScheduleImport` and nullable weekly-rule provenance/key/baseline metadata. It reconciles only unchanged managed rules, preserves manual rows and frozen days, and exposes a separate [complete import workflow](semester-schedule-import.md).

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AcademicCalendarController;
 use App\Http\Controllers\Api\AcademicPeriodController;
 use App\Http\Controllers\Api\AiConversationController;
 use App\Http\Controllers\Api\AiTaskActionController;
@@ -41,6 +42,10 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
 });
 
 Route::middleware('auth:sanctum')->group(function (): void {
+    Route::get('/academic-calendar/today', [AcademicCalendarController::class, 'today'])->name('academic-calendar.today');
+    Route::get('/academic-calendar/date/{date}', [AcademicCalendarController::class, 'date'])->where('date', '.*')->name('academic-calendar.date');
+    Route::get('/academic-calendar/week/{date}', [AcademicCalendarController::class, 'week'])->where('date', '.*')->name('academic-calendar.week');
+
     Route::prefix('ai/conversations')->name('ai.conversations.')->group(function (): void {
         Route::post('/', [AiConversationController::class, 'store'])->name('store');
         Route::get('/', [AiConversationController::class, 'index'])->name('index');

@@ -11,6 +11,8 @@ use App\Services\AI\Actions\LessonActionRegistry;
 use App\Services\AI\Actions\LessonActionService;
 use App\Services\AI\Actions\PlanningActionRegistry;
 use App\Services\AI\Actions\PlanningActionService;
+use App\Services\AI\Actions\SemesterActionRegistry;
+use App\Services\AI\Actions\SemesterActionService;
 use App\Services\AI\Actions\SubtaskReminderActionRegistry;
 use App\Services\AI\Actions\SubtaskReminderActionService;
 use App\Services\AI\Actions\TaskActionProposalService;
@@ -21,6 +23,7 @@ use App\Services\AI\GeminiToolSchema;
 use App\Services\AI\LlmProvider;
 use App\Services\AI\OpenAiToolSchema;
 use App\Services\AI\Tools\ManagementReadTools;
+use App\Services\AI\Tools\SemesterReadTools;
 use App\Services\AI\Tools\ToolExecutor;
 use App\Services\AI\Tools\ToolRegistry;
 use Illuminate\Container\Container;
@@ -170,7 +173,7 @@ class AvailabilityActionTest extends TestCase
         $agent = new AgentOrchestrator($provider, new ToolRegistry, $reads,
             new AgentLimits(['max_tool_rounds' => 5, 'max_tool_calls' => 8, 'max_context_bytes' => 131072, 'max_tool_result_bytes' => 65536, 'max_turn_seconds' => 180]),
             new TaskActionRegistry, $tasks, new SubtaskReminderActionRegistry, $management, $this->createMock(ManagementReadTools::class),
-            new PlanningActionRegistry, $planning, new LessonActionRegistry, $lessons, new AvailabilityActionRegistry, $availability);
+            new PlanningActionRegistry, $planning, new LessonActionRegistry, $lessons, new AvailabilityActionRegistry, $availability, new SemesterActionRegistry, $this->createMock(SemesterActionService::class), $this->createMock(SemesterReadTools::class));
         $owner = new User;
         $owner->timezone = 'UTC';
         $this->expectException(AiAgentException::class);

@@ -56,11 +56,14 @@ class SemesterScheduleManagementService
         });
     }
 
-    public function update(User $user, SemesterSchedule $schedule, array $values): array
+    public function update(User $user, SemesterSchedule $schedule, array $values, bool $previewOnly = false): array
     {
-        return $this->write($user, $schedule, $values, function ($owner, $graph) use ($values): bool {
+        return $this->write($user, $schedule, $values, function ($owner, $graph, bool $previewOnly) use ($values) {
             $graph['schedule']->fill(Arr::only($values, ['group_name', 'parity_anchor_on', 'first_week_parity']));
             $this->validate($owner, $graph);
+            if ($previewOnly) {
+                return $graph;
+            }
             if ($graph['schedule']->isDirty()) {
                 $this->check($graph['schedule']->save());
 
@@ -68,7 +71,7 @@ class SemesterScheduleManagementService
             }
 
             return false;
-        });
+        }, $previewOnly);
     }
 
     public function delete(User $user, SemesterSchedule $schedule, array $values): void
@@ -84,9 +87,9 @@ class SemesterScheduleManagementService
         });
     }
 
-    public function createRule(User $user, SemesterSchedule $schedule, array $values): array
+    public function createRule(User $user, SemesterSchedule $schedule, array $values, bool $previewOnly = false): array
     {
-        return $this->write($user, $schedule, $values, function ($owner, $graph) use ($values): void {
+        return $this->write($user, $schedule, $values, function ($owner, $graph, bool $previewOnly) use ($values) {
             $this->lessonTeachers->teacherId($values);
             $fields = $this->planner->values($values);
             $fields['lesson_type'] = $values['lesson_type'] ?? null;
@@ -98,15 +101,18 @@ class SemesterScheduleManagementService
             $candidate = $graph;
             $candidate['rules'] = $graph['rules']->concat([$rule]);
             $this->validate($owner, $candidate);
+            if ($previewOnly) {
+                return $candidate;
+            }
             unset($rule->id);
             $this->check($rule->save());
             $this->lessonTeachers->sync($rule, $fields['teacher_id']);
-        });
+        }, $previewOnly);
     }
 
-    public function updateRule(User $user, SemesterSchedule $schedule, int $id, array $values): array
+    public function updateRule(User $user, SemesterSchedule $schedule, int $id, array $values, bool $previewOnly = false): array
     {
-        return $this->write($user, $schedule, $values, function ($owner, $graph) use ($id, $values): bool {
+        return $this->write($user, $schedule, $values, function ($owner, $graph, bool $previewOnly) use ($id, $values) {
             $rule = $graph['rules']->find($id) ?? abort(404);
             $before = [...$this->planner->values($rule->attributesToArray()), 'lesson_type' => $rule->lesson_type?->value];
             $merged = $this->mergeLessonFields($before, Arr::only($values, [...SemesterScheduleImportPlanner::FIELDS, 'lesson_type']));
@@ -120,6 +126,9 @@ class SemesterScheduleManagementService
             $rule->fill(Arr::except($fields, ['teacher_ids']));
             $rule->setRelation('teachers', $graph['teachers']->whereIn('id', $fields['teacher_ids'])->values());
             $this->validate($owner, $graph);
+            if ($previewOnly) {
+                return $graph;
+            }
             if ($before !== $fields) {
                 if ($rule->semester_schedule_import_id !== null && $this->planner->key($fields) !== $rule->import_key) {
                     $this->suppress($owner, $graph, $rule->import_baseline);
@@ -132,16 +141,19 @@ class SemesterScheduleManagementService
             }
 
             return false;
-        });
+        }, $previewOnly);
     }
 
-    public function deleteRule(User $user, SemesterSchedule $schedule, int $id, array $values): array
+    public function deleteRule(User $user, SemesterSchedule $schedule, int $id, array $values, bool $previewOnly = false): array
     {
-        return $this->write($user, $schedule, $values, function ($owner, $graph) use ($id): void {
+        return $this->write($user, $schedule, $values, function ($owner, $graph, bool $previewOnly) use ($id) {
             $rule = $graph['rules']->find($id) ?? abort(404);
             $candidate = $graph;
             $candidate['rules'] = $graph['rules']->reject(fn ($row) => $row->id === $id);
             $this->validate($owner, $candidate);
+            if ($previewOnly) {
+                return $candidate;
+            }
             $this->suppress($owner, $graph, $rule->attributesToArray());
             if ($rule->semester_schedule_import_id !== null) {
                 $this->suppress($owner, $graph, $rule->import_baseline);
@@ -150,7 +162,7 @@ class SemesterScheduleManagementService
                 $this->check($lesson->update(['source_weekly_rule_id' => null]));
             }
             $this->check($rule->delete());
-        });
+        }, $previewOnly);
     }
 
     public function releaseSuppression(User $user, SemesterSchedule $schedule, int $id, array $values): array
@@ -162,9 +174,48 @@ class SemesterScheduleManagementService
         });
     }
 
-    public function replaceDate(User $user, SemesterSchedule $schedule, string $date, array $values): array
+    /** Change one effective occurrence while preserving every other lesson on that date. */
+    public function changeOccurrence(User $user, SemesterSchedule $schedule, string $date, string $identity,
+        array $patch, bool $cancelled, array $values, bool $previewOnly = false): array
     {
-        return $this->write($user, $schedule, $values, function ($owner, $graph) use ($date, $values): void {
+        return DB::transaction(function () use ($user, $schedule, $date, $identity, $patch, $cancelled, $values, $previewOnly): array {
+            $owner = User::findOrFail($user->id);
+            $target = $owner->semesterSchedules()->findOrFail($schedule->id);
+            $graph = $this->state->load($owner, $target->academic_period_id);
+            $this->within($graph, $date);
+            $snapshot = $graph['snapshots'][$date] ?? null;
+            $occurrences = $this->calculator->calculate($this->state->config($graph),
+                $graph['rules']->map->attributesToArray()->all(), $snapshot, $date, $owner->timezone);
+            $occurrence = collect($occurrences)->firstWhere('occurrence_id', $identity);
+            if ($occurrence === null) {
+                abort(404);
+            }
+            if ($snapshot === null) {
+                $replacement = ['mode' => 'copy_base', 'changes' => [[
+                    'weekly_lesson_rule_id' => $occurrence['weekly_lesson_rule_id'],
+                    ...Arr::only($patch, self::LESSON_FIELDS), 'cancelled' => $cancelled,
+                ]]];
+            } else {
+                $lessons = [];
+                foreach ($snapshot['lessons'] as $row) {
+                    $selected = $identity === 'semester:'.$target->id.':'.$date.':snapshot:'.$row['id'];
+                    if ($selected && $cancelled) {
+                        continue;
+                    }
+                    $lessons[] = ['id' => $row['id'], ...Arr::only($selected
+                        ? $this->mergeLessonFields($row, $patch) : $row, self::LESSON_FIELDS)];
+                }
+                $replacement = ['mode' => 'replace', 'lessons' => $lessons];
+            }
+
+            return $this->replaceDate($owner, $target, $date, [...$replacement,
+                'schedule_token' => $values['schedule_token']], $previewOnly);
+        });
+    }
+
+    public function replaceDate(User $user, SemesterSchedule $schedule, string $date, array $values, bool $previewOnly = false): array
+    {
+        return $this->write($user, $schedule, $values, function ($owner, $graph, bool $previewOnly) use ($date, $values) {
             $this->within($graph, $date);
             $existing = $graph['exceptions']->first(fn ($row) => $row->occurs_on->format('Y-m-d') === $date);
             $oldLessons = $graph['lessons']->where('schedule_date_exception_id', $existing?->id);
@@ -199,13 +250,14 @@ class SemesterScheduleManagementService
                 $lessons[] = [...$this->lessonFields($row), 'id' => $old?->id,
                     'source_weekly_rule_id' => $old?->source_weekly_rule_id, 'created_at' => $old?->getRawOriginal('created_at')];
             }
-            $this->saveSnapshot($owner, $graph, $date, $existing?->kind ?? 'replacement', $existing?->copied_weekday, $lessons, $existing);
-        });
+
+            return $this->saveSnapshot($owner, $graph, $date, $existing?->kind ?? 'replacement', $existing?->copied_weekday, $lessons, $existing, previewOnly: $previewOnly);
+        }, $previewOnly);
     }
 
-    public function workingSaturday(User $user, SemesterSchedule $schedule, array $values): array
+    public function workingSaturday(User $user, SemesterSchedule $schedule, array $values, bool $previewOnly = false): array
     {
-        return $this->write($user, $schedule, $values, function ($owner, $graph) use ($values): void {
+        return $this->write($user, $schedule, $values, function ($owner, $graph, bool $previewOnly) use ($values) {
             $date = $values['occurs_on'];
             $this->within($graph, $date);
             if ((new DateTimeImmutable($date.' UTC'))->format('N') !== '6') {
@@ -234,9 +286,8 @@ class SemesterScheduleManagementService
                     ...$rule->only(self::LESSON_FIELDS), 'source_weekly_rule_id' => $rule->id,
                 ])->values()->all();
                 $lessons = array_map($this->normalizeLessonType(...), $lessons);
-                $this->saveSnapshot($owner, $graph, $date, 'working_saturday', $values['copied_weekday'], $lessons, sourceWeekParity: $parity);
 
-                return;
+                return $this->saveSnapshot($owner, $graph, $date, 'working_saturday', $values['copied_weekday'], $lessons, sourceWeekParity: $parity, previewOnly: $previewOnly);
             }
             // Compatibility mode copies the effective source date, including replacements/cancellation.
             [$monday] = $this->calculator->weekDates($date);
@@ -251,23 +302,27 @@ class SemesterScheduleManagementService
                     'source_weekly_rule_id' => $row['weekly_lesson_rule_id'] ?? $origin->source_weekly_rule_id];
             }
             $lessons = array_map($this->normalizeLessonType(...), $lessons);
-            $this->saveSnapshot($owner, $graph, $date, 'working_saturday', $values['copied_weekday'], $lessons,
-                sourceWeekParity: $this->calculator->weekParity($this->state->config($graph), $source));
-        });
+
+            return $this->saveSnapshot($owner, $graph, $date, 'working_saturday', $values['copied_weekday'], $lessons,
+                sourceWeekParity: $this->calculator->weekParity($this->state->config($graph), $source), previewOnly: $previewOnly);
+        }, $previewOnly);
     }
 
-    public function deleteException(User $user, SemesterSchedule $schedule, string $date, array $values): array
+    public function deleteException(User $user, SemesterSchedule $schedule, string $date, array $values, bool $previewOnly = false): array
     {
-        return $this->write($user, $schedule, $values, function ($owner, $graph) use ($date): void {
+        return $this->write($user, $schedule, $values, function ($owner, $graph, bool $previewOnly) use ($date) {
             $exception = $graph['exceptions']->first(fn ($row) => $row->occurs_on->format('Y-m-d') === $date) ?? abort(404);
             $candidate = $graph;
             unset($candidate['snapshots'][$date]);
             $this->validate($owner, $candidate);
+            if ($previewOnly) {
+                return $candidate;
+            }
             $this->check($exception->delete());
-        });
+        }, $previewOnly);
     }
 
-    private function saveSnapshot(User $owner, array $graph, string $date, string $kind, ?int $copied, array $lessons, $existing = null, ?string $sourceWeekParity = null): void
+    private function saveSnapshot(User $owner, array $graph, string $date, string $kind, ?int $copied, array $lessons, $existing = null, ?string $sourceWeekParity = null, bool $previewOnly = false): ?array
     {
         foreach ($lessons as $index => &$lesson) {
             $this->references($graph, $lesson);
@@ -278,6 +333,9 @@ class SemesterScheduleManagementService
         $candidate['snapshots'][$date] = ['id' => $existing?->id ?? 0, 'occurs_on' => $date, 'kind' => $kind,
             'copied_weekday' => $copied, 'source_week_parity' => $existing?->source_week_parity ?? $sourceWeekParity, 'lessons' => $lessons];
         $this->validate($owner, $candidate);
+        if ($previewOnly) {
+            return $candidate;
+        }
         $exception = $existing ?? $graph['schedule']->dateExceptions()->make(['user_id' => $owner->id,
             'occurs_on' => $date, 'kind' => $kind, 'copied_weekday' => $copied, 'source_week_parity' => $sourceWeekParity]);
         if (! $exception->exists) {
@@ -299,6 +357,8 @@ class SemesterScheduleManagementService
             $this->check($model->save());
             $this->lessonTeachers->sync($model, $lesson['teacher_id']);
         }
+
+        return null;
     }
 
     private function lessonFields(array $row): array
@@ -338,11 +398,21 @@ class SemesterScheduleManagementService
         }
     }
 
-    private function write(User $user, SemesterSchedule $schedule, array $values, Closure $operation): array
+    private function write(User $user, SemesterSchedule $schedule, array $values, Closure $operation, bool $previewOnly = false): array
     {
-        return DB::transaction(function () use ($user, $schedule, $values, $operation): array {
+        return DB::transaction(function () use ($user, $schedule, $values, $operation, $previewOnly): array {
+            if ($previewOnly) {
+                $owner = User::findOrFail($user->id);
+                $target = $owner->semesterSchedules()->findOrFail($schedule->id);
+                $graph = $this->state->load($owner, $target->academic_period_id);
+                if (! hash_equals($this->state->fingerprint($owner, $graph), $values['schedule_token'])) {
+                    throw new ConflictHttpException('The semester schedule changed.');
+                }
+
+                return $operation($owner, $graph, true);
+            }
             [$owner, $graph] = $this->locked($user, $schedule, $values['schedule_token']);
-            if ($operation($owner, $graph) !== false) {
+            if ($operation($owner, $graph, false) !== false) {
                 $graph['schedule']->management_revision++;
                 $this->check($graph['schedule']->save());
             }

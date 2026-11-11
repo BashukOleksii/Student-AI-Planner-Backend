@@ -16,6 +16,8 @@ use App\Services\AI\Actions\PlanningActionArgumentValidator;
 use App\Services\AI\Actions\PlanningActionConsent;
 use App\Services\AI\Actions\PlanningActionRegistry;
 use App\Services\AI\Actions\PlanningActionService;
+use App\Services\AI\Actions\SemesterActionRegistry;
+use App\Services\AI\Actions\SemesterActionService;
 use App\Services\AI\Actions\SubtaskReminderActionRegistry;
 use App\Services\AI\Actions\SubtaskReminderActionService;
 use App\Services\AI\Actions\TaskActionProposalService;
@@ -25,6 +27,7 @@ use App\Services\AI\AgentOrchestrator;
 use App\Services\AI\LlmProvider;
 use App\Services\AI\OpenAiToolSchema;
 use App\Services\AI\Tools\ManagementReadTools;
+use App\Services\AI\Tools\SemesterReadTools;
 use App\Services\AI\Tools\ToolExecutor;
 use App\Services\AI\Tools\ToolRegistry;
 use App\Services\Planning\AvailabilityOccurrenceService;
@@ -190,7 +193,7 @@ class PlanningActionTest extends TestCase
         $reads = $this->createMock(ToolExecutor::class);
         $reads->expects($this->never())->method('execute');
         $agent = new AgentOrchestrator($provider, new ToolRegistry, $reads, $this->limits(), new TaskActionRegistry, $tasks,
-            new SubtaskReminderActionRegistry, $management, $this->createMock(ManagementReadTools::class), new PlanningActionRegistry, $planning, new LessonActionRegistry, $this->createMock(LessonActionService::class), new AvailabilityActionRegistry, $this->createMock(AvailabilityActionService::class));
+            new SubtaskReminderActionRegistry, $management, $this->createMock(ManagementReadTools::class), new PlanningActionRegistry, $planning, new LessonActionRegistry, $this->createMock(LessonActionService::class), new AvailabilityActionRegistry, $this->createMock(AvailabilityActionService::class), new SemesterActionRegistry, $this->createMock(SemesterActionService::class), $this->createMock(SemesterReadTools::class));
         $owner = new User;
         $owner->timezone = 'UTC';
         $this->expectException(AiAgentException::class);

@@ -83,6 +83,20 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
         $exceptions->render(function (Throwable $exception, Request $request) {
+            if ($request->is('api/academic-calendar/*')) {
+                if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
+                    return null;
+                }
+                if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                }
+                if ($exception instanceof InvalidArgumentException) {
+                    return response()->json(['message' => 'The saved academic calendar configuration is inconsistent.'], 409);
+                }
+
+                return response()->json(['message' => 'The academic calendar could not be processed.'], 500);
+            }
+
             if ($request->is('api/semester-schedule-imports', 'api/semester-schedule-imports/*')) {
                 if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
                     return null;

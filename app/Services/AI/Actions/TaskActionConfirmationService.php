@@ -18,7 +18,8 @@ class TaskActionConfirmationService
         private SubtaskReminderActionRegistry $additional, private SubtaskReminderActionService $management,
         private PlanningActionRegistry $planningRegistry, private PlanningActionService $planning,
         private LessonActionRegistry $lessonRegistry, private LessonActionService $lessons,
-        private AvailabilityActionRegistry $availabilityRegistry, private AvailabilityActionService $availability) {}
+        private AvailabilityActionRegistry $availabilityRegistry, private AvailabilityActionService $availability,
+        private SemesterActionRegistry $semesterRegistry, private SemesterActionService $semesters) {}
 
     public function query(User $owner, string $conversation)
     {
@@ -81,6 +82,8 @@ class TaskActionConfirmationService
                     $receipt = $this->lessons->execute($owner, $action);
                 } elseif ($this->availabilityRegistry->find($action->type) !== null) {
                     $receipt = $this->availability->execute($owner, $action);
+                } elseif ($this->semesterRegistry->find($action->type) !== null) {
+                    $receipt = $this->semesters->execute($owner, $action);
                 } elseif ($this->additional->find($action->type) !== null) {
                     $receipt = $this->management->execute($owner, $action);
                 } else {
@@ -162,10 +165,14 @@ class TaskActionConfirmationService
             default => 'Task action expired. No task was changed.',
         };
         if (! str_starts_with($action->type, 'propose_task_')) {
-            $domain = $this->planningRegistry->find($action->type) !== null ? 'Planning'
-                : ($this->lessonRegistry->find($action->type) !== null ? 'Lesson'
-                    : ($this->availabilityRegistry->find($action->type) !== null ? 'Availability'
-                        : (str_starts_with($action->type, 'propose_subtask_') ? 'Subtask' : 'Reminder')));
+            $domain = match (true) {
+                $this->semesterRegistry->find($action->type) !== null => 'Semester',
+                $this->planningRegistry->find($action->type) !== null => 'Planning',
+                $this->lessonRegistry->find($action->type) !== null => 'Lesson',
+                $this->availabilityRegistry->find($action->type) !== null => 'Availability',
+                str_starts_with($action->type, 'propose_subtask_') => 'Subtask',
+                default => 'Reminder',
+            };
             $content = $domain.' action '.$action->status.'.'.($action->status === 'executed' ? '' : ' No business data was changed.');
         }
         $message = $conversation->messages()->create(['role' => 'assistant', 'content' => $content,

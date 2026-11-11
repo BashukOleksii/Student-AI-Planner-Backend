@@ -1,5 +1,7 @@
 # Business Rules
 
+Unified calendar reads and semester AI edits now use the existing effective source and projected management validation rules. One-date changes freeze a complete snapshot; recurring edits preserve existing frozen dates. Academic edits never silently replan study sessions. All AI semester writes require existing authenticated confirmation; see [the current contract](unified-academic-calendar.md).
+
 Stage 4 enforces [semester management rules](semester-schedule-management.md): stale graph writes conflict; complete projected semesters are validated; snapshots remain independent; manually deleted slots cannot be recreated by import until explicitly released. Real changes increment a revision, so edit/revert cannot revive an old preview. Historical receipts remain immutable.
 
 The new [semester import contract](semester-schedule-import.md) requires explicit revision-bound confirmation, exact owned catalog resolution, full projected conflict/timezone checks and atomic application. Protected manual/edited rows and independent snapshots survive re-import. Legacy concrete import rules below remain unchanged.

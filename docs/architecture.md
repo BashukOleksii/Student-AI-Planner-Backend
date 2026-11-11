@@ -1,5 +1,7 @@
 # Backend Architecture
 
+Unified academic-calendar REST reads now share the authoritative effective calendar with AI and planning. Confirmed semester AI actions reuse management projection validation and the existing pending-action/receipt workflow. Earlier stage summaries below describe their historical scope; see [the current contract](unified-academic-calendar.md) and [ADR-011](decisions/ADR-011-unified-calendar-and-ai-semester-actions.md).
+
 Stage 4 adds owner-serialized [semester management](semester-schedule-management.md), shared import/management graph loading, optimistic graph tokens with a monotonic revision, frozen snapshot writers and explicit suppressed-slot release. See [ADR-008](decisions/ADR-008-semester-schedule-management.md); legacy consumers remain unchanged.
 
 Stage 3 adds a separate confirmed [recurring semester import](semester-schedule-import.md), with persisted revisions, owner-locked stale checks and atomic reconciliation. Legacy import and planning/AI consumers remain separate; see [ADR-007](decisions/ADR-007-semester-schedule-import.md).

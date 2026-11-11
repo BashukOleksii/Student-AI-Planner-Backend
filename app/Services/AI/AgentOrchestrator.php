@@ -10,11 +10,14 @@ use App\Services\AI\Actions\LessonActionRegistry;
 use App\Services\AI\Actions\LessonActionService;
 use App\Services\AI\Actions\PlanningActionRegistry;
 use App\Services\AI\Actions\PlanningActionService;
+use App\Services\AI\Actions\SemesterActionRegistry;
+use App\Services\AI\Actions\SemesterActionService;
 use App\Services\AI\Actions\SubtaskReminderActionRegistry;
 use App\Services\AI\Actions\SubtaskReminderActionService;
 use App\Services\AI\Actions\TaskActionProposalService;
 use App\Services\AI\Actions\TaskActionRegistry;
 use App\Services\AI\Tools\ManagementReadTools;
+use App\Services\AI\Tools\SemesterReadTools;
 use App\Services\AI\Tools\ToolExecutor;
 use App\Services\AI\Tools\ToolRegistry;
 use Carbon\CarbonImmutable;
@@ -25,13 +28,14 @@ class AgentOrchestrator
         private SubtaskReminderActionService $management, private ManagementReadTools $managementReads,
         private PlanningActionRegistry $planningRegistry, private PlanningActionService $planning,
         private LessonActionRegistry $lessonRegistry, private LessonActionService $lessons,
-        private AvailabilityActionRegistry $availabilityRegistry, private AvailabilityActionService $availability) {}
+        private AvailabilityActionRegistry $availabilityRegistry, private AvailabilityActionService $availability,
+        private SemesterActionRegistry $semesterRegistry, private SemesterActionService $semesters, private SemesterReadTools $semesterReads) {}
 
     public function run(User $owner, array $history, string $content, ?callable $assertCurrent = null): array
     {
         $started = microtime(true);
         $instructions = $this->instructions($owner);
-        $definitions = [...$this->registry->definitions(), ...$this->actions->definitions(), ...$this->managementRegistry->readDefinitions(), ...$this->managementRegistry->definitions(), ...$this->planningRegistry->definitions(), ...$this->lessonRegistry->definitions(), ...$this->availabilityRegistry->definitions()];
+        $definitions = [...$this->registry->definitions(), ...$this->actions->definitions(), ...$this->managementRegistry->readDefinitions(), ...$this->managementRegistry->definitions(), ...$this->planningRegistry->definitions(), ...$this->lessonRegistry->definitions(), ...$this->availabilityRegistry->definitions(), ...$this->semesterRegistry->readDefinitions(), ...$this->semesterRegistry->definitions()];
         $proposal = null;
         $proposalCalls = 0;
         $proposalDomain = null;
@@ -79,7 +83,7 @@ class AgentOrchestrator
                 }
                 $seen[$call['id']] = true;
             }
-            $proposalCalls += count(array_filter($calls, fn ($call) => $this->actions->find($call['name']) !== null || $this->managementRegistry->find($call['name']) !== null || $this->planningRegistry->find($call['name']) !== null || $this->lessonRegistry->find($call['name']) !== null || $this->availabilityRegistry->find($call['name']) !== null));
+            $proposalCalls += count(array_filter($calls, fn ($call) => $this->actions->find($call['name']) !== null || $this->managementRegistry->find($call['name']) !== null || $this->planningRegistry->find($call['name']) !== null || $this->lessonRegistry->find($call['name']) !== null || $this->availabilityRegistry->find($call['name']) !== null || $this->semesterRegistry->find($call['name']) !== null));
             if ($proposalCalls > 1) {
                 throw new AiAgentException('multiple_actions');
             }
@@ -145,6 +149,13 @@ class AgentOrchestrator
                     $prepared = $this->availability->prepare($owner, $call['name'], $call['arguments'], $call['id']);
                     $proposal = $prepared['proposal'];
                     $result = $prepared['result'];
+                } elseif ($this->semesterRegistry->find($call['name']) !== null) {
+                    $proposalDomain = 'semester';
+                    $prepared = $this->semesters->prepare($owner, $call['name'], $call['arguments'], $call['id']);
+                    $proposal = $prepared['proposal'];
+                    $result = $prepared['result'];
+                } elseif ($this->semesterRegistry->findRead($call['name']) !== null) {
+                    $result = $this->semesterReads->execute($owner, $call['name'], $call['arguments']);
                 } elseif ($this->managementRegistry->findRead($call['name']) !== null) {
                     $result = $this->managementReads->execute($owner, $call['name'], $call['arguments']);
                 } else {
@@ -175,9 +186,12 @@ Planning and rescheduling proposals use deterministic server Services; only the 
 You cannot delete work, reorder subtasks, deliver reminders or mutate the inbox. Ask for clarification
 rather than invent Subject, Teacher, Academic Period or Lesson IDs, ambiguous dates, or a clock time for a date-only request.
 Lesson create/replacement require explicit exact Subject ID, type and both whole-second UTC instants.
-The legacy Lesson action tools create, update, cancel and replace numeric legacy Lesson records only. They never edit semester rules or occurrence IDs. Do not create a legacy Lesson to work around a requested semester edit; explain that semester schedule changes use the semester management interface. Independent legacy Lesson actions remain available with explicit confirmation.
+The legacy Lesson action tools create, update, cancel and replace numeric legacy Lesson records only. They never edit semester rules or occurrence IDs. Do not create a legacy Lesson to work around a requested semester edit; use the registered semester proposal tools after resolving the exact owned schedule and target. Independent legacy Lesson actions remain available with explicit confirmation.
 Use owned IDs grounded in successful reads or explicit user input; ask for unknown IDs or ambiguous matches.
-Never silently select association IDs. No academic catalog discovery tool is available; clarify missing catalog IDs.
+Never silently select association IDs. Use search_academic_catalog for owned subject/teacher names; multiple matches require clarification. Use list_semester_schedules and get_semester_schedule_context to discover schedules and definitions. Never invent IDs. Suppressed slots are intentional removals: direct the student to explicit manual suppression release before trying to recreate one; never bypass them with a legacy Lesson.
+Semester changes require explicit scope: one occurrence, an entire recurring rule, a whole date, or semester settings. Fetch current effective occurrences for occurrence edits. occurrence_id must be the returned virtual semester identity (id/source_identity) and must match the supplied schedule and local date; it is never a legacy Lesson ID.
+Use propose_semester_occurrence_update/cancel for exactly one date occurrence, preserving all other lessons. Use propose_semester_rule_create/update/delete for recurring changes; frozen dates remain independent. Use propose_semester_date_replace only for an explicitly requested whole-day arrangement; replace requires a complete intended lesson list and an empty list cancels that entire day. copy_base deliberately resets to the recurring base before changes; clarify that intent when a saved exception exists. Date deletion restores base lessons, it does not cancel them. Working Saturday proposals require explicit copy weekday and optional explicit source parity/rule selection. Semester settings changes can affect parity throughout the semester; never infer them from a request to move one lesson.
+Local lesson times are exact HH:MM:SS in the persisted timezone. Clarify ambiguous dates/times and missing subject/teacher references. A classification may remain null; never infer it. Proposal previews validate deterministic semester rules and show before/after data; no preview or conversational yes writes academic records. Existing study sessions are not automatically rescheduled after calendar edits; explain this and use separate planning diagnostics/replanning proposals when requested.
 Convert unambiguous local instants to UTC using the persisted timezone; clarify DST ambiguity.
 Lesson cancellation retains history; replacement retires only the original. Neither operation replans study sessions.
 Propose at most ONE mutation action per turn across all domains, including planning and rescheduling; ask the student to choose when multiple actions are requested.
@@ -196,7 +210,7 @@ list_study_availability_windows reads recurring local weekly availability window
 find_free_study_slots calculates free time considering the existing schedule and study reservations.
 get_study_recovery_overview reads deterministic recovery diagnostics for a selected 1–31 day local period and optional owned task/subtask scope. Use its remaining-effort metrics, exclusions, warnings and bounded missed/past-planned session lists; never calculate remaining effort or free time yourself. A status of missed is distinct from a past session still marked planned. When a past planned session requires a lifecycle decision, ask whether the student completed or missed it; do not classify it or prepare a new recovery plan until that decision is resolved. Expired deadlines remain excluded by planning Services: explain the exclusion, do not move the deadline or claim an extension.
 For a clear request to recover eligible work, use get_study_recovery_overview first. If a past session remains planned, ask whether the student completed or missed it; after their explicit answer, use propose_session_complete or propose_session_mark_missed for that one session and require authenticated confirmation. Never infer a missed/completed state from the date or claim it changed before confirmation. On a later turn after a lifecycle action is confirmed, fetch fresh recovery diagnostics before proposing a replacement plan. Then use propose_study_plan_create only when the fresh overview shows a safe, actionable proposal and no unresolved lifecycle decision. Explain partial allocation and deadline restrictions. The proposal is not saved until the existing authenticated confirmation succeeds; never claim sessions were created before then. Changing a recorded deadline is a separate explicit action.
-get_schedule_for_date returns the effective schedule for the requested date in the persisted timezone: semester rules with numerator/denominator parity, replacements, cancellations, extra lessons and working Saturdays, together with independent active legacy Lessons. Its source selection is the same calendar service used by find_free_study_slots; every current class occupies time for independent study, including laboratory and practical classes. Use each semester occurrence's returned type as its saved classification, including date-specific replacements and working Saturday snapshots; do not substitute a recurring rule's type for that occurrence. Describe supported returned values (lecture, laboratory, practical, seminar, consultation, exam, other) accurately. When type is null, explicitly say that the lesson is unclassified; never infer a missing type from subject, teacher, room, parity or pair number. Semester occurrence identities are virtual read-only strings, never legacy Lesson IDs; preserve the distinction between semester occurrences and numeric legacy Lessons. Schedule reads never mutate business data. For “tomorrow” or another relative date, use the trusted local date/time and call get_schedule_for_date; for combined class/free-time questions, call both tools and report their results without calculating free time yourself. Semester edits are not supported by legacy Lesson actions; direct the student to semester management.
+get_schedule_for_date returns the effective schedule for the requested date in the persisted timezone: semester rules with numerator/denominator parity, replacements, cancellations, extra lessons and working Saturdays, together with independent active legacy Lessons. Its source selection is the same calendar service used by find_free_study_slots; every current class occupies time for independent study, including laboratory and practical classes. Use each semester occurrence's returned type as its saved classification, including date-specific replacements and working Saturday snapshots; do not substitute a recurring rule's type for that occurrence. Describe supported returned values (lecture, laboratory, practical, seminar, consultation, exam, other) accurately. When type is null, explicitly say that the lesson is unclassified; never infer a missing type from subject, teacher, room, parity or pair number. Semester occurrence identities are virtual read-only strings, never legacy Lesson IDs; preserve the distinction between semester occurrences and numeric legacy Lessons. Schedule reads never mutate business data. For “tomorrow” or another relative date, use the trusted local date/time and call get_schedule_for_date; for combined class/free-time questions, call both tools and report their results without calculating free time yourself. Semester edits use only the registered semester proposal tools and authenticated confirmation.
 A successful availability read does not authorize modifying availability.
 Use list_study_availability_windows to discover exact owned window IDs before update/delete proposals.
 Clarify ambiguous weekdays, local clock times or target matches; never invent missing availability values.

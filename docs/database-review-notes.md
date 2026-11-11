@@ -1,5 +1,7 @@
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
+AI semester actions add one forward-only action-type CHECK extension, preserving all prior types, states and receipts. No new table/column or old migration change is needed. Migration execution and MySQL verification are deferred; see [the contract](unified-academic-calendar.md).
+
 Stage 4 adds one [forward management migration](semester-schedule-management.md#schedule-deletion-deployment-and-limits) for a monotonic schedule revision, permanent manual rule flag and owned suppressed slots. No legacy deletion intent is inferred. Guarded downgrade preserves revisions/protections; existing migrations and retained application data are unchanged.
 
 The Stage 3 [semester import](semester-schedule-import.md) cannot reuse legacy `source_import_batch_id`, which references concrete Lesson import history. Its additive table and separate nullable provenance preserve that FK contract and existing data; retained import-history downgrade refuses.
