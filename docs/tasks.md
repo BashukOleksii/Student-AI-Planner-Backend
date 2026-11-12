@@ -123,7 +123,8 @@ TaskResource fields remain unchanged; Subtasks/progress are not exposed.
 
 POST with only `title` succeeds. Subject, estimate and deadline are optional;
 past deadlines are permitted. Omitted PATCH fields retain their persisted
-values. Explicit null clears nullable fields. Empty or whitespace-only deadlines
+values, except for the derived estimate described below. Explicit null clears
+nullable fields, subject to the same estimate rule. Empty or whitespace-only deadlines
 are rejected rather than interpreted as null; offset/fractional timestamps are
 also rejected. Ordinary text input follows Laravel trimming.
 
@@ -132,6 +133,33 @@ Ownership comes exclusively from authentication. Internal attributes including
 on the create/PATCH endpoints. Creation uses pending status, normal priority and null
 completion metadata. PATCH preserves status and completion metadata, including
 already completed Tasks. Lifecycle changes use only the dedicated endpoints below.
+
+### Task estimates derived from subtasks
+
+Without active (non-soft-deleted) subtasks, `estimated_minutes` is a manually
+editable nullable integer. With any active subtasks, it is their total estimate,
+including completed subtasks; any null child estimate makes the parent estimate
+null. Positions and completion/reopening do not affect this calculation.
+
+Subtask creation, PATCH and deletion synchronize the parent in the existing
+owner/parent-locked transaction. Deleting the last child preserves its derived
+estimate (including null) as the parent's initial manual estimate. This also
+repairs a legacy parent before its last child is removed. Task PATCH validates
+any explicitly supplied estimate against the current derived value and returns
+Laravel HTTP 422 errors under `estimated_minutes` for a mismatch. Omitting the
+field permits other edits and synchronizes legacy estimates on that Task.
+Read requests do not repair stored values; no bulk backfill is performed.
+
+The existing MySQL estimate capacity remains 65535 minutes. An operation whose
+fully known child total exceeds that limit fails with HTTP 422 and rolls back
+the entire mutation, rather than truncating the total or storing zero/null.
+REST and confirmed AI actions share these Services and rules. No response field
+or lifecycle/status contract changes.
+
+Planning continues to select active children instead of their parent whenever
+children exist. The stored parent total is not additional schedulable effort.
+Unknown child estimates remain `missing_estimate` exclusions with null effort;
+known eligible siblings remain independently schedulable.
 
 ## Completion and reopening
 

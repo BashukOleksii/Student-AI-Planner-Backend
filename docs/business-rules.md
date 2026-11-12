@@ -213,6 +213,17 @@ Every task belongs to one user. T3 lists only that authenticated owner's non-del
 **BR-TSK-002 — Planning estimate requirement**  
 A task may exist without a complete planning estimate if the product allows it, but automatic scheduling requires a positive remaining duration. Stage A excludes missing-estimate units with `missing_estimate`, preserving null effort bounds and known credit/reservations without defaults.
 
+The task estimate is manually editable only without active (non-soft-deleted)
+subtasks. Otherwise it equals the sum of all active child estimates, including
+completed children, or null when any child estimate is unknown. Subtask creation,
+editing and deletion synchronize it atomically under existing owner/parent locks;
+Task PATCH also enforces and synchronizes the derived value. A conflicting explicit
+parent estimate returns 422. Removing the last child retains the last derived
+value for subsequent manual editing, including when repairing a legacy parent.
+Completion/reopening and ordering do not change estimates. Fully known totals
+above the existing 65535-minute storage limit reject the mutation atomically.
+See [the Task estimate contract](tasks.md#task-estimates-derived-from-subtasks).
+
 **BR-TSK-003 — Deadline semantics**  
 When a deadline exists, no generated study session for the task may end after that deadline. C9 diagnostics use the nullable owned active Task deadline and accept end equality; historical candidates are allowed without authorizing past creation.
 

@@ -18,15 +18,23 @@ class SubtaskService
 {
     private const EDITABLE_FIELDS = ['title', 'description', 'estimated_minutes', 'deadline_at'];
 
-    public function __construct(private TaskDependencyCleanupService $cleanup, private ReminderSynchronizationService $reminders) {}
+    public function __construct(private TaskDependencyCleanupService $cleanup, private ReminderSynchronizationService $reminders,
+        private TaskEstimateService $estimates) {}
 
     public function delete(User $user, Task $task, Subtask $subtask): void
     {
         DB::transaction(function () use ($user, $task, $subtask): void {
             $task = $this->lockParent($user, $task);
             $subtask = $task->subtasks()->lockForUpdate()->findOrFail($subtask->getKey());
+            if (! $task->subtasks()->where('id', '!=', $subtask->getKey())->exists()) {
+                // Preserve the last derived estimate, including for an unsynchronized legacy parent.
+                $this->estimates->synchronize($task);
+            }
             $this->cleanup->cancel($user, $task, [$subtask->getKey()]);
-            $subtask->delete();
+            if (! $subtask->delete()) {
+                throw new ReminderIntegrityException;
+            }
+            $this->estimates->synchronize($task);
         });
     }
 
@@ -56,9 +64,12 @@ class SubtaskService
                 throw ValidationException::withMessages(['position' => ['No append position remains for this task.']]);
             }
 
-            return $task->subtasks()->create([
+            $subtask = $task->subtasks()->create([
                 ...$candidate, 'position' => $position, 'status' => TaskStatus::Pending, 'completed_at' => null,
-            ])->refresh();
+            ]);
+            $this->estimates->synchronize($task);
+
+            return $subtask->refresh();
         });
     }
 
@@ -72,6 +83,7 @@ class SubtaskService
             if (! $subtask->update($candidate)) {
                 throw new ReminderIntegrityException;
             }
+            $this->estimates->synchronize($task);
             if ($deadline !== $subtask->getRawOriginal('deadline_at')) {
                 $this->reminders->deadlineChanged($user, $task, $subtask);
             }

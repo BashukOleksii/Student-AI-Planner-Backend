@@ -19,7 +19,8 @@ class TaskService
 {
     private const EDITABLE_FIELDS = ['title', 'description', 'subject_id', 'priority', 'estimated_minutes', 'deadline_at'];
 
-    public function __construct(private TaskDependencyCleanupService $cleanup, private ReminderSynchronizationService $reminders) {}
+    public function __construct(private TaskDependencyCleanupService $cleanup, private ReminderSynchronizationService $reminders,
+        private TaskEstimateService $estimates) {}
 
     public function delete(User $user, Task $task): void
     {
@@ -189,6 +190,18 @@ class TaskService
                 : CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $deadline, 'UTC');
         }
         $candidate = array_replace($candidate, $this->editableValues($values));
+        if ($task !== null) {
+            $resolved = $this->estimates->resolve($task);
+            if ($resolved['has_subtasks']) {
+                if (array_key_exists('estimated_minutes', $values)
+                    && $values['estimated_minutes'] !== $resolved['estimated_minutes']) {
+                    throw ValidationException::withMessages([
+                        'estimated_minutes' => ['The task estimate is derived from its active subtasks and cannot be overwritten.'],
+                    ]);
+                }
+                $candidate['estimated_minutes'] = $resolved['estimated_minutes'];
+            }
+        }
         $this->validateCandidate($user, $candidate, $task, $lock);
 
         return $candidate;
