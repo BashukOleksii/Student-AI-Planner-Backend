@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-#[Fillable(['user_id', 'semester_schedule_id', 'schedule_date_exception_id', 'pair_number', 'pair_label', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'room', 'lesson_type', 'source_weekly_rule_id'])]
+#[Fillable(['user_id', 'semester_schedule_id', 'schedule_date_exception_id', 'pair_number', 'pair_label', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'room', 'lesson_type', 'source_weekly_rule_id', 'is_added'])]
 class ScheduleDateExceptionLesson extends Model
 {
     use HasSemesterTeachers;
@@ -54,6 +54,7 @@ class ScheduleDateExceptionLesson extends Model
     {
         return [
             'pair_number' => 'integer',
+            'is_added' => 'boolean',
             'lesson_type' => LessonType::class,
         ];
     }

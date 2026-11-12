@@ -3,23 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreScheduleImportRequest;
 use App\Http\Resources\ScheduleImportBatchResource;
 use App\Models\ScheduleImportBatch;
-use App\Services\Imports\ScheduleImportCommitService;
-use App\Services\Imports\ScheduleImportPreviewRevalidator;
-use App\Services\Imports\ScheduleImportPreviewService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
 class ScheduleImportController extends Controller
 {
-    public function store(StoreScheduleImportRequest $request, ScheduleImportPreviewService $service): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $batch = $service->create($request->user(), $request->validated('academic_period_id'), $request->file('schedule_file'));
-
-        return (new ScheduleImportBatchResource($batch))->response()->setStatusCode(201);
+        $this->unavailable();
     }
 
     public function show(ScheduleImportBatch $scheduleImportBatch): ScheduleImportBatchResource
@@ -30,22 +24,20 @@ class ScheduleImportController extends Controller
         return new ScheduleImportBatchResource($scheduleImportBatch);
     }
 
-    public function revalidate(Request $request, ScheduleImportBatch $scheduleImportBatch, ScheduleImportPreviewRevalidator $service): ScheduleImportBatchResource
+    public function revalidate(Request $request, ScheduleImportBatch $scheduleImportBatch): ScheduleImportBatchResource
     {
         Gate::authorize('revalidate', $scheduleImportBatch);
-
-        return new ScheduleImportBatchResource($service->revalidate($request->user(), $scheduleImportBatch));
+        $this->unavailable();
     }
 
-    public function commit(Request $request, ScheduleImportBatch $scheduleImportBatch, ScheduleImportCommitService $service): JsonResponse
+    public function commit(Request $request, ScheduleImportBatch $scheduleImportBatch): JsonResponse
     {
         Gate::authorize('commit', $scheduleImportBatch);
-        $result = $service->commit($request->user(), $scheduleImportBatch);
-        $resource = new ScheduleImportBatchResource($result['batch']);
-        if ($result['preview_changed']) {
-            $resource->additional(['message' => 'The import preview changed. Review it and confirm again.']);
-        }
+        $this->unavailable();
+    }
 
-        return $resource->response()->setStatusCode($result['preview_changed'] ? 409 : 200);
+    private function unavailable(): never
+    {
+        abort(410, 'Dated lesson imports are no longer available. Add individual lessons manually or use semester schedule imports.');
     }
 }

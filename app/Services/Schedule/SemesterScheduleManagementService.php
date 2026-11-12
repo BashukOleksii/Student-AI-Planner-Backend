@@ -233,7 +233,7 @@ class SemesterScheduleManagementService
                         continue;
                     }
                     $lessons[] = [...$this->lessonFields($this->mergeLessonFields($rule->only(self::LESSON_FIELDS), Arr::only($change, self::LESSON_FIELDS))),
-                        'source_weekly_rule_id' => $rule->id];
+                        'source_weekly_rule_id' => $rule->id, 'is_added' => false];
                 }
                 if ($changes->isNotEmpty()) {
                     $this->invalid('changes', 'Every changed rule must occur in the selected base day.');
@@ -248,7 +248,8 @@ class SemesterScheduleManagementService
                     $row['lesson_type'] = $old->lesson_type?->value;
                 }
                 $lessons[] = [...$this->lessonFields($row), 'id' => $old?->id,
-                    'source_weekly_rule_id' => $old?->source_weekly_rule_id, 'created_at' => $old?->getRawOriginal('created_at')];
+                    'source_weekly_rule_id' => $old?->source_weekly_rule_id,
+                    'is_added' => $old === null ? true : $old->is_added, 'created_at' => $old?->getRawOriginal('created_at')];
             }
 
             return $this->saveSnapshot($owner, $graph, $date, $existing?->kind ?? 'replacement', $existing?->copied_weekday, $lessons, $existing, previewOnly: $previewOnly);
@@ -283,7 +284,7 @@ class SemesterScheduleManagementService
                     $this->invalid('selected_weekly_rule_ids', 'Every selected rule must belong to this semester and match the chosen weekday and parity.');
                 }
                 $lessons = $eligible->whereIn('id', $selected)->map(fn ($rule) => [
-                    ...$rule->only(self::LESSON_FIELDS), 'source_weekly_rule_id' => $rule->id,
+                    ...$rule->only(self::LESSON_FIELDS), 'source_weekly_rule_id' => $rule->id, 'is_added' => false,
                 ])->values()->all();
                 $lessons = array_map($this->normalizeLessonType(...), $lessons);
 
@@ -299,7 +300,8 @@ class SemesterScheduleManagementService
                 $origin = $row['weekly_lesson_rule_id'] !== null ? $graph['rules']->find($row['weekly_lesson_rule_id'])
                     : $graph['lessons']->where('schedule_date_exception_id', $graph['snapshots'][$source]['id'])->firstWhere('pair_number', $row['pair_number']);
                 $lessons[] = [...$origin->only(self::LESSON_FIELDS),
-                    'source_weekly_rule_id' => $row['weekly_lesson_rule_id'] ?? $origin->source_weekly_rule_id];
+                    'source_weekly_rule_id' => $row['weekly_lesson_rule_id'] ?? $origin->source_weekly_rule_id,
+                    'is_added' => $row['weekly_lesson_rule_id'] !== null ? false : $origin->is_added];
             }
             $lessons = array_map($this->normalizeLessonType(...), $lessons);
 
@@ -349,7 +351,8 @@ class SemesterScheduleManagementService
         foreach ($lessons as $lesson) {
             $model = new ScheduleDateExceptionLesson(['user_id' => $owner->id, 'semester_schedule_id' => $graph['schedule']->id,
                 'schedule_date_exception_id' => $exception->id, ...Arr::except($this->lessonFields($lesson), ['teacher_ids']),
-                'source_weekly_rule_id' => $lesson['source_weekly_rule_id'] ?? null]);
+                'source_weekly_rule_id' => $lesson['source_weekly_rule_id'] ?? null,
+                'is_added' => $lesson['is_added'] ?? null]);
             if ($lesson['id'] > 0) {
                 $model->id = $lesson['id'];
                 $model->created_at = $lesson['created_at'];

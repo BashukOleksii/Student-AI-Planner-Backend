@@ -132,6 +132,7 @@ class EffectiveScheduleCalculator
                 'occurrence_id' => 'semester:'.$schedule['id'].':'.$date.':'.($snapshot === null ? 'rule:' : 'snapshot:').$row['id'],
                 'occurs_on' => $date,
                 'source' => $source,
+                'change_kind' => $this->changeKind($row, $rules, $snapshot, (int) $day->format('N'), $parity),
                 'weekly_lesson_rule_id' => $snapshot === null ? $row['id'] : null,
                 'schedule_date_exception_id' => $snapshot['id'] ?? null,
                 'pair_number' => $row['pair_number'],
@@ -155,6 +156,50 @@ class EffectiveScheduleCalculator
         }
 
         return $result;
+    }
+
+    /** Provenance, rather than a matching pair number, identifies the original rule. */
+    private function changeKind(array $lesson, array $rules, ?array $snapshot, int $weekday, string $parity): ?string
+    {
+        if ($snapshot === null) {
+            return 'base';
+        }
+        $sourceId = $lesson['source_weekly_rule_id'] ?? null;
+        if ($sourceId === null) {
+            // Null also represents detached/deleted rules in historical snapshots.
+            return ($lesson['is_added'] ?? null) === true ? 'added' : null;
+        }
+        $originals = array_values(array_filter($rules, fn ($rule) => (int) $rule['id'] === (int) $sourceId));
+        if (count($originals) !== 1) {
+            return null;
+        }
+        $rule = $originals[0];
+        $sourceWeekday = $snapshot['kind'] === 'working_saturday' ? $snapshot['copied_weekday'] : $weekday;
+        $sourceParity = $snapshot['source_week_parity'] ?? $parity;
+        if ($rule['weekday'] !== $sourceWeekday || ! in_array($rule['week_pattern'], ['all', $sourceParity], true)) {
+            return 'modified';
+        }
+
+        return $this->comparableLesson($lesson) === $this->comparableLesson($rule) ? 'base' : 'modified';
+    }
+
+    private function comparableLesson(array $lesson): array
+    {
+        $teachers = $lesson['teacher_ids'] ?? [];
+        if (isset($lesson['teacher_id'])) {
+            $teachers[] = $lesson['teacher_id'];
+        }
+        $teachers = array_values(array_unique(array_map('intval', $teachers)));
+        sort($teachers, SORT_NUMERIC);
+        $text = static fn ($value) => ($value === null || trim($value) === '') ? null : trim($value);
+
+        return [
+            (int) $lesson['pair_number'], $text($lesson['pair_label'] ?? null),
+            (int) $lesson['subject_id'], $teachers,
+            $text($lesson['lesson_type'] ?? null), $text($lesson['room'] ?? null),
+            // Inputs have already passed the canonical HH:MM:SS validation.
+            $lesson['starts_at_local'], $lesson['ends_at_local'],
+        ];
     }
 
     /** Validate both weeks, including days other than the requested date. */

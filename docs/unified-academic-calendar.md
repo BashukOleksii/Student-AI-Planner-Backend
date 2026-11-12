@@ -24,6 +24,7 @@ Responses use `AcademicCalendarLessonResource`:
     "source_type": "semester_occurrence",
     "occurrence_id": "semester:12:2026-10-20:rule:34",
     "source": "base",
+    "change_kind": "base",
     "occurs_on": "2026-10-20",
     "lesson_id": null,
     "academic_period_id": 5,
@@ -52,6 +53,23 @@ Responses use `AcademicCalendarLessonResource`:
 Subject metadata follows its source presentation: semester subjects include their existing code/color fields; legacy subjects include id/name. Subject/teacher may be null when a legacy presentation association is not owned. Do not assume a non-null classification or teacher for historical data.
 
 `source_type` is `semester_occurrence` or `legacy_lesson`. Semester `source` is the calculator's `base`, `replacement` or `working_saturday`. Empty cancellation snapshots return no lesson. For legacy rows `source` is `legacy_lesson`, `id` and `lesson_id` are persisted integers; semester fields and pair metadata are null. Semester `id` and `occurrence_id` are the same virtual string; legacy `occurrence_id` is null; snapshot identities end in `snapshot:{snapshotLessonId}`. The separately returned snapshot lesson ID identifies a saved row inside the specified date exception, not a legacy Lesson.
+
+Both academic and semester occurrence reads expose `change_kind` independently of the day `source`:
+
+- `base`: ordinary rule occurrence, or a linked snapshot lesson equal to its applicable rule after normalization;
+- `modified`: a linked snapshot differs in subject, teachers, pair number/label, type, room, local endpoints or rule applicability;
+- `added`: a new date-only lesson explicitly recorded by the server;
+- `null`: uncertain historical provenance, a deleted source rule, or an independent dated Lesson.
+
+Never infer a per-lesson change from `source = replacement`. Working Saturdays retain `source = working_saturday` and frozen copy semantics; rule comparison uses the copied weekday/source parity. Cancelled snapshot lessons remain absent. Missing source links are never guessed from pair numbers.
+
+Migration `2026_11_12_000004_add_snapshot_lesson_added_provenance` adds nullable `is_added` to snapshot lessons. It is internal, server-assigned provenance, not writable API input. New additions store true; copies of rules store false; edits/copies retain the marker and rule deletion does not turn a copy into an addition. Historical rows remain null without backfill. Apply the migration before deploying the writer changes; it has not been applied by this task.
+
+Independent dated Lessons retain all `LessonType` values, including consultation, and ordinary CRUD/cancellation. Active creates/edits validate half-open UTC overlaps against active dated Lessons and the effective semester calendar, under the existing owner lock/transaction; adjacency is allowed, conflicts return Laravel 422 `errors.schedule`. Semester reads resolve parity, snapshots and persisted timezone through the existing calendar services. Inactive lessons do not occupy time.
+
+New dated Lesson replacements are disabled: the compatibility POST replacement endpoint returns Laravel 422 `errors.replacement`; both service preflight and writer reject the operation. The retired AI proposal is absent from tool discovery and cannot prepare/execute a new replacement, including pending proposals; existing executed receipts/history remain readable. This supersedes ADR-005's availability of new replacement proposals, without changing its confirmation transaction or historical links.
+
+Legacy dated import POST `/schedule-imports`, POST `/{id}/revalidate` and POST `/{id}/commit` return 410 after authentication/ownership checks. GET `/schedule-imports/{id}` retains safe owned history reads. `/semester-schedule-imports` is unchanged. No institution/period uniqueness restriction or automatic history deletion is introduced.
 
 Use **source_identity as the rendering key**. Legacy identities are namespaced (`legacy_lesson:{id}`), and an imported lesson partly outside authoritative semester coverage may have a segment suffix. Segment rows can share the same persisted legacy ID. Never parse a semester string into a legacy ID. For editing, use explicit schedule/rule/date/snapshot references or the complete occurrence identity as described below.
 

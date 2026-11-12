@@ -140,7 +140,7 @@ class EffectiveScheduleService
                     $remember($lesson);
                     if ($lesson->semester_schedule_id !== $schedule->id
                         || ($lesson->source_weekly_rule_id !== null
-                            && ($lesson->sourceWeeklyRule === null || $lesson->sourceWeeklyRule->semester_schedule_id !== $schedule->id))) {
+                            && ($lesson->sourceWeeklyRule !== null && $lesson->sourceWeeklyRule->semester_schedule_id !== $schedule->id))) {
                         throw new InvalidArgumentException('Invalid snapshot provenance.');
                     }
                 }

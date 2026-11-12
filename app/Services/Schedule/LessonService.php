@@ -5,15 +5,19 @@ namespace App\Services\Schedule;
 use App\Enums\LessonStatus;
 use App\Models\Lesson;
 use App\Models\User;
+use App\Services\Planning\CalendarBusyIntervalService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 class LessonService
 {
     private const MANUAL_FIELDS = ['subject_id', 'teacher_id', 'academic_period_id', 'type', 'room', 'starts_at', 'ends_at'];
+
+    public function __construct(private CalendarBusyIntervalService $calendar) {}
 
     public function create(User $user, array $values): Lesson
     {
@@ -76,22 +80,7 @@ class LessonService
 
     public function createReplacement(User $user, Lesson $original, array $values): Lesson
     {
-        return DB::transaction(function () use ($user, $original, $values): Lesson {
-            $this->lockOwner($user);
-            $original = $user->lessons()->lockForUpdate()->findOrFail($original->getKey());
-            ['candidate' => $candidate, 'replacement' => $replacement] = $this->prepareReplacement($user, $original, $values, true);
-            if ($replacement === null) {
-                $replacement = $user->lessons()->create([
-                    ...$candidate, 'replaces_lesson_id' => $original->id, 'status' => LessonStatus::Active,
-                ]);
-            } else {
-                $replacement->fill([...$candidate, 'status' => LessonStatus::Active]);
-                $replacement->restore();
-            }
-            $original->update(['status' => LessonStatus::Replaced]);
-
-            return $replacement->refresh();
-        });
+        $this->invalidReplacement();
     }
 
     /** Shared deterministic preflight. It never invokes a writer or saves a speculative model. */
@@ -119,23 +108,7 @@ class LessonService
 
     public function prepareReplacement(User $user, Lesson $original, array $values, bool $lock = false): array
     {
-        if ($original->status !== LessonStatus::Active || $original->replaces_lesson_id !== null) {
-            $this->invalidReplacement();
-        }
-        // Search physical history: a deleted row still reserves the unique original ID.
-        $replacement = $original->replacement()->withTrashed()->when($lock, fn ($q) => $q->lockForUpdate())->first();
-        if ($replacement !== null && ($replacement->id === $original->id
-            || $replacement->user_id !== $user->id || ! $replacement->trashed()
-            || ! in_array($replacement->status, [LessonStatus::Active, LessonStatus::Cancelled], true)
-            || $replacement->schedule_import_batch_id !== null || $replacement->import_fingerprint !== null
-            || $replacement->replacement()->withTrashed()->when($lock, fn ($q) => $q->lockForUpdate())->first() !== null)) {
-            $this->invalidReplacement();
-        }
-        $candidate = ['teacher_id' => null, 'academic_period_id' => null, 'room' => null,
-            ...$this->manualValues($values)];
-        $this->validateCandidate($user, $candidate, LessonStatus::Active, null, [$original->id], $lock);
-
-        return compact('candidate', 'replacement');
+        $this->invalidReplacement();
     }
 
     private function replacementOriginal(User $user, Lesson $replacement, bool $lock = true): Lesson
@@ -210,6 +183,24 @@ class LessonService
                 ->when($lock, fn ($q) => $q->lockForUpdate())->first();
             if ($overlap !== null) {
                 throw ValidationException::withMessages(['schedule' => ['This lesson overlaps an existing active lesson.']]);
+            }
+
+            // The writer already holds the owner lock shared with semester writers.
+            // Keep bounded reads for the calendar service, even for a long dated lesson.
+            $end = $candidate['ends_at']->getTimestamp();
+            try {
+                for ($start = $candidate['starts_at']->getTimestamp(); $start < $end; $start = $until) {
+                    $until = min($end, $start + 120 * 86400);
+                    foreach ($this->calendar->between($user, $start, $until) as $interval) {
+                        // All dated Lessons (including the edited row's exclusions) were
+                        // checked above; calendar selection also handles semester exceptions.
+                        if ($interval['source_type'] === 'semester_occurrence') {
+                            throw ValidationException::withMessages(['schedule' => ['This lesson overlaps an effective semester lesson.']]);
+                        }
+                    }
+                }
+            } catch (InvalidArgumentException) {
+                throw ValidationException::withMessages(['schedule' => ['The effective schedule could not be validated. Review the semester schedule and timezone before saving.']]);
             }
         }
     }

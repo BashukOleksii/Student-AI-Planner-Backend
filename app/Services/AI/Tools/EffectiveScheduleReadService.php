@@ -79,6 +79,7 @@ class EffectiveScheduleReadService
                 $lessons[] = [
                     'id' => $row['occurrence_id'], 'source_identity' => $row['occurrence_id'], 'source_type' => 'semester_occurrence',
                     'subject' => $row['subject'], 'teacher' => $row['teacher'], 'type' => $row['lesson_type'] ?? null,
+                    'change_kind' => $row['change_kind'],
                     'pair_number' => $row['pair_number'], 'pair_label' => $row['pair_label'], 'room' => $row['room'],
                     'starts_at' => $row['starts_at'], 'ends_at' => $row['ends_at'],
                     'semester_schedule_id' => $record['semester_schedule_id'],
@@ -114,6 +115,7 @@ class EffectiveScheduleReadService
 
         return ['id' => $lesson->id, 'source_identity' => $occupancy['id'], 'source_type' => 'legacy_lesson',
             'subject' => $subject === null ? null : ['id' => $subject['id'], 'name' => $subject['name']],
+            'change_kind' => null,
             'teacher' => $teacher, 'type' => $lesson->type?->value, 'pair_number' => null, 'pair_label' => null,
             'room' => $lesson->room, 'starts_at' => $toLocal($occupancy['start']), 'ends_at' => $toLocal($occupancy['end']),
             'replaces_lesson_id' => $row['replaces_lesson_id']];
