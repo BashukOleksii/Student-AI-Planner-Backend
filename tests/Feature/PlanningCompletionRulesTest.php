@@ -12,6 +12,7 @@ use App\Services\AI\Actions\PlanningActionArgumentValidator;
 use App\Services\Planning\PlanningPreferenceService;
 use App\Services\Planning\RecoverySuggestionService;
 use App\Services\Planning\StudyAvailabilityService;
+use App\Services\Planning\StudyPlanningService;
 use App\Services\Planning\StudySessionLifecycleService;
 use App\Services\Schedule\LessonService;
 use App\Services\Tasks\TaskService;
@@ -28,6 +29,27 @@ class PlanningCompletionRulesTest extends TestCase
     {
         parent::setUp();
         $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
+    }
+
+    public function test_deadline_passage_and_scheduled_detection_do_not_infer_missed_status(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-11-13T08:00:00Z'));
+        $task = Task::factory()->create(['estimated_minutes' => 60, 'deadline_at' => '2026-11-13 09:00:00']);
+        $child = Subtask::factory()->for($task)->create(['estimated_minutes' => 60]);
+        $session = StudySession::factory()->for($task)->create(['subtask_id' => $child->id,
+            'starts_at' => '2026-11-13 08:00:00', 'ends_at' => '2026-11-13 09:00:00']);
+        $records = collect([$task, $child, $session]);
+        $before = $records->map(fn ($record) => $record->refresh()->getAttributes())->all();
+
+        $this->travelTo(CarbonImmutable::parse('2026-11-13T10:00:00Z'));
+        $this->artisan('learning:detect-recovery', ['--user' => (string) $task->user_id])->assertSuccessful();
+        $this->actingAs($task->user)->getJson('/api/tasks/'.$task->id)->assertOk()->assertJsonPath('data.status', 'pending');
+        $plan = app(StudyPlanningService::class)->plan($task->user, '2026-11-13', '2026-11-13', $task->id);
+
+        $this->assertSame([], $plan['sessions']);
+        $excluded = collect($plan['excluded_items'])->firstWhere('subtask_id', $child->id);
+        $this->assertContains('deadline_expired', $excluded['reason_codes']);
+        $this->assertSame($before, $records->map(fn ($record) => $record->refresh()->getAttributes())->all());
     }
 
     public function test_missing_actual_is_rejected_by_http_service_and_ai_without_changes(): void

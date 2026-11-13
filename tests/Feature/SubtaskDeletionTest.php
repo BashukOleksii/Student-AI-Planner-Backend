@@ -64,12 +64,12 @@ class SubtaskDeletionTest extends TestCase
     }
 
     #[DataProvider('sessionCases')]
-    public function test_only_future_planned_sessions_and_their_scheduled_reminders_are_cancelled(string $status, string $start, bool $cancel): void
+    public function test_only_future_planned_sessions_and_their_scheduled_reminders_are_cancelled(string $status, string $start, bool $cancel, string $end = '2026-10-12 12:00:00'): void
     {
         $child = Subtask::factory()->create();
         $task = $child->task;
         $session = StudySession::factory()->for($task)->create(['subtask_id' => $child->id, 'status' => $status,
-            'starts_at' => $start, 'ends_at' => '2026-10-12 12:00:00',
+            'starts_at' => $start, 'ends_at' => $end,
             'completed_at' => $status === 'completed' ? '2026-10-12 11:00:00' : null,
             'actual_minutes' => $status === 'completed' ? 40 : null])->refresh();
         $reminder = Reminder::factory()->for($task->user)->create(['study_session_id' => $session->id])->refresh();
@@ -91,7 +91,8 @@ class SubtaskDeletionTest extends TestCase
 
     public static function sessionCases(): array
     {
-        return [['planned', '2026-10-12 10:20:29', false], ['planned', '2026-10-12 10:20:30', true],
+        return [['planned', '2026-10-11 10:00:00', false, '2026-10-11 11:00:00'],
+            ['planned', '2026-10-12 10:20:29', false], ['planned', '2026-10-12 10:20:30', true],
             ['planned', '2026-10-12 10:20:31', true], ['completed', '2026-10-12 10:20:31', false],
             ['missed', '2026-10-12 10:20:31', false], ['rescheduled', '2026-10-12 10:20:31', false], ['cancelled', '2026-10-12 10:20:31', false]];
     }
@@ -127,7 +128,11 @@ class SubtaskDeletionTest extends TestCase
         $general = Reminder::factory()->for($task->user)->create();
         $other = Reminder::factory()->for($task->user)->create(['subtask_id' => $sibling->id]);
         $directTask = Reminder::factory()->for($task->user)->create(['task_id' => $task->id]);
-        $records = [$sent, $cancelled, $general, $other, $directTask];
+        $siblingSession = StudySession::factory()->for($task)->create(['subtask_id' => $sibling->id,
+            'starts_at' => '2026-10-12 11:00:00', 'ends_at' => '2026-10-12 12:00:00']);
+        $parentSession = StudySession::factory()->for($task)->create([
+            'starts_at' => '2026-10-12 12:00:00', 'ends_at' => '2026-10-12 13:00:00']);
+        $records = [$sent, $cancelled, $general, $other, $directTask, $siblingSession, $parentSession];
         $before = array_map(fn ($record) => $record->refresh()->getAttributes(), $records);
         $scheduledBefore = $scheduled->getAttributes();
         $this->actingAs($task->user, 'web')->deleteJson($this->url($task, $child))->assertNoContent();
@@ -227,7 +232,7 @@ class SubtaskDeletionTest extends TestCase
         $user = $task->user;
         $session = StudySession::factory()->for($task)->create(['subtask_id' => $child->id, 'starts_at' => '2026-10-12 10:20:30', 'ends_at' => '2026-10-12 12:00:00']);
         $reminder = Reminder::factory()->for($user)->create(['study_session_id' => $session->id]);
-        $records = [$child, $session, $reminder];
+        $records = [$task, $child, $session, $reminder];
         $before = array_map(fn ($record) => $record->refresh()->getAttributes(), $records);
         $queries = [];
         $level = DB::transactionLevel();
@@ -245,6 +250,9 @@ class SubtaskDeletionTest extends TestCase
         } catch (RuntimeException $exception) {
             $this->assertSame('Deliberate cleanup failure', $exception->getMessage());
         }
+        // Ignore estimate reads and the nested observer's reentrant owner lock.
+        $queries = array_values(array_filter($queries, fn ($query) => str_contains($query['sql'], 'for update') && $query['level'] === $level + 1));
+        $this->assertCount(5, $queries);
         foreach (['users', 'tasks', 'subtasks', 'study_sessions', 'reminders'] as $i => $table) {
             $this->assertStringContainsString('from `'.$table.'`', $queries[$i]['sql']);
             $this->assertStringContainsString('for update', $queries[$i]['sql']);

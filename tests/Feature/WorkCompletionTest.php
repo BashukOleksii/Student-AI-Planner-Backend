@@ -25,6 +25,7 @@ class WorkCompletionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
         $this->travelTo(CarbonImmutable::parse('2026-11-13T10:00:00Z'));
     }
 
@@ -33,13 +34,17 @@ class WorkCompletionTest extends TestCase
         $task = Task::factory()->create();
         $child = Subtask::factory()->for($task)->create();
         $future = StudySession::factory()->for($task)->create(['subtask_id' => $child->id, 'starts_at' => '2026-11-13 11:00:00', 'ends_at' => '2026-11-13 12:00:00']);
+        $directFuture = StudySession::factory()->for($task)->create(['starts_at' => '2026-11-13 12:00:00', 'ends_at' => '2026-11-13 13:00:00']);
         $boundary = StudySession::factory()->for($task)->create(['starts_at' => '2026-11-13 10:00:00', 'ends_at' => '2026-11-13 11:00:00']);
         $base = '/api/tasks/'.$task->id;
         $this->actingAs($task->user);
-        $this->postJson($base.'/complete')->assertStatus(409)->assertJsonPath('completion_review.future_sessions_count', 1);
+        $this->postJson($base.'/complete')->assertStatus(409)->assertJsonPath('completion_review.future_sessions_count', 2);
         $review = $this->getJson($base.'/completion-review')->assertOk()->json();
         $this->postJson($base.'/complete', $review)->assertOk();
         $this->assertSame('cancelled', $future->refresh()->status->value);
+        $this->assertSame('cancelled', $directFuture->refresh()->status->value);
+        $this->assertNull($directFuture->actual_minutes);
+        $this->assertNull($directFuture->completed_at);
         $this->assertSame('planned', $boundary->refresh()->status->value);
         $this->assertSame('pending', $child->refresh()->status->value);
         $this->postJson($base.'/complete')->assertOk();
@@ -82,15 +87,22 @@ class WorkCompletionTest extends TestCase
             'subtask_id' => $c->id, 'starts_at' => '2026-11-13 11:00:00', 'ends_at' => '2026-11-13 12:00:00',
         ]));
         $reminder = Reminder::factory()->for($task->user)->create(['study_session_id' => $sessions[0]->id]);
+        $elapsed = collect(['09:00:00', '10:00:00'])->map(fn ($start) => StudySession::factory()->for($task)->create([
+            'subtask_id' => $child->id, 'starts_at' => '2026-11-13 '.$start, 'ends_at' => '2026-11-13 11:00:00',
+        ]));
+        $before = $elapsed->map(fn ($session) => $session->refresh()->getAttributes())->all();
         $base = '/api/tasks/'.$task->id.'/subtasks/'.$child->id;
         $this->actingAs($task->user);
         $review = $this->getJson($base.'/completion-review')->assertJsonPath('future_sessions_count', 1)->json();
         $this->postJson($base.'/complete', $review)->assertOk();
         $this->assertSame('cancelled', $sessions[0]->refresh()->status->value);
+        $this->assertNull($sessions[0]->actual_minutes);
+        $this->assertNull($sessions[0]->completed_at);
         $this->assertSame('cancelled', $reminder->refresh()->status->value);
         $this->assertSame('planned', $sessions[1]->refresh()->status->value);
         $this->assertSame('pending', $task->refresh()->status->value);
         $this->assertSame('pending', $other->refresh()->status->value);
+        $this->assertSame($before, $elapsed->map(fn ($session) => $session->refresh()->getAttributes())->all());
     }
 
     public function test_write_failure_rolls_back_sessions_work_reminders_and_scan_generation(): void
@@ -119,7 +131,7 @@ class WorkCompletionTest extends TestCase
         $this->postJson('/api/study-sessions/'.$source->id.'/complete', ['actual_minutes' => 12])->assertOk();
         $this->assertSame('pending', $child->refresh()->status->value);
         $this->assertSame('pending', $task->refresh()->status->value);
-        $source = StudySession::factory()->for($task)->create(['subtask_id' => $child->id]);
+        $source = StudySession::factory()->for($task)->create(['subtask_id' => $child->id, 'starts_at' => '2026-11-13 10:00:00', 'ends_at' => '2026-11-13 11:00:00']);
         $future = StudySession::factory()->for($task)->create(['subtask_id' => $child->id, 'starts_at' => '2026-11-13 11:00:00', 'ends_at' => '2026-11-13 12:00:00']);
         $base = '/api/study-sessions/'.$source->id;
         $review = $this->getJson($base.'/completion-review')->assertOk()->assertJsonPath('work_type', 'subtask')->json('completion_review');
@@ -130,6 +142,9 @@ class WorkCompletionTest extends TestCase
         $this->assertSame('completed', $child->refresh()->status->value);
         $this->assertSame('pending', $task->refresh()->status->value);
         $this->assertSame('cancelled', $future->refresh()->status->value);
+        $this->assertSame('completed', $source->refresh()->status->value);
+        $this->assertNull($future->actual_minutes);
+        $this->assertNull($future->completed_at);
         $this->assertSame(17, $source->refresh()->actual_minutes);
         $this->getJson($base.'/completion-review')->assertJsonPath('can_complete_work', false);
     }
@@ -160,11 +175,19 @@ class WorkCompletionTest extends TestCase
     public function test_combined_task_completion_and_completed_work_capability(): void
     {
         $task = Task::factory()->create();
-        $source = StudySession::factory()->for($task)->create();
+        $source = StudySession::factory()->for($task)->create(['starts_at' => '2026-11-13 10:00:00', 'ends_at' => '2026-11-13 11:00:00']);
         $this->actingAs($task->user);
         $base = '/api/study-sessions/'.$source->id;
+        $this->travelTo(CarbonImmutable::parse('2026-11-13T09:59:59.999999Z'));
+        $this->postJson($base.'/complete', ['actual_minutes' => 5, 'complete_work' => true])->assertConflict();
+        $this->assertSame('pending', $task->refresh()->status->value);
+        $this->assertSame('planned', $source->refresh()->status->value);
+        $this->assertNull($source->actual_minutes);
+        $this->travelTo(CarbonImmutable::parse('2026-11-13T10:00:00Z'));
         $this->postJson($base.'/complete', ['actual_minutes' => 5, 'complete_work' => true])->assertOk();
         $this->assertSame('completed', $task->refresh()->status->value);
+        $this->assertSame('completed', $source->refresh()->status->value);
+        $this->assertSame(5, $source->actual_minutes);
         $source = StudySession::factory()->for($task)->create();
         $base = '/api/study-sessions/'.$source->id;
         $this->getJson($base.'/completion-review')->assertJsonPath('can_complete_work', false);

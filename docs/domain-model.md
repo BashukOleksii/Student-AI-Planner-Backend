@@ -368,7 +368,7 @@ Lifecycle states use PHP string-backed enums over bounded scalar columns when im
 
 ### Task and Subtask
 
-Both persist only `pending` or `completed`. Completion requires a completion instant; pending work has none. Task priority is LOW = 1, NORMAL = 2, HIGH = 3.
+Tasks persist `pending`, explicitly unfinished `missed`, or `completed`; Subtasks persist only `pending` or `completed`. Completion requires a completion instant; unfinished work has none. A deadline passing does not change status. Task priority is LOW = 1, NORMAL = 2, HIGH = 3. See [work/session/planning rules and regression coverage](work-completion.md#правила-взаємодії-роботи-сесій-і-планувальника).
 
 **Overdue is derived from deadline, completion state, and current time, never persisted as another V1 status or flag.**
 

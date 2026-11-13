@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Enums\TaskStatus;
+use App\Models\StudyAvailabilityWindow;
 use App\Models\StudySession;
 use App\Models\Subtask;
 use App\Models\Task;
+use App\Services\Planning\StudyPlanningService;
 use App\Services\Tasks\TaskService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,6 +20,28 @@ use Tests\TestCase;
 class TaskMissedStatusTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_explicit_miss_preserves_deadline_and_remaining_plan_after_credit_and_reservations(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-11-13T08:00:00Z'));
+        $task = Task::factory()->create(['estimated_minutes' => 90, 'deadline_at' => '2026-11-13 17:00:00']);
+        $owner = $task->user;
+        $owner->update(['timezone' => 'UTC']);
+        StudyAvailabilityWindow::factory()->for($owner)->create(['day_of_week' => 5, 'starts_at' => '09:00:00', 'ends_at' => '17:00:00']);
+        StudySession::factory()->for($task)->create(['status' => 'completed', 'starts_at' => '2026-11-13 07:00:00',
+            'ends_at' => '2026-11-13 08:00:00', 'completed_at' => '2026-11-13 08:00:00', 'actual_minutes' => 15]);
+        StudySession::factory()->for($task)->create(['starts_at' => '2026-11-13 11:00:00', 'ends_at' => '2026-11-13 11:30:00']);
+        $planner = app(StudyPlanningService::class);
+        $before = $planner->plan($owner, '2026-11-13', '2026-11-13', $task->id);
+        $this->assertSame(2700, $before['summary']['requested_seconds']);
+        $this->assertSame(2700, $before['summary']['allocated_seconds']);
+
+        $this->actingAs($owner)->postJson('/api/tasks/'.$task->id.'/miss')->assertOk()->assertJsonPath('data.status', 'missed');
+
+        $this->assertSame($before, $planner->plan($owner, '2026-11-13', '2026-11-13', $task->id));
+        $this->assertSame('2026-11-13 17:00:00', $task->fresh()->getRawOriginal('deadline_at'));
+        $this->assertDatabaseCount('study_sessions', 2);
+    }
 
     public function test_miss_is_an_explicit_idempotent_task_only_transition_and_patch_cannot_bypass_it(): void
     {

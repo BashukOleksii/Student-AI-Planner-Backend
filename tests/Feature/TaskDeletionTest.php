@@ -77,13 +77,13 @@ class TaskDeletionTest extends TestCase
     }
 
     #[DataProvider('sessionCases')]
-    public function test_task_session_cleanup_preserves_lifecycle_metadata_and_relations(string $status, string $start, bool $withChild, bool $cancel): void
+    public function test_task_session_cleanup_preserves_lifecycle_metadata_and_relations(string $status, string $start, bool $withChild, bool $cancel, string $end = '2026-10-12 12:00:00'): void
     {
         $task = Task::factory()->create();
         $child = Subtask::factory()->for($task)->create();
         $predecessor = StudySession::factory()->for($task)->create(['status' => StudySessionStatus::Rescheduled]);
         $session = StudySession::factory()->for($task)->create(['subtask_id' => $withChild ? $child->id : null,
-            'rescheduled_from_session_id' => $predecessor->id, 'status' => $status, 'starts_at' => $start, 'ends_at' => '2026-10-12 12:00:00',
+            'rescheduled_from_session_id' => $predecessor->id, 'status' => $status, 'starts_at' => $start, 'ends_at' => $end,
             'completed_at' => $status === 'completed' ? '2026-10-12 11:00:00' : null,
             'actual_minutes' => $status === 'completed' ? 45 : null])->refresh();
         $before = $session->getAttributes();
@@ -101,7 +101,8 @@ class TaskDeletionTest extends TestCase
 
     public static function sessionCases(): array
     {
-        return [['planned', '2026-10-12 10:20:29', false, false], ['planned', '2026-10-12 10:20:30', false, true],
+        return [['planned', '2026-10-11 10:00:00', true, false, '2026-10-11 11:00:00'],
+            ['planned', '2026-10-12 10:20:29', false, false], ['planned', '2026-10-12 10:20:30', false, true],
             ['planned', '2026-10-12 10:20:31', true, true], ['completed', '2026-10-12 10:20:31', true, false],
             ['missed', '2026-10-12 10:20:31', true, false], ['rescheduled', '2026-10-12 10:20:31', false, false],
             ['cancelled', '2026-10-12 10:20:31', false, false]];
