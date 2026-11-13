@@ -2,6 +2,7 @@
 
 namespace App\Services\AI\Tools;
 
+use App\Exceptions\SemesterOccurrenceConflictException;
 use App\Models\Lesson;
 use App\Models\Task;
 use App\Models\User;
@@ -11,6 +12,14 @@ use Illuminate\Database\Eloquent\Model;
 /** HTTP-independent equivalents of the approved Task/ScheduleLesson Resource fields. */
 class ToolResultPresenter
 {
+    /** Only this operation's allowlisted preparation failures have a public reason. */
+    public static function errorReason(string $name, mixed $ok, mixed $code, mixed $reason): array
+    {
+        return $name === 'propose_semester_occurrence_create' && $ok === false && $code === 'invalid_arguments'
+            && in_array($reason, SemesterOccurrenceConflictException::REASONS, true)
+                ? ['error_reason' => $reason] : [];
+    }
+
     public function task(User $owner, Task $task): array
     {
         return [

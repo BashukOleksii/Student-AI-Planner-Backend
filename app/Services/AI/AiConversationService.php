@@ -10,6 +10,7 @@ use App\Models\AiPendingAction;
 use App\Models\User;
 use App\Services\AI\Actions\PlanningActionRegistry;
 use App\Services\AI\Actions\PlanningActionService;
+use App\Services\AI\Tools\ToolResultPresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -102,7 +103,8 @@ class AiConversationService
                 return ['result' => ['conversation_id' => $stored['conversation_id'], 'user_message_id' => $stored['user_message_id'],
                     'assistant_message_id' => $stored['assistant_message_id'], 'content' => $stored['content'],
                     'tools' => array_map(fn ($tool) => ['call_id' => $tool['call_id'], 'name' => $tool['name'], 'ok' => $tool['ok'],
-                        'error_code' => $tool['error_code']], $stored['tools']),
+                        'error_code' => $tool['error_code'],
+                        ...ToolResultPresenter::errorReason($tool['name'], $tool['ok'], $tool['error_code'], $tool['error_reason'] ?? null)], $stored['tools']),
                     ...(isset($stored['action']) ? ['action' => $stored['action']] : [])]];
             }
             if ((clone $query)->whereNull('result')->where('lease_expires_at', '>', DB::raw('UTC_TIMESTAMP(6)'))->exists()) {

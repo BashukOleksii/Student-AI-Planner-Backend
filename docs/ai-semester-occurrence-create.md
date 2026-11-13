@@ -135,6 +135,12 @@ preview.effects.changes_legacy_lessons = false
 - Помилка підготовки повертається у чинному tool result: `ok=false`,
   `error.code=invalid_arguments` для конфліктів/невалідних посилань або `not_found`
   для недоступного розкладу. Пропозиція відсутня; чат сам по собі не стає HTTP 422.
+  Для додавання однієї пари відомі конфлікти додатково мають дозволену
+  `error.reason`: `pair_number_taken`, `time_overlap` або `date_cancelled`.
+  Клієнт отримує її як `data.tools[i].error_reason` після POST та
+  `data[j].tool_result.error_reason` у GET messages. За конфлікту номера й часу
+  пріоритет має номер. Приклади, підказки та актуальні перевірки:
+  [структуровані причини відмови](ai-semester-occurrence-errors.md).
 
 ## Перевірка
 

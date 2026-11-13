@@ -3,6 +3,7 @@
 namespace App\Services\AI\Actions;
 
 use App\Exceptions\AiAgentException;
+use App\Exceptions\SemesterOccurrenceConflictException;
 use App\Models\AiPendingAction;
 use App\Models\User;
 use App\Services\Schedule\EffectiveScheduleCalculator;
@@ -48,6 +49,8 @@ class SemesterActionService
             });
         } catch (ModelNotFoundException|AuthorizationException|NotFoundHttpException) {
             return $this->error($name, 'not_found');
+        } catch (SemesterOccurrenceConflictException $exception) {
+            return $this->error($name, 'invalid_arguments', $name === 'propose_semester_occurrence_create' ? $exception->reason : null);
         } catch (InvalidArgumentException|ValidationException) {
             return $this->error($name, 'invalid_arguments');
         } catch (ConflictHttpException) {
@@ -198,10 +201,10 @@ class SemesterActionService
         return $this->state->hash($strip($value));
     }
 
-    private function error(string $name, string $code): array
+    private function error(string $name, string $code, ?string $reason = null): array
     {
         return ['proposal' => null, 'result' => ['ok' => false, 'tool' => $name, 'error' => [
-            'code' => $code, 'message' => match ($code) {
+            'code' => $code, ...($reason === null ? [] : ['reason' => $reason]), 'message' => match ($code) {
                 'invalid_arguments' => 'Invalid semester action arguments.', 'not_found' => 'Resource not found.',
                 'access_denied' => 'Access denied.', 'action_stale' => 'The semester schedule changed. Read it again.',
                 default => 'Semester proposal could not be prepared.',

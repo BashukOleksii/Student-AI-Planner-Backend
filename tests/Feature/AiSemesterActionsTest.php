@@ -24,6 +24,7 @@ use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Tests\Concerns\InteractsWithAiResponses;
 use Tests\Support\AiCapabilities;
 use Tests\TestCase;
@@ -228,7 +229,7 @@ class AiSemesterActionsTest extends TestCase
 
     public static function invalidAdditions(): array
     {
-        return array_map(fn ($case) => [$case], ['occupied pair', 'overlap', 'foreign subject', 'foreign teacher', 'foreign schedule',
+        return array_map(fn ($case) => [$case], ['occupied pair', 'overlap', 'occupied pair and overlap', 'foreign subject', 'foreign teacher', 'foreign schedule',
             'wrong teacher', 'outside semester', 'invalid time', 'ambiguous local time', 'cancelled date']);
     }
 
@@ -241,6 +242,8 @@ class AiSemesterActionsTest extends TestCase
             case 'occupied pair': $arguments['pair_number'] = 1;
                 break;
             case 'overlap': $arguments['starts_at_local'] = '08:30:00';
+                break;
+            case 'occupied pair and overlap': $arguments = [...$arguments, 'pair_number' => 2, 'starts_at_local' => '08:30:00'];
                 break;
             case 'foreign subject': $arguments['subject_id'] = Subject::factory()->create()->id;
                 break;
@@ -266,6 +269,111 @@ class AiSemesterActionsTest extends TestCase
         $prepared = app(SemesterActionService::class)->prepare($f['owner'], 'propose_semester_occurrence_create', $arguments, 'invalid_addition');
         $this->assertNull($prepared['proposal']);
         $this->assertSame($case === 'foreign schedule' ? 'not_found' : 'invalid_arguments', $prepared['result']['error']['code']);
+        $this->assertSame(match ($case) {
+            'occupied pair', 'occupied pair and overlap' => 'pair_number_taken',
+            'overlap' => 'time_overlap', 'cancelled date' => 'date_cancelled', default => null,
+        }, $prepared['result']['error']['reason'] ?? null);
+        $this->assertSame($before, $this->snapshot());
+        $this->assertDatabaseCount('ai_pending_actions', 0);
+    }
+
+    public static function additionFailureResponses(): array
+    {
+        return [
+            ['occupied pair', 'pair_number_taken', 'invalid_arguments'],
+            ['overlap', 'time_overlap', 'invalid_arguments'],
+            ['occupied pair and overlap', 'pair_number_taken', 'invalid_arguments'],
+            ['cancelled date', 'date_cancelled', 'invalid_arguments'],
+            ['invalid arguments', null, 'invalid_arguments'],
+            ['invalid interval with occupied pair', null, 'invalid_arguments'],
+            ['unavailable schedule', null, 'not_found'],
+            ['stale state', null, 'action_stale'],
+            ['internal failure', null, 'execution_failed'],
+        ];
+    }
+
+    #[DataProvider('additionFailureResponses')]
+    public function test_addition_failure_reason_reaches_chat_replay_and_history_without_calendar_changes(string $case, ?string $reason, string $code): void
+    {
+        $f = $this->fixture();
+        // A saved Saturday must be checked rather than the empty Saturday base rules.
+        $f['manager']->workingSaturday($f['owner'], $f['schedule'], ['occurs_on' => '2026-10-24', 'copied_weekday' => 2,
+            'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
+        $arguments = $this->addition($f, '2026-10-24');
+        $arguments = match ($case) {
+            'occupied pair' => [...$arguments, 'pair_number' => 1],
+            'overlap' => [...$arguments, 'starts_at_local' => '08:30:00'],
+            // Pair 2 is later than the overlapping pair 1; pair priority is global.
+            'occupied pair and overlap' => [...$arguments, 'pair_number' => 2, 'starts_at_local' => '08:30:00'],
+            'invalid arguments' => [...$arguments, 'pair_number' => '3'],
+            'invalid interval with occupied pair' => [...$arguments, 'pair_number' => 1, 'ends_at_local' => '11:00:00'],
+            'unavailable schedule' => [...$arguments, 'semester_schedule_id' => $f['schedule']->id + 1000],
+            default => $arguments,
+        };
+        if ($case === 'cancelled date') {
+            $f['manager']->replaceDate($f['owner'], $f['schedule'], $arguments['date'], ['mode' => 'replace', 'lessons' => [],
+                'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
+        }
+        if (in_array($case, ['stale state', 'internal failure'], true)) {
+            $manager = $this->createMock(SemesterScheduleManagementService::class);
+            $manager->expects($this->once())->method('createOccurrence')->willThrowException($case === 'stale state'
+                ? new ConflictHttpException('time_overlap: private stale state')
+                : new RuntimeException('SQL: private pair_number_taken debug data'));
+            $this->app->instance(SemesterScheduleManagementService::class, $manager);
+        }
+        $before = $this->snapshot();
+        $name = 'propose_semester_occurrence_create';
+        $expected = ['ok' => false, 'tool' => $name, 'error' => ['code' => $code,
+            ...($reason === null ? [] : ['reason' => $reason]),
+            'message' => match ($code) {
+                'not_found' => 'Resource not found.', 'action_stale' => 'The semester schedule changed. Read it again.',
+                'execution_failed' => 'Semester proposal could not be prepared.', default => 'Invalid semester action arguments.',
+            }]];
+        $summary = ['call_id' => 'failed_addition', 'name' => $name, 'ok' => false, 'error_code' => $code,
+            ...($reason === null ? [] : ['error_reason' => $reason])];
+        $round = 0;
+        $provider = $this->createMock(LlmProvider::class);
+        $provider->expects($this->exactly(3))->method('respond')->willReturnCallback(function ($instructions, $history) use (&$round, $arguments, $name, $expected): array {
+            if ($round++ === 0) {
+                return ['text' => null, 'calls' => [['id' => 'failed_addition', 'name' => $name, 'arguments' => $arguments]], 'state' => []];
+            }
+            $tool = collect($history)->firstWhere('role', 'tool');
+            $this->assertSame($expected, json_decode($tool['content'], true, flags: JSON_THROW_ON_ERROR));
+
+            return ['text' => 'The lesson was added successfully.', 'calls' => [], 'state' => []];
+        });
+        $this->app->instance(LlmProvider::class, $provider);
+        $key = (string) Str::uuid();
+        $body = ['content' => 'Додай пару на робочу суботу.'];
+        $response = $this->postJson($f['base'].'/messages', $body, ['Idempotency-Key' => $key])->assertOk();
+        $this->assertSame([$summary], $response->json('data.tools'));
+        $this->assertArrayNotHasKey('action', $response->json('data'));
+        $this->assertSame('No semester action was prepared. No business data has changed.', $response->json('data.content'));
+        $replay = $this->postJson($f['base'].'/messages', $body, ['Idempotency-Key' => $key])->assertOk();
+        $this->assertSame($response->json('data'), $replay->json('data'));
+        $messages = $this->getJson($f['base'].'/messages')->assertOk()->json('data');
+        $tool = collect($messages)->firstWhere('role', 'tool');
+        $this->assertNull($tool['content']);
+        // The existing history code allowlist does not expose action_stale.
+        $this->assertSame([...$summary, 'error_code' => $code === 'action_stale' ? null : $code], $tool['tool_result']);
+        $stored = AiMessage::where('role', 'tool')->sole();
+        $this->assertSame($expected, json_decode($stored->content, true, flags: JSON_THROW_ON_ERROR));
+        $this->postJson($f['base'].'/messages', ['content' => 'Поясни попередній результат.'], ['Idempotency-Key' => (string) Str::uuid()])->assertOk();
+        $this->assertSame($before, $this->snapshot());
+        $this->assertDatabaseCount('ai_pending_actions', 0);
+    }
+
+    public function test_an_empty_base_day_is_not_a_cancelled_date_and_touching_intervals_are_allowed(): void
+    {
+        $f = $this->fixture();
+        $before = $this->snapshot();
+        $service = app(SemesterActionService::class);
+        $empty = $service->prepare($f['owner'], 'propose_semester_occurrence_create', $this->addition($f, '2026-10-21'), 'empty');
+        $this->assertTrue($empty['result']['ok']);
+        $this->assertSame([], $empty['proposal']['preview']['before']['lessons']);
+        $touching = $service->prepare($f['owner'], 'propose_semester_occurrence_create',
+            [...$this->addition($f), 'starts_at_local' => '09:00:00', 'ends_at_local' => '10:00:00'], 'touching');
+        $this->assertTrue($touching['result']['ok']);
         $this->assertSame($before, $this->snapshot());
         $this->assertDatabaseCount('ai_pending_actions', 0);
     }

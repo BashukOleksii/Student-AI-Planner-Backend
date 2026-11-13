@@ -3,6 +3,7 @@
 namespace App\Services\Schedule;
 
 use App\Enums\LessonType;
+use App\Exceptions\SemesterOccurrenceConflictException;
 use DateTimeImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
@@ -156,6 +157,26 @@ class EffectiveScheduleCalculator
         }
 
         return $result;
+    }
+
+    /** Classify one addition using the same endpoint validation as effective reads. */
+    public function validateOccurrenceAddition(array $effective, array $lesson, string $date, string $timezone): void
+    {
+        $this->validateLesson($lesson);
+        $zone = new DateTimeZone($timezone);
+        $start = $this->localInstant($date, $lesson['starts_at_local'], $zone)->getTimestamp();
+        $end = $this->localInstant($date, $lesson['ends_at_local'], $zone)->getTimestamp();
+        // Pair number wins even when a different lesson also overlaps the interval.
+        foreach ($effective as $row) {
+            if ($row['pair_number'] === $lesson['pair_number']) {
+                throw new SemesterOccurrenceConflictException('pair_number_taken');
+            }
+        }
+        foreach ($effective as $row) {
+            if ($start < $row['end'] && $end > $row['start']) {
+                throw new SemesterOccurrenceConflictException('time_overlap');
+            }
+        }
     }
 
     /** Provenance, rather than a matching pair number, identifies the original rule. */

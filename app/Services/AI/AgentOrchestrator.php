@@ -21,6 +21,7 @@ use App\Services\AI\Tools\RecoveryReadTools;
 use App\Services\AI\Tools\SemesterReadTools;
 use App\Services\AI\Tools\ToolExecutor;
 use App\Services\AI\Tools\ToolRegistry;
+use App\Services\AI\Tools\ToolResultPresenter;
 use Carbon\CarbonImmutable;
 
 class AgentOrchestrator
@@ -168,7 +169,8 @@ class AgentOrchestrator
                 $json = $this->limits->json(CompletionReviewPrivacy::structured($result), $this->limits->get('max_tool_result_bytes'));
                 $events[] = ['role' => 'tool', 'content' => $json, 'call_id' => $call['id']];
                 $tools[] = ['call_id' => $call['id'], 'name' => $call['name'], 'ok' => $result['ok'],
-                    'error_code' => $result['error']['code'] ?? null];
+                    'error_code' => $result['error']['code'] ?? null,
+                    ...ToolResultPresenter::errorReason($call['name'], $result['ok'], $result['error']['code'] ?? null, $result['error']['reason'] ?? null)];
                 $this->limits->json([$instructions, $definitions, $history, $events]);
             }
         }

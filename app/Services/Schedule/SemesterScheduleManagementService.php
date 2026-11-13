@@ -3,6 +3,7 @@
 namespace App\Services\Schedule;
 
 use App\Enums\LessonType;
+use App\Exceptions\SemesterOccurrenceConflictException;
 use App\Models\ScheduleDateExceptionLesson;
 use App\Models\SemesterSchedule;
 use App\Models\User;
@@ -222,8 +223,12 @@ class SemesterScheduleManagementService
             $snapshot = $graph['snapshots'][$date] ?? null;
             $effective = $this->calculator->calculate($this->state->config($graph),
                 $graph['rules']->map->attributesToArray()->all(), $snapshot, $date, $owner->timezone);
+            $added = [...$this->lessonFields(Arr::only($values, self::LESSON_FIELDS)),
+                'source_weekly_rule_id' => null, 'is_added' => true];
+            $this->references($graph, $added);
+            $this->calculator->validateOccurrenceAddition($effective, $added, $date, $owner->timezone);
             if ($existing !== null && $effective === []) {
-                $this->invalid('date', 'This date is cancelled. Restore or replace it explicitly before adding a lesson.');
+                throw new SemesterOccurrenceConflictException('date_cancelled');
             }
             $lessons = $snapshot['lessons'] ?? array_map(function ($row) use ($graph): array {
                 $rule = $graph['rules']->find($row['weekly_lesson_rule_id']);
@@ -231,8 +236,6 @@ class SemesterScheduleManagementService
                 return [...$this->lessonFields($rule->only(self::LESSON_FIELDS)),
                     'source_weekly_rule_id' => $rule->id, 'is_added' => false];
             }, $effective);
-            $added = [...$this->lessonFields(Arr::only($values, self::LESSON_FIELDS)),
-                'source_weekly_rule_id' => null, 'is_added' => true];
             $lessons[] = $added;
             // Use the same full projected-semester validation as manual date edits.
             $candidate = $this->saveSnapshot($owner, $graph, $date, $existing?->kind ?? 'replacement',
