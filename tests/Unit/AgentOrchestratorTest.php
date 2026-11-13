@@ -71,6 +71,39 @@ class AgentOrchestratorTest extends TestCase
             ['Create a task', 'Task creation is not available in this read-only chat.']];
     }
 
+    public function test_provider_receives_only_current_lesson_tools_and_semester_creation_with_consistent_instructions(): void
+    {
+        $requests = [];
+        $provider = $this->provider([$this->response(text: 'Please choose the date and lesson.')], $requests);
+        $agent = new AgentOrchestrator($provider, new ToolRegistry, $this->createMock(ToolExecutor::class),
+            $this->limits(), new TaskActionRegistry, $this->createMock(TaskActionProposalService::class),
+            new SubtaskReminderActionRegistry, $this->createMock(SubtaskReminderActionService::class), $this->createMock(ManagementReadTools::class),
+            new PlanningActionRegistry, $this->createMock(PlanningActionService::class),
+            new LessonActionRegistry, $this->createMock(LessonActionService::class),
+            new AvailabilityActionRegistry, $this->createMock(AvailabilityActionService::class),
+            new SemesterActionRegistry, $this->createMock(SemesterActionService::class),
+            $this->createMock(SemesterReadTools::class), $this->createMock(RecoveryReadTools::class));
+        $agent->run($this->owner(), [], 'What Lesson changes can you propose?');
+        $definitions = $requests[0]['definitions'];
+        $names = array_column($definitions, 'name');
+        $this->assertSame(['propose_lesson_create', 'propose_lesson_update', 'propose_lesson_cancel'],
+            array_values(array_filter($names, fn ($name) => str_starts_with($name, 'propose_lesson_'))));
+        $this->assertContains('propose_semester_occurrence_create', $names);
+        $this->assertStringContainsString('No deletion or new replacement proposal is available.', $requests[0]['instructions']);
+        $this->assertStringContainsString('registered semester proposal tools', $requests[0]['instructions']);
+        $this->assertStringContainsString('reviewed linked planned sessions', $requests[0]['instructions']);
+        $this->assertStringNotContainsString('cancellation and deletion', $requests[0]['instructions']);
+        foreach ($definitions as $definition) {
+            if (str_starts_with($definition['name'], 'propose_lesson_')) {
+                $this->assertStringNotContainsString('semester management interface', $definition['description']);
+            }
+            if (in_array($definition['name'], ['propose_task_complete', 'propose_subtask_complete'], true)) {
+                $this->assertStringContainsString('reviewed linked planned sessions starting strictly in the future', $definition['description']);
+                $this->assertStringNotContainsString('session statuses are preserved', $definition['description']);
+            }
+        }
+    }
+
     #[DataProvider('conversationalMessages')]
     public function test_greetings_clarification_and_unavailable_mutations_can_finish_without_tools(string $content, string $answer): void
     {

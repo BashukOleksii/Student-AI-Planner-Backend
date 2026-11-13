@@ -160,17 +160,29 @@ class AiTaskActionsTest extends TestCase
         $this->assertSame($sessionBefore, $session->fresh()->getAttributes());
     }
 
-    public function test_completion_cancels_dependent_reminders_preserves_children_sessions_and_reopening_recreates_nothing(): void
+    public function test_completion_cancels_reviewed_future_sessions_preserves_history_and_reopening_recreates_nothing(): void
     {
+        $this->travelTo(CarbonImmutable::parse('2026-11-13T10:00:00Z'));
         [$owner, $conversation] = $this->fixture();
         $task = Task::factory()->for($owner)->create();
         $child = Subtask::factory()->for($task)->create();
         $session = StudySession::factory()->for($task)->create(['subtask_id' => $child->id]);
+        $boundary = StudySession::factory()->for($task)->create(['starts_at' => '2026-11-13 10:00:00', 'ends_at' => '2026-11-13 11:00:00']);
+        $future = collect([null, $child->id])->map(fn ($childId) => StudySession::factory()->for($task)->create([
+            'subtask_id' => $childId, 'starts_at' => '2026-11-14 10:00:00', 'ends_at' => '2026-11-14 11:00:00',
+        ]));
         $reminders = [Reminder::factory()->for($owner)->for($task)->create(),
             Reminder::factory()->for($owner)->create(['subtask_id' => $child->id]),
             Reminder::factory()->for($owner)->create(['study_session_id' => $session->id])];
-        $before = [$child->fresh()->getAttributes(), $session->fresh()->getAttributes()];
+        foreach ($future as $planned) {
+            $reminders[] = Reminder::factory()->for($owner)->create(['study_session_id' => $planned->id]);
+        }
+        $before = [$child->fresh()->getAttributes(), $session->fresh()->getAttributes(), $boundary->fresh()->getAttributes()];
         $turn = $this->propose($conversation, 'propose_task_complete', ['task_id' => $task->id]);
+        $this->assertSame(2, $turn['action']['preview']['completion_review']['future_sessions_count']);
+        foreach ($future as $planned) {
+            $this->assertSame('planned', $planned->fresh()->status->value);
+        }
         $this->assertStringContainsString('history are preserved', $turn['action']['preview']['effects'][0]);
         $this->postAction($this->url($conversation, $turn['action']['id']).'/confirm')->assertOk()->assertJsonPath('data.receipt.task.status', 'completed');
         $this->assertSame(TaskStatus::Completed, $task->fresh()->status);
@@ -178,11 +190,18 @@ class AiTaskActionsTest extends TestCase
         foreach ($reminders as $reminder) {
             $this->assertSame(ReminderStatus::Cancelled, $reminder->fresh()->status);
         }
+        foreach ($future as $planned) {
+            $this->assertSame('cancelled', $planned->fresh()->status->value);
+            $this->assertNull($planned->fresh()->actual_minutes);
+            $this->assertNull($planned->fresh()->completed_at);
+        }
+        $futureBeforeReopen = $future->map(fn ($planned) => $planned->fresh()->getAttributes())->all();
         $turn = $this->propose($conversation, 'propose_task_reopen', ['task_id' => $task->id]);
         $reminderBefore = DB::table('reminders')->orderBy('id')->get()->toArray();
         $this->postAction($this->url($conversation, $turn['action']['id']).'/confirm')->assertOk()->assertJsonPath('data.receipt.task.status', 'pending');
         $this->assertNull($task->fresh()->completed_at);
-        $this->assertSame($before, [$child->fresh()->getAttributes(), $session->fresh()->getAttributes()]);
+        $this->assertSame($before, [$child->fresh()->getAttributes(), $session->fresh()->getAttributes(), $boundary->fresh()->getAttributes()]);
+        $this->assertSame($futureBeforeReopen, $future->map(fn ($planned) => $planned->fresh()->getAttributes())->all());
         $this->assertEquals($reminderBefore, DB::table('reminders')->orderBy('id')->get()->toArray());
     }
 

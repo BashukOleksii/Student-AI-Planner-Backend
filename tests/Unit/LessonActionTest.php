@@ -51,7 +51,8 @@ class LessonActionTest extends TestCase
             ...(new SubtaskReminderActionRegistry)->readDefinitions(), ...(new SubtaskReminderActionRegistry)->definitions(),
             ...(new PlanningActionRegistry)->definitions()];
         $definitions = (new LessonActionRegistry)->definitions();
-        $this->assertSame(LessonActionRegistry::NAMES, array_column($definitions, 'name'));
+        $this->assertSame(['propose_lesson_create', 'propose_lesson_update', 'propose_lesson_cancel'], array_column($definitions, 'name'));
+        $this->assertSame(LessonActionRegistry::NAMES, array_column((new LessonActionRegistry)->definitions(includeRetired: true), 'name'));
         $this->assertCount(count($old) + count($definitions), array_unique(array_column([...$old, ...$definitions], 'name')));
         foreach ((new OpenAiToolSchema)->definitions($definitions) as $i => $definition) {
             $this->assertFalse($definition['strict']);

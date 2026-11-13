@@ -11,9 +11,10 @@ use App\Models\ScheduleImportBatch;
 use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\User;
-use App\Services\AI\Actions\LessonActionRegistry;
+use App\Services\AI\Actions\LessonActionPresenter;
 use App\Services\AI\Actions\LessonActionService;
 use App\Services\AI\LlmProvider;
+use App\Services\Planning\CalendarBusyIntervalService;
 use App\Services\Schedule\LessonService;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Http\Client\Factory;
@@ -51,6 +52,15 @@ class AiLessonActionsTest extends TestCase
         $this->actingAs($owner, 'web');
 
         return compact('owner', 'conversation', 'subject', 'teacher', 'period', 'lesson');
+    }
+
+    /** Retained records from before retirement, not a request to the disabled writer. */
+    private function historicalReplacement(array $f, bool $deleted = false): Lesson
+    {
+        return Lesson::factory()->for($f['owner'])->create(['replaces_lesson_id' => $f['lesson']->id,
+            'subject_id' => $f['subject']->id, 'teacher_id' => $f['teacher']->id, 'academic_period_id' => $f['period']->id,
+            'starts_at' => '2026-11-04 07:00:00', 'ends_at' => '2026-11-04 08:00:00',
+            'deleted_at' => $deleted ? now() : null]);
     }
 
     private function args(array $f, string $name): array
@@ -91,7 +101,8 @@ class AiLessonActionsTest extends TestCase
     private function snapshot(): array
     {
         $snapshot = [];
-        foreach (['subjects', 'teachers', 'academic_periods', 'lessons', 'tasks', 'subtasks', 'study_sessions', 'reminders', 'notifications', 'schedule_import_batches', 'schedule_import_rows'] as $table) {
+        foreach (['subjects', 'teachers', 'academic_periods', 'lessons', 'tasks', 'subtasks', 'study_sessions', 'reminders', 'notifications', 'schedule_import_batches', 'schedule_import_rows',
+            'semester_schedules', 'weekly_lesson_rules', 'schedule_date_exceptions', 'schedule_date_exception_lessons'] as $table) {
             $snapshot[$table] = DB::table($table)->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
         }
 
@@ -100,7 +111,7 @@ class AiLessonActionsTest extends TestCase
 
     public static function actions(): array
     {
-        return array_map(fn ($name) => [$name], LessonActionRegistry::NAMES);
+        return [['propose_lesson_create'], ['propose_lesson_update'], ['propose_lesson_cancel']];
     }
 
     #[DataProvider('actions')]
@@ -109,10 +120,12 @@ class AiLessonActionsTest extends TestCase
         $f = $this->fixture();
         $method = match ($name) {
             'propose_lesson_create' => 'create', 'propose_lesson_update' => 'update',
-            'propose_lesson_cancel' => 'cancel', default => 'createReplacement',
+            'propose_lesson_cancel' => 'cancel',
         };
-        $real = new LessonService;
-        $writer = $this->createPartialMock(LessonService::class, ['create', 'update', 'cancel', 'createReplacement']);
+        $real = app(LessonService::class);
+        $writer = $this->getMockBuilder(LessonService::class)
+            ->setConstructorArgs([app(CalendarBusyIntervalService::class)])
+            ->onlyMethods(['create', 'update', 'cancel', 'createReplacement'])->getMock();
         foreach (['create', 'update', 'cancel', 'createReplacement'] as $other) {
             if ($other !== $method) {
                 $writer->expects($this->never())->method($other);
@@ -149,10 +162,7 @@ class AiLessonActionsTest extends TestCase
         $this->assertSame($id, $receipt['action_id']);
         $this->assertSame($name, $receipt['type']);
         $this->assertSame($name === 'propose_lesson_cancel' ? 'cancelled' : 'active', $receipt['lesson']['status']);
-        if ($name === 'propose_lesson_replacement') {
-            $this->assertSame('replaced', $receipt['original']['status']);
-            $this->assertSame($f['lesson']->id, $receipt['lesson']['replaces_lesson_id']);
-        }
+        $this->assertNull($receipt['original']);
         $this->assertArrayNotHasKey('user_id', $receipt['lesson']);
         $this->assertArrayNotHasKey('schedule_import_batch_id', $receipt['lesson']);
         $after = $this->snapshot();
@@ -238,7 +248,7 @@ class AiLessonActionsTest extends TestCase
             'teacher_label' => $f['teacher']->update(['name' => 'Renamed teacher']),
             'period_label' => $f['period']->update(['name' => 'Renamed period']),
             'subject_owner' => $f['subject']->update(['user_id' => User::factory()->create()->id]),
-            'replacement_history' => app(LessonService::class)->createReplacement($f['owner'], $f['lesson'], $this->args($f, 'propose_lesson_replacement')),
+            'replacement_history' => $this->historicalReplacement($f, deleted: true),
         };
         $before = $this->snapshot();
         $this->decide($f, $turn['action']['id'])->assertConflict()->assertJsonPath('code', 'action_stale');
@@ -265,7 +275,7 @@ class AiLessonActionsTest extends TestCase
 
     public static function conflictActions(): array
     {
-        return [['propose_lesson_create'], ['propose_lesson_update'], ['propose_lesson_replacement']];
+        return [['propose_lesson_create'], ['propose_lesson_update']];
     }
 
     #[DataProvider('conflictActions')]
@@ -287,7 +297,7 @@ class AiLessonActionsTest extends TestCase
     public static function rollbackActions(): array
     {
         $cases = [];
-        foreach (LessonActionRegistry::NAMES as $name) {
+        foreach (self::actions() as [$name]) {
             foreach (['receipt', 'history'] as $failure) {
                 $cases[] = [$name, $failure];
             }
@@ -317,7 +327,7 @@ class AiLessonActionsTest extends TestCase
         $this->decide($f, $turn['action']['id'])->assertOk();
     }
 
-    public function test_import_identity_is_immutable_and_imported_original_can_be_cancelled_or_manually_replaced(): void
+    public function test_import_identity_is_immutable_and_imported_original_can_be_updated_and_cancelled(): void
     {
         $f = $this->fixture();
         $batch = ScheduleImportBatch::factory()->for($f['owner'])->create(['academic_period_id' => $f['period']->id]);
@@ -328,30 +338,33 @@ class AiLessonActionsTest extends TestCase
         $this->decide($f, $turn['action']['id'])->assertOk();
         $this->assertSame($batch->id, $f['lesson']->fresh()->schedule_import_batch_id);
         $this->assertSame(str_repeat('a', 64), $f['lesson']->fresh()->import_fingerprint);
-        $turn = $this->propose($f, 'propose_lesson_replacement');
-        $receipt = $this->decide($f, $turn['action']['id'])->assertOk()->json('data.receipt');
-        $replacement = Lesson::findOrFail($receipt['lesson']['id']);
-        $this->assertNull($replacement->schedule_import_batch_id);
-        $this->assertNull($replacement->import_fingerprint);
-        $turn = $this->propose($f, 'propose_lesson_cancel', ['lesson_id' => $replacement->id]);
+        $turn = $this->propose($f, 'propose_lesson_cancel');
         $this->decide($f, $turn['action']['id'])->assertOk();
-        $this->assertSame('replaced', $f['lesson']->fresh()->status->value);
+        $this->assertSame('cancelled', $f['lesson']->fresh()->status->value);
+        $this->assertSame($batch->id, $f['lesson']->fresh()->schedule_import_batch_id);
+        $this->assertSame(str_repeat('a', 64), $f['lesson']->fresh()->import_fingerprint);
+        $this->assertDatabaseCount('lessons', 1);
     }
 
-    public function test_manual_replacement_reuses_deleted_history_and_never_converts_imported_history(): void
+    public function test_disabled_replacement_never_creates_a_proposal_or_changes_deleted_history(): void
     {
         $f = $this->fixture();
-        $history = app(LessonService::class)->createReplacement($f['owner'], $f['lesson'], $this->args($f, 'propose_lesson_replacement'));
-        app(LessonService::class)->delete($f['owner'], $history);
-        $history->refresh()->update(['import_fingerprint' => str_repeat('b', 64), 'academic_period_id' => $f['period']->id]);
-        $before = $this->snapshot();
-        $turn = $this->propose($f, 'propose_lesson_replacement');
-        $this->assertFalse($turn['tools'][0]['ok']);
-        $this->assertSame($before, $this->snapshot());
-        $history->update(['import_fingerprint' => null]);
-        $turn = $this->propose($f, 'propose_lesson_replacement');
-        $this->assertSame($history->id, $turn['action']['preview']['after']['id']);
-        $this->decide($f, $turn['action']['id'])->assertOk()->assertJsonPath('data.receipt.lesson.id', $history->id);
+        $history = $this->historicalReplacement($f, deleted: true);
+        foreach ([str_repeat('b', 64), null] as $fingerprint) {
+            $history->update(['import_fingerprint' => $fingerprint]);
+            $before = $this->snapshot();
+            $prepared = app(LessonActionService::class)->prepare($f['owner'], 'propose_lesson_replacement',
+                $this->args($f, 'propose_lesson_replacement'), 'disabled');
+            $this->assertNull($prepared['proposal']);
+            $this->assertSame('invalid_arguments', $prepared['result']['error']['code']);
+            $turn = $this->propose($f, 'propose_lesson_replacement');
+            $this->assertFalse($turn['tools'][0]['ok']);
+            $this->assertSame('invalid_arguments', $turn['tools'][0]['error_code']);
+            $this->assertArrayNotHasKey('action', $turn);
+            $this->assertSame($before, $this->snapshot());
+            $this->assertSoftDeleted($history);
+        }
+        $this->assertDatabaseCount('ai_pending_actions', 0);
         $this->assertDatabaseCount('lessons', 2);
     }
 
@@ -377,7 +390,7 @@ class AiLessonActionsTest extends TestCase
     {
         $f = $this->fixture();
         $before = $this->snapshot();
-        foreach (LessonActionRegistry::NAMES as $name) {
+        foreach (self::actions() as [$name]) {
             $result = app(LessonActionService::class)->prepare($f['owner'], $name, $this->args($f, $name), 'correlated');
             $this->assertTrue($result['result']['ok']);
             $this->assertSame('correlated', $result['proposal']['call_id']);
@@ -411,13 +424,14 @@ class AiLessonActionsTest extends TestCase
     public function test_changed_deleted_replacement_history_is_stale_even_when_the_original_did_not_change(): void
     {
         $f = $this->fixture();
-        $history = app(LessonService::class)->createReplacement($f['owner'], $f['lesson'], $this->args($f, 'propose_lesson_replacement'));
-        app(LessonService::class)->delete($f['owner'], $history);
-        $turn = $this->propose($f, 'propose_lesson_replacement');
+        $history = $this->historicalReplacement($f, deleted: true);
+        $originalBefore = $f['lesson']->fresh()->getAttributes();
+        $turn = $this->propose($f, 'propose_lesson_update');
         DB::table('lessons')->where('id', $history->id)->update(['room' => 'Changed deleted history']);
         $before = $this->snapshot();
         $this->decide($f, $turn['action']['id'])->assertConflict()->assertJsonPath('code', 'action_stale');
         $this->assertSame($before, $this->snapshot());
+        $this->assertSame($originalBefore, $f['lesson']->fresh()->getAttributes());
     }
 
     public function test_deleted_create_reference_requires_a_fresh_review_and_unauthenticated_decisions_are_denied(): void
@@ -434,6 +448,78 @@ class AiLessonActionsTest extends TestCase
         $this->getJson($this->url($f, $id))->assertUnauthorized();
         $this->decide($f, $id)->assertUnauthorized();
         $this->decide($f, $id, 'reject')->assertUnauthorized();
+        $this->assertSame($before, $this->snapshot());
+    }
+
+    public function test_supported_actions_reject_virtual_semester_occurrence_identities(): void
+    {
+        $f = $this->fixture();
+        $before = $this->snapshot();
+        foreach (self::actions() as [$name]) {
+            foreach (['semester:1:2026-11-04:rule:1', 'semester:1:2026-11-04:snapshot:2'] as $identity) {
+                $args = array_replace($this->args($f, $name), ['lesson_id' => $identity]);
+                $prepared = app(LessonActionService::class)->prepare($f['owner'], $name, $args, 'virtual');
+                $this->assertNull($prepared['proposal']);
+                $this->assertSame('invalid_arguments', $prepared['result']['error']['code']);
+                $turn = $this->propose($f, $name, $args);
+                $this->assertFalse($turn['tools'][0]['ok']);
+                $this->assertArrayNotHasKey('action', $turn);
+            }
+        }
+        $this->assertSame($before, $this->snapshot());
+        $this->assertDatabaseCount('ai_pending_actions', 0);
+    }
+
+    public function test_historical_replacement_can_be_updated_and_cancelled_without_restoring_original(): void
+    {
+        $f = $this->fixture();
+        $f['lesson']->update(['status' => 'replaced']);
+        $original = $f['lesson']->fresh();
+        $f['lesson'] = $this->historicalReplacement($f);
+        $before = $original->getAttributes();
+        foreach (['propose_lesson_update', 'propose_lesson_cancel'] as $name) {
+            $turn = $this->propose($f, $name);
+            $receipt = $this->decide($f, $turn['action']['id'])->assertOk()->json('data.receipt');
+            $this->assertSame($original->id, $receipt['lesson']['replaces_lesson_id']);
+            $this->assertSame($before, $original->fresh()->getAttributes());
+            $this->decide($f, $turn['action']['id'])->assertOk()->assertJsonPath('replayed', true)->assertJsonPath('data.receipt', $receipt);
+        }
+        $this->assertSame('cancelled', $f['lesson']->fresh()->status->value);
+        $this->assertDatabaseCount('lessons', 2);
+    }
+
+    public function test_retained_replacement_pending_action_is_rejected_but_executed_receipt_still_replays(): void
+    {
+        $f = $this->fixture();
+        // Seed an old pending action using a current graph hash and representative old arguments.
+        $prepared = app(LessonActionService::class)->prepare($f['owner'], 'propose_lesson_update', $this->args($f, 'propose_lesson_update'), 'historical');
+        $turn = DB::table('ai_conversation_turns')->insertGetId(['conversation_id' => $f['conversation']->id,
+            'request_id' => (string) Str::uuid(), 'input_hash' => hash('sha256', 'historical'), 'result' => '{}']);
+        $action = AiPendingAction::create([...$prepared['proposal'], 'conversation_id' => $f['conversation']->id, 'turn_id' => $turn,
+            'type' => 'propose_lesson_replacement', 'arguments' => $this->args($f, 'propose_lesson_replacement'),
+            'status' => 'pending', 'expires_at' => now()->addMinutes(15)]);
+        $before = $this->snapshot();
+        $this->getJson($this->url($f, $action->id))->assertOk()->assertJsonPath('data.type', 'propose_lesson_replacement');
+        $this->decide($f, $action->id)->assertUnprocessable()->assertJsonPath('code', 'action_validation_failed');
+        $this->assertSame($before, $this->snapshot());
+        $this->assertSame('pending', $action->fresh()->status);
+        $this->assertNull($action->fresh()->receipt);
+
+        // An already executed historical receipt bypasses domain execution, as before.
+        $f['lesson']->update(['status' => 'replaced']);
+        $replacement = $this->historicalReplacement($f);
+        $presenter = app(LessonActionPresenter::class);
+        $receipt = ['action_id' => $action->id, 'type' => 'propose_lesson_replacement',
+            'lesson' => $presenter->lesson($f['owner'], $replacement),
+            'original' => $presenter->lesson($f['owner'], $f['lesson']->fresh())];
+        $action->update(['status' => 'executed', 'resolved_at' => now(), 'receipt' => $receipt]);
+        $stored = $action->fresh()->getAttributes();
+        $receipt = $action->fresh()->receipt; // MySQL normalizes JSON object key order.
+        $before = $this->snapshot();
+        $this->getJson($this->url($f, $action->id))->assertOk()->assertJsonPath('data.receipt', $receipt);
+        $this->decide($f, $action->id)->assertOk()->assertJsonPath('replayed', true)->assertJsonPath('data.receipt', $receipt);
+        $this->decide($f, $action->id, 'reject')->assertConflict()->assertJsonPath('code', 'action_executed');
+        $this->assertSame($stored, $action->fresh()->getAttributes());
         $this->assertSame($before, $this->snapshot());
     }
 }

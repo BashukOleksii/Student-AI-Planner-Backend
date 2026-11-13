@@ -234,7 +234,18 @@ class AiSubtaskReminderActionsTest extends TestCase
         $parentReminder = app(ReminderService::class)->create($f['owner'], ['task_id' => $f['task']->id, 'trigger_at' => $this->time()]);
         $taskBefore = $f['task']->fresh()->getAttributes();
         $sessionBefore = $f['session']->fresh()->getAttributes();
+        $sibling = Subtask::factory()->for($f['task'])->create();
+        $siblingSession = StudySession::factory()->for($f['task'])->create(['subtask_id' => $sibling->id,
+            'starts_at' => now('UTC')->addDays(3)->startOfSecond(), 'ends_at' => now('UTC')->addDays(3)->addHour()->startOfSecond()]);
+        $parentSession = StudySession::factory()->for($f['task'])->create([
+            'starts_at' => now('UTC')->addDays(3)->startOfSecond(), 'ends_at' => now('UTC')->addDays(3)->addHour()->startOfSecond()]);
+        $started = StudySession::factory()->for($f['task'])->create(['subtask_id' => $f['child']->id,
+            'starts_at' => now('UTC')->subHour()->startOfSecond(), 'ends_at' => now('UTC')->addHour()->startOfSecond()]);
+        $untouched = collect([$sibling, $siblingSession, $parentSession, $started]);
+        $untouchedBefore = $untouched->map(fn ($record) => $record->fresh()->getAttributes())->all();
         $turn = $this->propose($f, 'propose_subtask_complete', $this->args($f, 'propose_subtask_complete'));
+        $this->assertSame(1, $turn['action']['preview']['completion_review']['future_sessions_count']);
+        $this->assertSame('planned', $f['session']->fresh()->status->value);
         $this->decide($f, $turn['action']['id'])->assertOk();
         $this->assertSame('cancelled', $own->fresh()->status->value);
         $this->assertSame('cancelled', $sessionReminder->fresh()->status->value);
@@ -245,6 +256,9 @@ class AiSubtaskReminderActionsTest extends TestCase
         $this->assertEquals($remindersBefore, DB::table('reminders')->orderBy('id')->get()->toArray());
         $this->assertSame($taskBefore, $f['task']->fresh()->getAttributes());
         $this->assertSame('cancelled', $f['session']->fresh()->status->value);
+        $this->assertNull($f['session']->fresh()->actual_minutes);
+        $this->assertNull($f['session']->fresh()->completed_at);
+        $this->assertSame($untouchedBefore, $untouched->map(fn ($record) => $record->fresh()->getAttributes())->all());
         $this->assertSame($sessionBefore['starts_at'], $f['session']->fresh()->getRawOriginal('starts_at'));
     }
 
