@@ -1,5 +1,9 @@
 # Unified academic calendar and AI semester management
 
+Current extension: the separate `propose_semester_occurrence_create` appends one
+lesson to an effective date while retaining saved snapshot rows and working
+Saturday metadata. See [arguments, behavior and Frontend handoff](ai-semester-occurrence-create.md).
+
 This contract is additive. The academic calendar contains university classes only. Study sessions remain in the planning workspace. No migration was applied and no test suite, CI, deployment or production verification was executed during implementation. PHP syntax inspection is separate from behavioral verification. Regression cases were authored for a later disposable MySQL verification stage.
 
 ## Unified REST reads

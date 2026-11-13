@@ -92,6 +92,13 @@ class AiSemesterActionsTest extends TestCase
         return $response->json('data.action.id');
     }
 
+    private function addition(array $f, string $date = '2026-10-20'): array
+    {
+        return ['semester_schedule_id' => $f['schedule']->id, 'date' => $date, 'pair_number' => 3,
+            'starts_at_local' => '12:00:00', 'ends_at_local' => '13:00:00',
+            'subject_id' => $f['fields']['subject_id'], 'teacher_id' => $f['fields']['teacher_id'], 'room' => '301'];
+    }
+
     public static function operations(): array
     {
         return array_map(fn ($name) => [$name], SemesterActionRegistry::NAMES);
@@ -119,6 +126,7 @@ class AiSemesterActionsTest extends TestCase
             'propose_semester_occurrence_update' => [...$occurrence, 'room' => 'One occurrence'],
             'propose_semester_occurrence_cancel' => $occurrence,
             'propose_semester_settings_update' => [...$target, 'group_name' => 'New group'],
+            'propose_semester_occurrence_create' => $this->addition($f),
         };
         $before = $this->snapshot();
         $id = $this->propose($f, $name, $arguments);
@@ -145,10 +153,136 @@ class AiSemesterActionsTest extends TestCase
         }
         if (str_starts_with($name, 'propose_semester_occurrence_')) {
             $lessons = app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-20');
-            $this->assertSame($name === 'propose_semester_occurrence_cancel' ? 1 : 2, count($lessons));
-            $this->assertSame('10:00:00', substr($lessons[array_key_last($lessons)]['starts_at'], 11, 8));
+            $this->assertSame(match ($name) {
+                'propose_semester_occurrence_cancel' => 1, 'propose_semester_occurrence_create' => 3, default => 2,
+            }, count($lessons));
+            $this->assertSame($name === 'propose_semester_occurrence_create' ? '12:00:00' : '10:00:00', substr($lessons[array_key_last($lessons)]['starts_at'], 11, 8));
             $this->assertSame(2, $f['schedule']->weeklyLessonRules()->count());
         }
+    }
+
+    public function test_addition_to_working_saturday_preserves_saved_lessons_identities_provenance_and_rules(): void
+    {
+        $f = $this->fixture();
+        $f['manager']->workingSaturday($f['owner'], $f['schedule'], ['occurs_on' => '2026-10-24', 'copied_weekday' => 2,
+            'source_week_parity' => 'numerator', 'selected_weekly_rule_ids' => $f['schedule']->weeklyLessonRules()->pluck('id')->all(),
+            'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
+        // A saved modification must survive: the effective Saturday is not the base Tuesday.
+        $graph = $f['manager']->read($f['owner'], $f['schedule']);
+        $first = $graph['lessons']->first();
+        $f['manager']->changeOccurrence($f['owner'], $f['schedule'], '2026-10-24',
+            'semester:'.$f['schedule']->id.':2026-10-24:snapshot:'.$first->id,
+            ['room' => 'Frozen Saturday room'], false, ['schedule_token' => $graph['meta']['schedule_token']]);
+        $before = $this->snapshot();
+        $links = DB::table('schedule_date_exception_lesson_teacher')->orderBy('schedule_date_exception_lesson_id')->get()->all();
+        $effective = app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-24');
+        $revision = $f['schedule']->fresh()->management_revision;
+        $id = $this->propose($f, 'propose_semester_occurrence_create', $this->addition($f, '2026-10-24'));
+        $this->assertSame($before, $this->snapshot());
+        $preview = AiPendingAction::findOrFail($id)->preview;
+        $this->assertSame('2026-10-24', $preview['after']['date']);
+        $this->assertSame('working_saturday', $preview['after']['kind']);
+        $this->assertSame('numerator', $preview['after']['source_week_parity']);
+        $new = collect($preview['after']['lessons'])->firstWhere('pair_number', 3);
+        $this->assertSame('301', $new['room']);
+        $this->assertSame($f['owner']->subjects()->findOrFail($new['subject_id'])->name, $new['subject']['name']);
+        $this->assertSame($f['owner']->teachers()->findOrFail($new['teacher_id'])->name, $new['teacher']['name']);
+        $this->travelTo(CarbonImmutable::parse('2026-10-16T08:05:00Z'));
+        $path = $f['base'].'/actions/'.$id.'/confirm';
+        $receipt = $this->postJson($path)->assertOk()->assertJsonPath('data.status', 'executed')->json('data.receipt');
+        $after = $this->snapshot();
+        $this->assertSame($before['weekly_lesson_rules'], $after['weekly_lesson_rules']);
+        $this->assertSame($before['schedule_date_exceptions'], $after['schedule_date_exceptions']);
+        $this->assertSame($before['schedule_date_exception_lessons'], array_slice($after['schedule_date_exception_lessons'], 0, 2));
+        $this->assertEquals($links, DB::table('schedule_date_exception_lesson_teacher')->whereIn('schedule_date_exception_lesson_id', array_column($before['schedule_date_exception_lessons'], 'id'))->orderBy('schedule_date_exception_lesson_id')->get()->all());
+        $lessons = app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-24');
+        $this->assertSame([1, 2, 3], array_column($lessons, 'pair_number'));
+        $this->assertSame($effective, array_slice($lessons, 0, 2));
+        $this->assertSame('added', $lessons[2]['change_kind']);
+        $this->assertSame($revision + 1, $f['schedule']->fresh()->management_revision);
+        $this->assertSame($receipt, $this->postJson($path)->assertOk()->json('data.receipt'));
+        $this->assertSame($after, $this->snapshot());
+    }
+
+    public function test_base_day_addition_freezes_only_selected_date(): void
+    {
+        $f = $this->fixture();
+        $before = $this->snapshot();
+        $other = app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-27');
+        $id = $this->propose($f, 'propose_semester_occurrence_create', $this->addition($f));
+        $this->assertSame($before, $this->snapshot());
+        $this->postJson($f['base'].'/actions/'.$id.'/confirm')->assertOk();
+        $lessons = app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-20');
+        $this->assertSame([1, 2, 3], array_column($lessons, 'pair_number'));
+        $this->assertSame(['base', 'base', 'added'], array_column($lessons, 'change_kind'));
+        $this->assertSame($other, app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-27'));
+        $this->assertSame($before['weekly_lesson_rules'], $this->snapshot()['weekly_lesson_rules']);
+        $this->assertDatabaseCount('schedule_date_exceptions', 1);
+        $rows = $f['manager']->read($f['owner'], $f['schedule'])['lessons'];
+        $this->assertSame($f['schedule']->weeklyLessonRules()->pluck('id')->all(), $rows->where('is_added', false)->pluck('source_weekly_rule_id')->all());
+        $this->assertNull($rows->firstWhere('pair_number', 3)->source_weekly_rule_id);
+    }
+
+    public static function invalidAdditions(): array
+    {
+        return array_map(fn ($case) => [$case], ['occupied pair', 'overlap', 'foreign subject', 'foreign teacher', 'foreign schedule',
+            'wrong teacher', 'outside semester', 'invalid time', 'ambiguous local time', 'cancelled date']);
+    }
+
+    #[DataProvider('invalidAdditions')]
+    public function test_invalid_single_additions_fail_without_proposal_or_calendar_changes(string $case): void
+    {
+        $f = $this->fixture();
+        $arguments = $this->addition($f);
+        switch ($case) {
+            case 'occupied pair': $arguments['pair_number'] = 1;
+                break;
+            case 'overlap': $arguments['starts_at_local'] = '08:30:00';
+                break;
+            case 'foreign subject': $arguments['subject_id'] = Subject::factory()->create()->id;
+                break;
+            case 'foreign teacher': $arguments['teacher_id'] = Teacher::factory()->create()->id;
+                break;
+            case 'foreign schedule': $f['owner'] = User::factory()->create();
+                break;
+            case 'wrong teacher': $arguments['teacher_id'] = Teacher::factory()->for($f['owner'])->create()->id;
+                break;
+            case 'outside semester': $arguments['date'] = '2026-11-02';
+                break;
+            case 'invalid time': $arguments['ends_at_local'] = '11:00:00';
+                break;
+            case 'ambiguous local time':
+                $arguments = [...$arguments, 'date' => '2026-10-25', 'starts_at_local' => '03:30:00', 'ends_at_local' => '04:30:00'];
+                break;
+            case 'cancelled date':
+                $f['manager']->replaceDate($f['owner'], $f['schedule'], $arguments['date'], ['mode' => 'replace', 'lessons' => [],
+                    'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
+                break;
+        }
+        $before = $this->snapshot();
+        $prepared = app(SemesterActionService::class)->prepare($f['owner'], 'propose_semester_occurrence_create', $arguments, 'invalid_addition');
+        $this->assertNull($prepared['proposal']);
+        $this->assertSame($case === 'foreign schedule' ? 'not_found' : 'invalid_arguments', $prepared['result']['error']['code']);
+        $this->assertSame($before, $this->snapshot());
+        $this->assertDatabaseCount('ai_pending_actions', 0);
+    }
+
+    public function test_single_addition_rejection_and_stale_confirmation_preserve_calendar(): void
+    {
+        $f = $this->fixture();
+        $id = $this->propose($f, 'propose_semester_occurrence_create', $this->addition($f));
+        $before = $this->snapshot();
+        $path = $f['base'].'/actions/'.$id;
+        $this->postJson($path.'/reject')->assertOk()->assertJsonPath('data.status', 'rejected');
+        $this->postJson($path.'/confirm')->assertConflict();
+        $this->assertSame($before, $this->snapshot());
+        $id = $this->propose($f, 'propose_semester_occurrence_create', $this->addition($f));
+        $f['manager']->updateRule($f['owner'], $f['schedule'], $f['rule']->id, ['room' => 'Concurrent edit',
+            'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
+        $before = $this->snapshot();
+        $this->postJson($f['base'].'/actions/'.$id.'/confirm')->assertConflict()->assertJsonPath('code', 'action_stale');
+        $this->assertSame($before, $this->snapshot());
+        $this->assertNull(AiPendingAction::findOrFail($id)->receipt);
     }
 
     public function test_changed_graph_cannot_be_confirmed(): void
@@ -262,5 +396,106 @@ class AiSemesterActionsTest extends TestCase
         $this->assertSame($f['rule']->id, $ruleId);
         $this->assertSame($before, $this->snapshot());
         $this->assertDatabaseCount('ai_pending_actions', 1);
+    }
+
+    /** Scripted provider verifies data flow and supplied instructions, not live-model language understanding. */
+    public function test_names_are_resolved_from_catalog_before_a_single_saturday_addition_proposal(): void
+    {
+        $f = $this->fixture();
+        $f['owner']->subjects()->whereKey($f['fields']['subject_id'])->update(['name' => 'Алгоритми']);
+        $f['owner']->teachers()->whereKey($f['fields']['teacher_id'])->update(['name' => 'Олена Коваль']);
+        $f['manager']->workingSaturday($f['owner'], $f['schedule'], ['occurs_on' => '2026-10-24', 'copied_weekday' => 2,
+            'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
+        $before = $this->snapshot();
+        $round = 0;
+        $scheduleId = $subjectId = $teacherId = null;
+        $provider = $this->createMock(LlmProvider::class);
+        $provider->expects($this->exactly(4))->method('respond')->willReturnCallback(function ($instructions, $history, $definitions) use (&$round, &$scheduleId, &$subjectId, &$teacherId) {
+            $this->assertStringContainsString('Zero matches or multiple matches require clarification before a proposal', $instructions);
+            $this->assertStringContainsString('instead of asking the student to enter database IDs', $instructions);
+            $this->assertStringContainsString('a duration that contradicts those endpoints', $instructions);
+            $this->assertContains('propose_semester_occurrence_create', array_column($definitions, 'name'));
+            $call = fn ($name, $arguments, $id) => ['id' => $id, 'name' => $name, 'arguments' => $arguments];
+            if ($round++ === 0) {
+                return ['text' => null, 'calls' => [
+                    $call('list_semester_schedules', [], 'schedule'),
+                    $call('search_academic_catalog', ['kind' => 'subject', 'query' => 'Алгоритми'], 'subject'),
+                    $call('search_academic_catalog', ['kind' => 'teacher', 'query' => 'Олена Коваль'], 'teacher'),
+                ], 'state' => []];
+            }
+            if ($round === 2) {
+                $results = array_map(fn ($event) => json_decode($event['content'], true, flags: JSON_THROW_ON_ERROR), array_slice($history, -3));
+                foreach ($results as $result) {
+                    $this->assertTrue($result['ok']);
+                }
+                $this->assertSame(1, $results[1]['data']['meta']['total']);
+                $this->assertSame(1, $results[2]['data']['meta']['total']);
+                $scheduleId = $results[0]['data']['schedules'][0]['id'];
+                $subjectId = $results[1]['data']['items'][0]['id'];
+                $teacherId = $results[2]['data']['items'][0]['id'];
+                $this->assertSame($teacherId, $results[1]['data']['items'][0]['teachers'][0]['id']);
+
+                return ['text' => null, 'calls' => [$call('get_schedule_for_date', ['date' => '2026-10-24'], 'effective')], 'state' => []];
+            }
+            if ($round === 3) {
+                $effective = json_decode($history[array_key_last($history)]['content'], true, flags: JSON_THROW_ON_ERROR);
+                $this->assertTrue($effective['ok']);
+
+                return ['text' => null, 'calls' => [$call('propose_semester_occurrence_create', [
+                    'semester_schedule_id' => $scheduleId, 'date' => '2026-10-24', 'pair_number' => 3,
+                    'starts_at_local' => '12:00:00', 'ends_at_local' => '13:00:00',
+                    'subject_id' => $subjectId, 'teacher_id' => $teacherId, 'room' => '301',
+                ], 'append')], 'state' => []];
+            }
+
+            return ['text' => 'Review the proposed addition.', 'calls' => [], 'state' => []];
+        });
+        $this->app->instance(LlmProvider::class, $provider);
+        $response = $this->postJson($f['base'].'/messages', [
+            'content' => 'Додай третю пару на робочу суботу 24 жовтня: Алгоритми, Олена Коваль, з 12:00 до 13:00, аудиторія 301.',
+        ], ['Idempotency-Key' => (string) Str::uuid()])->assertOk()->assertJsonPath('data.action.preview.type', 'propose_semester_occurrence_create');
+        $this->assertSame(['list_semester_schedules', 'search_academic_catalog', 'search_academic_catalog',
+            'get_schedule_for_date', 'propose_semester_occurrence_create'], array_column($response->json('data.tools'), 'name'));
+        $this->assertSame($f['fields']['subject_id'], $subjectId);
+        $this->assertSame($f['fields']['teacher_id'], $teacherId);
+        $this->assertSame($f['schedule']->id, $scheduleId);
+        $this->assertSame($before, $this->snapshot());
+        $this->assertDatabaseCount('ai_pending_actions', 1);
+        $this->assertSame(3, count($response->json('data.action.preview.after.lessons')));
+    }
+
+    public static function unresolvedCatalogMatches(): array
+    {
+        return [['Немає такого предмета', 0], ['Неоднозначний предмет', 2]];
+    }
+
+    #[DataProvider('unresolvedCatalogMatches')]
+    public function test_catalog_uncertainty_is_visible_to_the_provider_and_can_end_with_clarification(string $query, int $count): void
+    {
+        $f = $this->fixture();
+        foreach ([1, 2] as $index) {
+            Subject::factory()->for($f['owner'])->create(['name' => 'Неоднозначний предмет '.$index]);
+        }
+        $before = $this->snapshot();
+        $round = 0;
+        $provider = $this->createMock(LlmProvider::class);
+        $provider->expects($this->exactly(2))->method('respond')->willReturnCallback(function ($instructions, $history) use (&$round, $query, $count) {
+            $this->assertStringContainsString('Zero matches or multiple matches require clarification before a proposal', $instructions);
+            if ($round++ === 0) {
+                return ['text' => null, 'calls' => [['id' => 'lookup', 'name' => 'search_academic_catalog',
+                    'arguments' => ['kind' => 'subject', 'query' => $query]]], 'state' => []];
+            }
+            $result = json_decode($history[array_key_last($history)]['content'], true, flags: JSON_THROW_ON_ERROR);
+            $this->assertTrue($result['ok']);
+            $this->assertSame($count, $result['data']['meta']['total']);
+
+            return ['text' => 'Уточніть, будь ласка, назву предмета.', 'calls' => [], 'state' => []];
+        });
+        $this->app->instance(LlmProvider::class, $provider);
+        $response = $this->postJson($f['base'].'/messages', ['content' => 'Додай пару: '.$query],
+            ['Idempotency-Key' => (string) Str::uuid()])->assertOk();
+        $this->assertArrayNotHasKey('action', $response->json('data'));
+        $this->assertDatabaseCount('ai_pending_actions', 0);
+        $this->assertSame($before, $this->snapshot());
     }
 }

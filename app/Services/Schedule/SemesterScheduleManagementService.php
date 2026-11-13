@@ -213,6 +213,44 @@ class SemesterScheduleManagementService
         });
     }
 
+    /** Append one date-only lesson to the effective day, without replacing saved rows. */
+    public function createOccurrence(User $user, SemesterSchedule $schedule, string $date, array $values, bool $previewOnly = false): array
+    {
+        return $this->write($user, $schedule, $values, function ($owner, $graph, bool $previewOnly) use ($date, $values) {
+            $this->within($graph, $date);
+            $existing = $graph['exceptions']->first(fn ($row) => $row->occurs_on->format('Y-m-d') === $date);
+            $snapshot = $graph['snapshots'][$date] ?? null;
+            $effective = $this->calculator->calculate($this->state->config($graph),
+                $graph['rules']->map->attributesToArray()->all(), $snapshot, $date, $owner->timezone);
+            if ($existing !== null && $effective === []) {
+                $this->invalid('date', 'This date is cancelled. Restore or replace it explicitly before adding a lesson.');
+            }
+            $lessons = $snapshot['lessons'] ?? array_map(function ($row) use ($graph): array {
+                $rule = $graph['rules']->find($row['weekly_lesson_rule_id']);
+
+                return [...$this->lessonFields($rule->only(self::LESSON_FIELDS)),
+                    'source_weekly_rule_id' => $rule->id, 'is_added' => false];
+            }, $effective);
+            $added = [...$this->lessonFields(Arr::only($values, self::LESSON_FIELDS)),
+                'source_weekly_rule_id' => null, 'is_added' => true];
+            $lessons[] = $added;
+            // Use the same full projected-semester validation as manual date edits.
+            $candidate = $this->saveSnapshot($owner, $graph, $date, $existing?->kind ?? 'replacement',
+                $existing?->copied_weekday, $lessons, $existing, previewOnly: true);
+            if ($previewOnly) {
+                return $candidate;
+            }
+            if ($existing === null) {
+                return $this->saveSnapshot($owner, $graph, $date, 'replacement', null, $lessons);
+            }
+            // Existing snapshot identities, timestamps, teacher links and Saturday metadata are untouched.
+            $lesson = new ScheduleDateExceptionLesson(['user_id' => $owner->id, 'semester_schedule_id' => $graph['schedule']->id,
+                'schedule_date_exception_id' => $existing->id, ...Arr::except($added, ['teacher_ids'])]);
+            $this->check($lesson->save());
+            $this->lessonTeachers->sync($lesson, $added['teacher_id']);
+        }, $previewOnly);
+    }
+
     public function replaceDate(User $user, SemesterSchedule $schedule, string $date, array $values, bool $previewOnly = false): array
     {
         return $this->write($user, $schedule, $values, function ($owner, $graph, bool $previewOnly) use ($date, $values) {

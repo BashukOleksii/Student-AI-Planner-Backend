@@ -9,7 +9,8 @@ class SemesterActionRegistry
 {
     public const NAMES = ['propose_semester_rule_create', 'propose_semester_rule_update', 'propose_semester_rule_delete',
         'propose_semester_date_replace', 'propose_semester_date_delete', 'propose_semester_working_saturday',
-        'propose_semester_occurrence_update', 'propose_semester_occurrence_cancel', 'propose_semester_settings_update'];
+        'propose_semester_occurrence_update', 'propose_semester_occurrence_cancel', 'propose_semester_settings_update',
+        'propose_semester_occurrence_create'];
 
     public function definitions(): array
     {
@@ -36,7 +37,7 @@ class SemesterActionRegistry
                 'changes' => $this->listOf($this->object($change, ['weekly_lesson_rule_id'])),
             ], ['semester_schedule_id', 'date', 'mode']),
             $this->definition(self::NAMES[4], 'Propose removing one date exception, including a working Saturday. Restores the base day; does not cancel the base lessons. Requires explicit restore/delete intent.', $day, array_keys($day)),
-            $this->definition(self::NAMES[5], 'Propose a working Saturday by copying the same week effective weekday, or an explicit nonempty subset of owned weekly rules with source parity. Preserves a frozen snapshot; never guesses weekday/parity.', [...$target,
+            $this->definition(self::NAMES[5], 'Propose a working Saturday by copying the same week effective weekday, or an explicit nonempty subset of owned weekly rules with source parity. Use only for explicit day-copy intent, never to add a pair to an existing Saturday; use propose_semester_occurrence_create for that. Preserves a frozen snapshot; never guesses weekday/parity.', [...$target,
                 'occurs_on' => $date, 'copied_weekday' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 5],
                 'source_week_parity' => ['type' => 'string', 'enum' => ['numerator', 'denominator']],
                 'selected_weekly_rule_ids' => ['type' => 'array', 'items' => $id, 'minItems' => 1, 'maxItems' => 255],
@@ -47,6 +48,7 @@ class SemesterActionRegistry
                 'group_name' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 255],
                 'parity_anchor_on' => $date, 'first_week_parity' => ['type' => 'string', 'enum' => ['numerator', 'denominator']],
             ], array_keys($target)),
+            $this->definition(self::NAMES[9], 'Propose adding exactly ONE new pair on one local date to its effective semester schedule, including an existing working Saturday. Preserves existing lessons and Saturday source/parity metadata; never copies another day or changes weekly rules. Not an edit of an existing occurrence or a whole-day replacement. Occupied pair numbers and overlapping times fail; never silently replace or renumber. Cancelled dates require explicit restoration/replacement first. Resolve subject/teacher names with search_academic_catalog; zero or multiple matches require clarification, never guessed IDs or student-entered IDs. If start/end contradict a supplied duration, ask for clarification before proposing. Send one lesson only, never a lessons list.', [...$day, ...$fields], ['semester_schedule_id', 'date', ...$required]),
         ];
     }
 
@@ -58,7 +60,7 @@ class SemesterActionRegistry
         return [
             $this->definition('list_semester_schedules', 'List owned semester schedule IDs, periods and parity settings with pagination. No writes.', $page, []),
             $this->definition('get_semester_schedule_context', 'Read owned semester metadata, paginated weekly definitions and intentionally suppressed slots, optionally a saved date snapshot with paginated lessons. Use before semester edits. Null snapshot means the date uses base rules; use get_schedule_for_date for its effective occurrences. Omitted records are explicitly marked truncated; fetch further pages before choosing targets.', ['semester_schedule_id' => $this->id(), 'date' => $this->date(), ...$page], ['semester_schedule_id']),
-            $this->definition('search_academic_catalog', 'Find owned subject or teacher IDs by optional literal name substring. Paginated; multiple matches require clarification. Never invent or silently choose an association.', ['kind' => ['type' => 'string', 'enum' => ['subject', 'teacher']],
+            $this->definition('search_academic_catalog', 'Find owned subject or teacher IDs by optional literal name substring. Resolve ordinary names here instead of asking the student for database IDs. Paginated; zero or multiple matches require clarification before a proposal. Subject results include assigned teachers: respect that association, never guess or silently choose one.', ['kind' => ['type' => 'string', 'enum' => ['subject', 'teacher']],
                 'query' => ['type' => 'string', 'maxLength' => 100], ...$page], ['kind']),
         ];
     }

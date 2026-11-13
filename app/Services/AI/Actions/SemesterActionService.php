@@ -132,6 +132,7 @@ class SemesterActionService
             'propose_semester_date_replace' => $this->management->replaceDate($owner, $schedule, $arguments['date'], $values, $previewOnly),
             'propose_semester_date_delete' => $this->management->deleteException($owner, $schedule, $arguments['date'], $values, $previewOnly),
             'propose_semester_working_saturday' => $this->management->workingSaturday($owner, $schedule, $values, $previewOnly),
+            'propose_semester_occurrence_create' => $this->management->createOccurrence($owner, $schedule, $arguments['date'], $values, $previewOnly),
             'propose_semester_occurrence_update', 'propose_semester_occurrence_cancel' => $this->management->changeOccurrence($owner, $schedule,
                 $arguments['date'], $arguments['occurrence_id'], Arr::only($arguments, array_keys((new SemesterActionRegistry)->lessonFields())),
                 $name === 'propose_semester_occurrence_cancel', $values, $previewOnly),
