@@ -138,7 +138,7 @@ class TaskActionConfirmationService
     private function recordPlanningFailure(AiConversation $conversation, AiPendingAction $action, string $code): void
     {
         $message = $conversation->messages()->create(['role' => 'assistant',
-            'content' => 'Planning action confirmation failed. No business data was changed.',
+            'content' => 'Не вдалося підтвердити зміни плану. Зміни не виконано.',
             'tool_calls' => ['version' => 2, 'action_event' => ['action_id' => $action->id, 'status' => 'failed', 'error_code' => $code, 'receipt' => null]]]);
         if (! $message->exists || ! $conversation->touch()) {
             throw new AiAgentException('persistence_error');
@@ -161,20 +161,10 @@ class TaskActionConfirmationService
     {
         $event = ['action_id' => $action->id, 'status' => $action->status, 'receipt' => $action->receipt];
         $content = match ($action->status) {
-            'executed' => 'Task action executed.', 'rejected' => 'Task action rejected. No task was changed.',
-            default => 'Task action expired. No task was changed.',
+            'executed' => 'Підтверджені зміни виконано.',
+            'rejected' => 'Пропозицію відхилено. Зміни не виконано.',
+            default => 'Строк пропозиції минув. Зміни не виконано.',
         };
-        if (! str_starts_with($action->type, 'propose_task_')) {
-            $domain = match (true) {
-                $this->semesterRegistry->find($action->type) !== null => 'Semester',
-                $this->planningRegistry->find($action->type) !== null => 'Planning',
-                $this->lessonRegistry->find($action->type) !== null => 'Lesson',
-                $this->availabilityRegistry->find($action->type) !== null => 'Availability',
-                str_starts_with($action->type, 'propose_subtask_') => 'Subtask',
-                default => 'Reminder',
-            };
-            $content = $domain.' action '.$action->status.'.'.($action->status === 'executed' ? '' : ' No business data was changed.');
-        }
         $message = $conversation->messages()->create(['role' => 'assistant', 'content' => $content,
             'tool_calls' => ['version' => 2, 'action_event' => $event]]);
         if (! $message->exists || ! $conversation->touch()) {

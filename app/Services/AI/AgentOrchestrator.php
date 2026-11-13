@@ -41,7 +41,7 @@ class AgentOrchestrator
         $definitions = [...$this->registry->definitions(), ...$this->actions->definitions(), ...$this->managementRegistry->readDefinitions(), ...$this->managementRegistry->definitions(), ...$this->planningRegistry->definitions(), ...$this->lessonRegistry->definitions(), ...$this->availabilityRegistry->definitions(), ...$this->semesterRegistry->readDefinitions(), ...$this->semesterRegistry->definitions(), ...RecoveryReadTools::definitions()];
         $proposal = null;
         $proposalCalls = 0;
-        $proposalDomain = null;
+        $serverMessage = null;
         $events = [['role' => 'user', 'content' => $content]];
         $tools = $seen = [];
         foreach ($history as $event) {
@@ -99,12 +99,11 @@ class AgentOrchestrator
 
                 $answer = $response['text'];
                 if ($proposalCalls > 0) {
-                    $answer = $proposal === null ? 'No task action was prepared. No task has changed.'
-                        : 'Task action proposed. Confirmation is required; no task has changed.';
-                    if ($proposalDomain !== null && $proposalDomain !== 'task') {
-                        $answer = $proposal === null ? 'No '.$proposalDomain.' action was prepared. No business data has changed.'
-                            : ucfirst($proposalDomain).' action proposed. Confirmation is required; no business data has changed.';
-                    }
+                    $answer = $proposal === null
+                        ? 'Пропозицію не створено. Зміни не виконано.'
+                        : 'Пропозицію підготовлено до підтвердження. Зміни ще не виконано.';
+                    $serverMessage = $proposal === null ? ['kind' => 'proposal_not_created']
+                        : ['kind' => 'proposal_ready', 'action_id' => $proposal['id']];
                     // Provider text cannot manufacture successful mutation history, including intermediate rounds.
                     foreach ($events as &$event) {
                         if ($event['role'] === 'assistant') {
@@ -118,9 +117,11 @@ class AgentOrchestrator
                     $events[array_key_last($events)]['content'] = $answer;
                     // Replaying final provider state must replay the server-controlled wording too.
                     $events[array_key_last($events)]['state'] = [];
+                    $events[array_key_last($events)]['server_message'] = $serverMessage;
                 }
 
-                return ['messages' => $events, 'answer' => $answer, 'tools' => $tools, 'proposal' => $proposal];
+                return ['messages' => $events, 'answer' => $answer, 'tools' => $tools, 'proposal' => $proposal,
+                    ...($serverMessage === null ? [] : ['server_message' => $serverMessage])];
             }
             if ($round + 1 === $this->limits->get('max_tool_rounds')) {
                 throw new AiAgentException('execution_limit_reached');
@@ -128,32 +129,26 @@ class AgentOrchestrator
             foreach ($calls as $call) {
                 $checkpoint();
                 if ($this->actions->find($call['name']) !== null) {
-                    $proposalDomain = 'task';
                     $prepared = $this->proposals->prepare($owner, $call['name'], $call['arguments'], $call['id']);
                     $proposal = $prepared['proposal'];
                     $result = $prepared['result'];
                 } elseif ($this->managementRegistry->find($call['name']) !== null) {
-                    $proposalDomain = str_starts_with($call['name'], 'propose_subtask_') ? 'subtask' : 'reminder';
                     $prepared = $this->management->prepare($owner, $call['name'], $call['arguments'], $call['id']);
                     $proposal = $prepared['proposal'];
                     $result = $prepared['result'];
                 } elseif ($this->planningRegistry->find($call['name']) !== null) {
-                    $proposalDomain = 'planning';
                     $prepared = $this->planning->prepare($owner, $call['name'], $call['arguments'], $call['id']);
                     $proposal = $prepared['proposal'];
                     $result = $prepared['result'];
                 } elseif ($this->lessonRegistry->find($call['name']) !== null) {
-                    $proposalDomain = 'lesson';
                     $prepared = $this->lessons->prepare($owner, $call['name'], $call['arguments'], $call['id']);
                     $proposal = $prepared['proposal'];
                     $result = $prepared['result'];
                 } elseif ($this->availabilityRegistry->find($call['name']) !== null) {
-                    $proposalDomain = 'availability';
                     $prepared = $this->availability->prepare($owner, $call['name'], $call['arguments'], $call['id']);
                     $proposal = $prepared['proposal'];
                     $result = $prepared['result'];
                 } elseif ($this->semesterRegistry->find($call['name']) !== null) {
-                    $proposalDomain = 'semester';
                     $prepared = $this->semesters->prepare($owner, $call['name'], $call['arguments'], $call['id']);
                     $proposal = $prepared['proposal'];
                     $result = $prepared['result'];
@@ -183,7 +178,8 @@ class AgentOrchestrator
         $local = $now->setTimezone($owner->timezone);
 
         return <<<'PROMPT'
-You are the student's learning-planning assistant. Respond in the user's language.
+You are the student's learning-planning assistant. Always respond and ask clarification questions in Ukrainian, even if the user writes in another language.
+Do not automatically translate subject names, personal names or user-provided data. Preserve their original spelling.
 You orchestrate tools; application Services alone calculate schedules, free time and statistics.
 Use the available read-only tools and Task/Subtask/Reminder/planning/Lesson/semester/availability proposal tools. Proposals NEVER
 execute a mutation. Explicit authenticated REST confirmation is required for every mutation action. Conversational

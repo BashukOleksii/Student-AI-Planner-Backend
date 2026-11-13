@@ -157,19 +157,44 @@ return Application::configure(basePath: dirname(__DIR__))
                 if ($exception instanceof AiAgentException) {
                     return response()->json(['message' => $exception->getMessage(), 'code' => $exception->errorCode], $exception->status());
                 }
-                if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
-                    return null;
+                if ($exception instanceof ValidationException) {
+                    // Only AI HTTP presentation is localized; field keys, validators and manual REST stay unchanged.
+                    $labels = [
+                        'content' => 'Введіть змістовне повідомлення до 4000 символів.',
+                        'idempotency_key' => 'Надішліть запит із чинним ключем повторення.',
+                        'request' => 'Запит має містити лише дозволені поля у підтримуваному форматі.',
+                        'page' => 'Укажіть коректний номер сторінки.',
+                        'per_page' => 'Кількість записів на сторінці має бути від 1 до 50.',
+                        'through_id' => 'Оновіть історію та повторіть завантаження.',
+                        'accept_partial' => 'Підтвердьте згоду на частковий результат.',
+                        'accept_unplaced_cancellation' => 'Підтвердьте згоду на скасування сесій без заміни.',
+                        'accept_split_replacements' => 'Підтвердьте згоду на поділ сесії.',
+                        'completion_token' => 'Огляд завершення змінився. Перевірте наслідки ще раз.',
+                    ];
+                    $errors = [];
+                    foreach ($exception->errors() as $field => $messages) {
+                        $errors[$field] = array_fill(0, count($messages), $labels[$field] ?? 'Перевірте значення цього поля.');
+                    }
+
+                    return response()->json(['message' => 'Перевірте дані запиту.', 'errors' => $errors], $exception->status);
+                }
+                if ($exception instanceof AuthenticationException) {
+                    return response()->json(['message' => 'Увійдіть до облікового запису, щоб скористатися AI-помічником.'], 401);
                 }
                 if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
-                    return match ($exception->getStatusCode()) {
-                        404 => response()->json(['message' => 'Not found.'], 404),
-                        419 => response()->json(['message' => 'CSRF token mismatch.'], 419),
-                        429 => response()->json(['message' => 'Too Many Attempts.'], 429, $exception->getHeaders()),
-                        default => null,
+                    $message = match ($exception->getStatusCode()) {
+                        404 => 'Розмову або дію не знайдено.',
+                        419 => 'Сеанс захисту запиту завершився. Оновіть сторінку та повторіть дію.',
+                        429 => 'Забагато запитів. Зачекайте й спробуйте ще раз.',
+                        403 => 'Доступ до цієї дії заборонено.',
+                        405 => 'Цей спосіб запиту не підтримується.',
+                        default => 'Не вдалося виконати запит AI-чату.',
                     };
+
+                    return response()->json(['message' => $message], $exception->getStatusCode(), $exception->getHeaders());
                 }
 
-                return response()->json(['message' => 'The AI conversation could not be processed.', 'code' => 'persistence_error'], 500);
+                return response()->json(['message' => 'Не вдалося опрацювати розмову з AI-помічником.', 'code' => 'persistence_error'], 500);
             }
             if ($request->is('api/statistics/progress', 'api/statistics/trends', 'api/statistics/reports/comparison')) {
                 if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {

@@ -53,10 +53,10 @@ class TaskActionPresenter
         return ['action' => $name, 'confirmation_required' => true,
             'before' => $before, 'changes' => $this->values($candidate),
             'effects' => match ($name) {
-                'propose_task_complete' => ['Complete the task and cancel dependent scheduled reminders. Future planned sessions are cancelled; subtask statuses and session history are preserved.'],
-                'propose_task_reopen' => ['Reopen the task. Previously cancelled reminders and retired study sessions are not recreated.'],
-                'propose_task_update' => ['Update the supplied fields. Deadline changes reconcile relative reminders using current lifecycle rules.'],
-                default => ['Create one pending task. No subtasks, study sessions or reminders are created.'],
+                'propose_task_complete' => ['Після підтвердження завдання буде завершено, а залежні заплановані нагадування та майбутні заплановані сесії — скасовано. Стани підзавдань та історія сесій збережуться.'],
+                'propose_task_reopen' => ['Після підтвердження завдання повернеться до виконання. Скасовані нагадування та завершені, пропущені, скасовані чи перенесені сесії не створюватимуться знову.'],
+                'propose_task_update' => ['Після підтвердження зміняться лише вказані поля. При зміні дедлайну відносні нагадування буде узгоджено з новою датою з урахуванням їхнього стану.'],
+                default => ['Після підтвердження буде створено одне завдання до виконання. Підзавдання, навчальні сесії та нагадування не створюються.'],
             }];
     }
 }

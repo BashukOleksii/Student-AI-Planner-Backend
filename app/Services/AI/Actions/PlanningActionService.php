@@ -110,11 +110,11 @@ class PlanningActionService
                 }
                 $preview = ['action' => $name, 'confirmation_required' => $actionable, 'review' => $review,
                     'required_consent' => $required, 'effects' => [match ($name) {
-                        'propose_study_plan_create' => 'Create only the reviewed planned sessions. A partial allocation needs explicit accept_partial consent.',
-                        'propose_adaptive_replanning' => 'Preserve valid and cannot-replan sessions. Replace affected sources with one or more successors; splitting needs explicit split consent; shorter replacements need partial consent and unplaced cancellation needs separate cancellation consent. Cancel source scheduled reminders without cloning them.',
-                        'propose_session_reschedule' => 'Preliminary lifecycle and duration review only. Confirmation revalidates remaining effort and all planning constraints; the interval is not guaranteed feasible. Retire the source, create one successor, cancel scheduled source reminders, preserve history and do not clone reminders.',
-                        'propose_session_mark_missed' => 'Mark the existing session missed only after authenticated confirmation. Cancel its scheduled dependent reminders; preserve the session identity and history. No replacement is created.',
-                        default => 'Mark the existing session completed only after authenticated confirmation, using only stated actual minutes. Cancel its scheduled dependent reminders; preserve the session identity and history. No replacement is created.',
+                        'propose_study_plan_create' => 'Після підтвердження буде створено лише переглянуті заплановані сесії. Часткове розміщення потребує окремої явної згоди.',
+                        'propose_adaptive_replanning' => 'Сесії, які не потребують або не допускають перенесення, залишаться без змін. Після підтвердження змінювані сесії буде замінено однією або кількома новими. Поділ, часткове перенесення та скасування без заміни потребують окремих дозволів. Заплановані нагадування початкових сесій буде скасовано без копіювання.',
+                        'propose_session_reschedule' => 'Це попередня перевірка стану й тривалості. Підтвердження повторно перевірить залишок роботи та обмеження планування; новий час поки не гарантовано. Початкову сесію буде позначено перенесеною та створено одну заміну. Її заплановані нагадування буде скасовано без копіювання; історія збережеться.',
+                        'propose_session_mark_missed' => 'Лише після підтвердження наявну сесію буде позначено пропущеною. Залежні заплановані нагадування буде скасовано. Сама сесія та її історія збережуться; заміна не створюється.',
+                        default => 'Лише після підтвердження наявну сесію буде завершено з указаними фактичними хвилинами. Залежні заплановані нагадування буде скасовано. Сама сесія та її історія збережуться; заміна не створюється.',
                     }]];
                 // Never trim a material effect. An oversized review cannot become confirmable.
                 $this->limits->json($preview, $this->limits->get('max_tool_result_bytes'));

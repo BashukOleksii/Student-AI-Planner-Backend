@@ -62,7 +62,7 @@ class AiPlanningActionsTest extends TestCase
         $id = $turn['action']['id'];
         $this->assertSame($before, $this->planningSnapshot());
         $this->assertSame('confirmation_required', $turn['action']['state']);
-        $this->assertStringContainsString('Confirmation is required', $turn['content']);
+        $this->assertStringContainsString('підготовлено до підтвердження', $turn['content']);
         $action = AiPendingAction::findOrFail($id);
         $this->assertEquals($f['arguments'], $action->arguments);
         if (in_array($name, ['propose_study_plan_create', 'propose_adaptive_replanning'], true)) {
@@ -186,7 +186,7 @@ class AiPlanningActionsTest extends TestCase
         $before = $this->planningSnapshot();
         $response = $this->proposePlanning($f)->assertOk();
         $this->assertArrayNotHasKey('action', $response->json('data'));
-        $this->assertStringContainsString('No planning action was prepared', $response->json('data.content'));
+        $this->assertStringContainsString('Пропозицію не створено', $response->json('data.content'));
         $this->assertDatabaseCount('ai_pending_actions', 0);
         $this->assertSame($before, $this->planningSnapshot());
     }

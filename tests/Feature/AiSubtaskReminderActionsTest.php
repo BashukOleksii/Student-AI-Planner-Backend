@@ -129,7 +129,7 @@ class AiSubtaskReminderActionsTest extends TestCase
         $this->assertSame($turn['tools'][0]['call_id'], AiPendingAction::sole()->call_id);
         $this->assertEquals($arguments, AiPendingAction::sole()->arguments);
         $this->assertTrue($turn['action']['preview']['confirmation_required']);
-        $this->assertStringContainsString('Confirmation is required', $turn['content']);
+        $this->assertStringContainsString('підготовлено до підтвердження', $turn['content']);
         $replay = $this->postJson('/api/ai/conversations/'.$f['conversation']->id.'/messages', ['content' => 'Propose one change.'], ['Idempotency-Key' => $key])->assertOk()->json('data');
         $this->assertEquals($turn, $replay);
         $this->assertDatabaseCount('ai_pending_actions', 1);
@@ -595,7 +595,7 @@ class AiSubtaskReminderActionsTest extends TestCase
         $before = $this->snapshot();
         foreach (['confirm', 'reject'] as $operation) {
             $this->postJson($this->url($f, $id, '/'.$operation), ['arguments' => ['message' => 'Replaced']])->assertUnprocessable();
-            $this->postJson($this->url($f, (string) Str::uuid(), '/'.$operation), ['user_id' => 999])->assertNotFound()->assertExactJson(['message' => 'Not found.']);
+            $this->postJson($this->url($f, (string) Str::uuid(), '/'.$operation), ['user_id' => 999])->assertNotFound()->assertExactJson(['message' => 'Розмову або дію не знайдено.']);
         }
         $other = AiConversation::factory()->for($f['owner'])->create();
         $this->postJson('/api/ai/conversations/'.$other->id.'/actions/'.$id.'/confirm')->assertNotFound();

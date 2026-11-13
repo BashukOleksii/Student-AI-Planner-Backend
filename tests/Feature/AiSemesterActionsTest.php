@@ -91,7 +91,7 @@ class AiSemesterActionsTest extends TestCase
         });
         $response = $this->postJson($f['base'].'/messages', ['content' => 'Propose the semester change.'], ['Idempotency-Key' => (string) Str::uuid()])
             ->assertOk()->assertJsonPath('data.action.state', 'confirmation_required');
-        $this->assertStringContainsString('Confirmation is required', $response->json('data.content'));
+        $this->assertStringContainsString('підготовлено до підтвердження', $response->json('data.content'));
 
         return $response->json('data.action.id');
     }
@@ -348,7 +348,7 @@ class AiSemesterActionsTest extends TestCase
         $response = $this->postJson($f['base'].'/messages', $body, ['Idempotency-Key' => $key])->assertOk();
         $this->assertSame([$summary], $response->json('data.tools'));
         $this->assertArrayNotHasKey('action', $response->json('data'));
-        $this->assertSame('No semester action was prepared. No business data has changed.', $response->json('data.content'));
+        $this->assertSame('Пропозицію не створено. Зміни не виконано.', $response->json('data.content'));
         $replay = $this->postJson($f['base'].'/messages', $body, ['Idempotency-Key' => $key])->assertOk();
         $this->assertSame($response->json('data'), $replay->json('data'));
         $messages = $this->getJson($f['base'].'/messages')->assertOk()->json('data');

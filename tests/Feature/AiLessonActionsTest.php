@@ -144,7 +144,7 @@ class AiLessonActionsTest extends TestCase
         $this->assertSame($before, $this->snapshot());
         $this->assertTrue($turn['tools'][0]['ok']);
         $this->assertSame('confirmation_required', $turn['action']['state']);
-        $this->assertStringContainsString('Confirmation is required', $turn['content']);
+        $this->assertStringContainsString('підготовлено до підтвердження', $turn['content']);
         $this->assertSame($name, $turn['action']['preview']['type']);
         $this->assertSame('Mathematics', $turn['action']['preview']['after']['subject']['name']);
         $this->assertStringEndsWith('Z', $turn['action']['preview']['after']['starts_at']);
@@ -175,7 +175,7 @@ class AiLessonActionsTest extends TestCase
         $history = $this->getJson('/api/ai/conversations/'.$f['conversation']->id.'/messages')->assertOk()->json('data');
         $this->assertSame($receipt, end($history)['action_event']['receipt']);
         $this->assertStringNotContainsString('Already changed', json_encode($history));
-        $this->assertStringContainsString('Lesson action executed', end($history)['content']);
+        $this->assertStringContainsString('Підтверджені зміни виконано', end($history)['content']);
         Http::assertSentCount(2);
     }
 

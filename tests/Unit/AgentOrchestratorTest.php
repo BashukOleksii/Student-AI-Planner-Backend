@@ -319,7 +319,93 @@ class AgentOrchestratorTest extends TestCase
             new AvailabilityActionRegistry, $this->createMock(AvailabilityActionService::class),
             new SemesterActionRegistry, $semester, $this->createMock(SemesterReadTools::class), $this->createMock(RecoveryReadTools::class));
         $this->expectException(AiAgentException::class);
-        $this->expectExceptionMessage('Only one mutation action may be proposed per turn.');
+        $this->expectExceptionMessage('За одне повідомлення можна запропонувати лише одну зміну.');
         $agent->run($this->owner(), [], 'Delete the recurring lesson and create a task.');
+    }
+
+    public static function localizedProposals(): array
+    {
+        $cases = [];
+        foreach ([
+            [new TaskActionRegistry, TaskActionProposalService::class],
+            [new SubtaskReminderActionRegistry, SubtaskReminderActionService::class],
+            [new PlanningActionRegistry, PlanningActionService::class],
+            [new LessonActionRegistry, LessonActionService::class],
+            [new AvailabilityActionRegistry, AvailabilityActionService::class],
+            [new SemesterActionRegistry, SemesterActionService::class],
+        ] as [$registry, $service]) {
+            foreach ($registry->definitions() as $definition) {
+                foreach ([true, false] as $prepared) {
+                    $cases[$definition['name'].($prepared ? ':ready' : ':failed')] = [$definition['name'], $service, $prepared];
+                }
+            }
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('localizedProposals')]
+    public function test_all_current_proposals_have_code_owned_ukrainian_summaries_and_typed_provenance(string $name, string $targetService, bool $prepared): void
+    {
+        $requests = [];
+        $services = [];
+        $uuid = '10000000-0000-4000-8000-000000000001';
+        foreach ([TaskActionProposalService::class, SubtaskReminderActionService::class, PlanningActionService::class,
+            LessonActionService::class, AvailabilityActionService::class, SemesterActionService::class] as $service) {
+            $mock = $this->createMock($service);
+            $services[$service] = $mock;
+            if ($service === $targetService) {
+                $mock->expects($this->once())->method('prepare')->willReturn([
+                    'proposal' => $prepared ? ['id' => $uuid, 'type' => $name, 'call_id' => 'localized'] : null,
+                    'result' => $prepared ? ['ok' => true, 'tool' => $name, 'data' => ['state' => 'confirmation_required']]
+                        : ['ok' => false, 'tool' => $name, 'error' => ['code' => 'invalid_arguments', 'message' => 'Internal provider-facing error.']],
+                ]);
+            } else {
+                $mock->expects($this->never())->method('prepare');
+            }
+        }
+        $executor = $this->createMock(ToolExecutor::class);
+        $executor->expects($this->never())->method('execute');
+        $agent = new AgentOrchestrator($this->provider([
+            $this->response([['id' => 'localized', 'name' => $name, 'arguments' => []]], 'I already changed everything.'),
+            $this->response(text: 'Operation completed successfully.'),
+        ], $requests), new ToolRegistry, $executor, $this->limits(), new TaskActionRegistry, $services[TaskActionProposalService::class],
+            new SubtaskReminderActionRegistry, $services[SubtaskReminderActionService::class], $this->createMock(ManagementReadTools::class),
+            new PlanningActionRegistry, $services[PlanningActionService::class], new LessonActionRegistry, $services[LessonActionService::class],
+            new AvailabilityActionRegistry, $services[AvailabilityActionService::class], new SemesterActionRegistry, $services[SemesterActionService::class],
+            $this->createMock(SemesterReadTools::class), $this->createMock(RecoveryReadTools::class));
+        $result = $agent->run($this->owner(), [], 'Please make the change.');
+        $expected = $prepared ? 'Пропозицію підготовлено до підтвердження. Зміни ще не виконано.' : 'Пропозицію не створено. Зміни не виконано.';
+        $marker = $prepared ? ['kind' => 'proposal_ready', 'action_id' => $uuid] : ['kind' => 'proposal_not_created'];
+        $this->assertSame($expected, $result['answer']);
+        $this->assertSame($marker, $result['server_message']);
+        $this->assertSame($expected, $result['messages'][array_key_last($result['messages'])]['content']);
+        $this->assertSame($marker, $result['messages'][array_key_last($result['messages'])]['server_message']);
+        $this->assertNull($result['messages'][1]['content']);
+        $this->assertSame('localized', $result['tools'][0]['call_id']);
+        $this->assertSame($name, $result['tools'][0]['name']);
+        $this->assertSame($prepared, $result['tools'][0]['ok']);
+        $this->assertSame($prepared ? null : 'invalid_arguments', $result['tools'][0]['error_code']);
+        $this->assertCount(2, $requests); // No additional translation call.
+    }
+
+    public function test_ukrainian_is_a_provider_instruction_not_a_text_filter_and_names_remain_unchanged(): void
+    {
+        $requests = [];
+        $text = 'Ask John Smith about Advanced Algebra. Task action proposed. Confirmation is required; no task has changed.';
+        $agent = new AgentOrchestrator($this->provider([$this->response(text: $text)], $requests), new ToolRegistry,
+            $this->createMock(ToolExecutor::class), $this->limits(), new TaskActionRegistry, $this->createMock(TaskActionProposalService::class),
+            new SubtaskReminderActionRegistry, $this->createMock(SubtaskReminderActionService::class), $this->createMock(ManagementReadTools::class),
+            new PlanningActionRegistry, $this->createMock(PlanningActionService::class), new LessonActionRegistry, $this->createMock(LessonActionService::class),
+            new AvailabilityActionRegistry, $this->createMock(AvailabilityActionService::class), new SemesterActionRegistry, $this->createMock(SemesterActionService::class),
+            $this->createMock(SemesterReadTools::class), $this->createMock(RecoveryReadTools::class));
+        $result = $agent->run($this->owner(), [], 'Answer in English about Advanced Algebra and John Smith.');
+        $this->assertStringContainsString('Always respond and ask clarification questions in Ukrainian, even if the user writes in another language.', $requests[0]['instructions']);
+        $this->assertStringContainsString('Do not automatically translate subject names, personal names or user-provided data.', $requests[0]['instructions']);
+        $this->assertSame('Answer in English about Advanced Algebra and John Smith.', $requests[0]['history'][0]['content']);
+        $this->assertSame($text, $result['answer']); // A fake verifies delivery, not live-model compliance.
+        $this->assertArrayNotHasKey('server_message', $result);
+        $this->assertArrayNotHasKey('server_message', $result['messages'][1]);
+        $this->assertCount(1, $requests);
     }
 }

@@ -10,21 +10,21 @@ class AiAgentException extends RuntimeException
     public function __construct(public readonly string $errorCode)
     {
         parent::__construct(match ($errorCode) {
-            'multiple_actions' => 'Only one mutation action may be proposed per turn.',
-            'action_expired' => 'The action expired. No business data was changed.',
-            'action_executed' => 'An executed action cannot be rejected.',
-            'action_stale' => 'The action target has changed. Request a new proposal.',
-            'action_conflict' => 'The requested planning change is no longer feasible. Request a fresh proposal.',
-            'action_token_invalid' => 'The protected planning review is invalid or expired. Request a fresh proposal.',
-            'action_validation_failed' => 'The action is no longer valid. Review the target and request a new proposal.',
-            'ai_unavailable' => 'The AI service is unavailable.',
-            'provider_error' => 'The AI provider could not complete the request.',
-            'invalid_provider_response' => 'The AI provider returned an invalid response.',
-            'conversation_busy' => 'This conversation already has an active turn.',
-            'turn_expired' => 'This conversation turn has expired. Retry with the same idempotency key.',
-            'idempotency_conflict' => 'This idempotency key was already used for different content.',
-            'execution_limit_reached' => 'The AI request exceeded an execution limit. Narrow the request or start a new conversation.',
-            default => 'The AI conversation could not be processed.',
+            'multiple_actions' => 'За одне повідомлення можна запропонувати лише одну зміну.',
+            'action_expired' => 'Строк пропозиції минув. Зміни не виконано.',
+            'action_executed' => 'Виконану дію вже не можна відхилити.',
+            'action_stale' => 'Дані змінилися. Попросіть нову пропозицію.',
+            'action_conflict' => 'Запропоновану зміну плану більше неможливо виконати. Попросіть нову пропозицію.',
+            'action_token_invalid' => 'Огляд плану більше не дійсний або його строк минув. Попросіть нову пропозицію.',
+            'action_validation_failed' => 'Ці зміни більше не дозволені. Перевірте дані та попросіть нову пропозицію.',
+            'ai_unavailable' => 'AI-помічник зараз недоступний. Спробуйте пізніше.',
+            'provider_error' => 'AI-помічник не зміг завершити відповідь. Перевірте історію перед повторенням запиту.',
+            'invalid_provider_response' => 'AI-помічник повернув некоректну відповідь. Перевірте історію перед повторенням запиту.',
+            'conversation_busy' => 'Попередній запит у цій розмові ще обробляється. Зачекайте та оновіть історію.',
+            'turn_expired' => 'Строк обробки запиту минув. Повторіть той самий запит зі збереженим ключем повторення.',
+            'idempotency_conflict' => 'Цей ключ повторення вже використано для іншого повідомлення. Перевірте історію.',
+            'execution_limit_reached' => 'Запит перевищив ліміт обробки. Уточніть запит або почніть нову розмову.',
+            default => 'Не вдалося опрацювати розмову з AI-помічником.',
         });
     }
 

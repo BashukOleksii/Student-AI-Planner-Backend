@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\AiMessageRole;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
+use App\Models\AiPendingAction;
 use App\Models\Lesson;
 use App\Models\Reminder;
 use App\Models\StudyAvailabilityWindow;
@@ -228,9 +229,9 @@ class AiChatTest extends TestCase
         $this->actingAs($owner, 'web');
         foreach ([$foreign->id, PHP_INT_MAX, 0, 'invalid'] as $id) {
             foreach (['', '/messages'] as $suffix) {
-                $this->getJson('/api/ai/conversations/'.$id.$suffix)->assertNotFound()->assertExactJson(['message' => 'Not found.']);
+                $this->getJson('/api/ai/conversations/'.$id.$suffix)->assertNotFound()->assertExactJson(['message' => 'Розмову або дію не знайдено.']);
             }
-            $this->postJson('/api/ai/conversations/'.$id.'/messages', ['content' => null], ['Idempotency-Key' => (string) Str::uuid()])->assertNotFound()->assertExactJson(['message' => 'Not found.']);
+            $this->postJson('/api/ai/conversations/'.$id.'/messages', ['content' => null], ['Idempotency-Key' => (string) Str::uuid()])->assertNotFound()->assertExactJson(['message' => 'Розмову або дію не знайдено.']);
         }
         Http::assertNothingSent();
     }
@@ -275,7 +276,7 @@ class AiChatTest extends TestCase
         $key = (string) Str::uuid();
         Http::fakeSequence()->push($this->aiResponse([$this->aiCall()]))->push(['error' => ['message' => 'PRIVATE credentials SQL']], 500)
             ->push($this->aiResponse([$this->aiText('Recovered.')]));
-        $this->send($conversation, ['content' => 'Tasks?'], $key)->assertStatus(502)->assertExactJson(['message' => 'The AI provider could not complete the request.', 'code' => 'provider_error']);
+        $this->send($conversation, ['content' => 'Tasks?'], $key)->assertStatus(502)->assertExactJson(['message' => 'AI-помічник не зміг завершити відповідь. Перевірте історію перед повторенням запиту.', 'code' => 'provider_error']);
         $this->assertDatabaseCount('ai_messages', 0);
         $this->assertNull(DB::table('ai_conversation_turns')->sole()->lease_token);
         $this->send($conversation, ['content' => 'Tasks?'], $key)->assertOk();
@@ -294,7 +295,7 @@ class AiChatTest extends TestCase
         });
         $key = (string) Str::uuid();
         try {
-            $this->send($conversation, ['content' => 'Hello'], $key)->assertStatus(500)->assertExactJson(['message' => 'The AI conversation could not be processed.', 'code' => 'persistence_error']);
+            $this->send($conversation, ['content' => 'Hello'], $key)->assertStatus(500)->assertExactJson(['message' => 'Не вдалося опрацювати розмову з AI-помічником.', 'code' => 'persistence_error']);
             $this->assertDatabaseCount('ai_messages', 0);
             $this->assertNull(DB::table('ai_conversation_turns')->sole()->result);
         } finally {
@@ -427,5 +428,119 @@ class AiChatTest extends TestCase
         ksort($result);
 
         return $result;
+    }
+
+    public function test_ukrainian_proposal_marker_survives_post_history_and_replay_without_translation_of_user_data(): void
+    {
+        [$owner, $conversation] = $this->fixture();
+        $name = 'Advanced Algebra — John Smith';
+        Http::fakeSequence()->push($this->aiResponse([$this->aiCall('propose_task_create', json_encode(['title' => $name]))]))
+            ->push($this->aiResponse([$this->aiText('Created successfully!')]));
+        $key = (string) Str::uuid();
+        $data = $this->send($conversation, ['content' => 'Create Advanced Algebra for John Smith'], $key)->assertOk()->json('data');
+        $marker = ['kind' => 'proposal_ready', 'action_id' => $data['action']['id']];
+        $this->assertSame('Пропозицію підготовлено до підтвердження. Зміни ще не виконано.', $data['content']);
+        $this->assertSame($marker, $data['server_message']);
+        $this->assertSame('confirmation_required', $data['action']['state']);
+        $this->assertSame($name, $data['action']['preview']['changes']['title']);
+        $this->assertDatabaseCount('tasks', 0);
+        $before = AiMessage::findOrFail($data['assistant_message_id'])->getAttributes();
+        $history = collect($this->getJson($this->url($conversation))->assertOk()->json('data'));
+        $this->assertSame($marker, $history->firstWhere('id', $data['assistant_message_id'])['server_message']);
+        $this->assertCount(1, $history->filter(fn ($row) => isset($row['server_message'])));
+        $this->assertSame($before, AiMessage::findOrFail($data['assistant_message_id'])->getAttributes());
+        $this->assertSame($data, $this->send($conversation, ['content' => 'Create Advanced Algebra for John Smith'], $key)->assertOk()->json('data'));
+        Http::assertSentCount(2);
+        $base = '/api/ai/conversations/'.$conversation->id.'/actions/'.$data['action']['id'];
+        $receipt = $this->json('POST', $base.'/confirm', [], [], JSON_FORCE_OBJECT)->assertOk()->assertJsonPath('data.status', 'executed')->json('data.receipt');
+        $this->assertSame($name, $receipt['task']['title']);
+        $this->assertSame($receipt, $this->json('POST', $base.'/confirm', [], [], JSON_FORCE_OBJECT)->assertOk()->json('data.receipt'));
+        $event = collect($this->getJson($this->url($conversation))->assertOk()->json('data'))->first(fn ($row) => isset($row['action_event']));
+        $this->assertSame('Підтверджені зміни виконано.', $event['content']);
+        $this->assertSame('executed', $event['action_event']['status']);
+        $this->assertSame($data['action']['id'], $event['action_event']['action_id']);
+        $this->json('POST', $base.'/reject', [], [], JSON_FORCE_OBJECT)->assertConflict()
+            ->assertJsonPath('code', 'action_executed')->assertJsonPath('message', 'Виконану дію вже не можна відхилити.');
+        Http::assertSentCount(2);
+    }
+
+    public function test_failed_proposal_has_ukrainian_summary_and_marker_without_changing_machine_error_code(): void
+    {
+        [, $conversation] = $this->fixture();
+        Http::fakeSequence()->push($this->aiResponse([$this->aiCall('propose_task_create', '{}')]))
+            ->push($this->aiResponse([$this->aiText('I created it anyway.')]));
+        $key = (string) Str::uuid();
+        $data = $this->send($conversation, ['content' => 'Create a task'], $key)->assertOk()->json('data');
+        $this->assertSame('Пропозицію не створено. Зміни не виконано.', $data['content']);
+        $this->assertSame(['kind' => 'proposal_not_created'], $data['server_message']);
+        $this->assertArrayNotHasKey('action', $data);
+        $this->assertFalse($data['tools'][0]['ok']);
+        $this->assertSame('invalid_arguments', $data['tools'][0]['error_code']);
+        $history = collect($this->getJson($this->url($conversation))->assertOk()->json('data'));
+        $final = $history->firstWhere('id', $data['assistant_message_id']);
+        $this->assertSame($data['server_message'], $final['server_message']);
+        $this->assertSame($data['content'], $final['content']);
+        $this->assertSame($data, $this->send($conversation, ['content' => 'Create a task'], $key)->assertOk()->json('data'));
+        $this->assertDatabaseCount('tasks', 0);
+        $this->assertDatabaseCount('ai_pending_actions', 0);
+        Http::assertSentCount(2);
+    }
+
+    public function test_ordinary_provider_text_is_unmarked_even_when_it_equals_a_server_summary(): void
+    {
+        [, $conversation] = $this->fixture();
+        $text = 'Пропозицію підготовлено до підтвердження. Зміни ще не виконано.';
+        Http::fakeSequence()->push($this->aiResponse([$this->aiText($text)]));
+        $key = (string) Str::uuid();
+        $data = $this->send($conversation, ['content' => 'Just answer'], $key)->assertOk()->json('data');
+        $this->assertSame($text, $data['content']);
+        $this->assertArrayNotHasKey('server_message', $data);
+        $this->assertArrayNotHasKey('action', $data);
+        $this->assertSame($data, $this->send($conversation, ['content' => 'Just answer'], $key)->assertOk()->json('data'));
+        foreach ($this->getJson($this->url($conversation))->assertOk()->json('data') as $row) {
+            $this->assertArrayNotHasKey('server_message', $row);
+        }
+        Http::assertSentCount(1);
+    }
+
+    public function test_ai_validation_and_missing_resource_errors_are_ukrainian_without_changing_statuses_or_fields(): void
+    {
+        [, $conversation] = $this->fixture();
+        $this->send($conversation, ['content' => ''])->assertUnprocessable()
+            ->assertJsonPath('message', 'Перевірте дані запиту.')
+            ->assertJsonPath('errors.content.0', 'Введіть змістовне повідомлення до 4000 символів.');
+        $this->postJson($this->url($conversation), ['content' => 'Hello'])->assertUnprocessable()
+            ->assertJsonPath('errors.idempotency_key.0', 'Надішліть запит із чинним ключем повторення.');
+        $this->getJson('/api/ai/conversations?per_page=99')->assertUnprocessable()
+            ->assertJsonPath('errors.per_page.0', 'Кількість записів на сторінці має бути від 1 до 50.');
+        $this->getJson('/api/ai/conversations/999999')->assertNotFound()->assertJsonPath('message', 'Розмову або дію не знайдено.');
+        Http::assertNothingSent();
+    }
+
+    public static function localizedDecisions(): array
+    {
+        return [['reject', 'rejected', 'Пропозицію відхилено. Зміни не виконано.'],
+            ['confirm', 'expired', 'Строк пропозиції минув. Зміни не виконано.']];
+    }
+
+    #[DataProvider('localizedDecisions')]
+    public function test_decision_history_is_ukrainian_with_unchanged_machine_statuses(string $operation, string $status, string $text): void
+    {
+        [, $conversation] = $this->fixture();
+        Http::fakeSequence()->push($this->aiResponse([$this->aiCall('propose_task_create', '{"title":"Original Title"}')]))
+            ->push($this->aiResponse([$this->aiText('Proposal ready.')]));
+        $data = $this->send($conversation)->assertOk()->json('data');
+        $action = AiPendingAction::findOrFail($data['action']['id']);
+        if ($status === 'expired') {
+            DB::table('ai_pending_actions')->where('id', $action->id)->update(['expires_at' => DB::raw('DATE_SUB(UTC_TIMESTAMP(6), INTERVAL 1 SECOND)')]);
+        }
+        $response = $this->json('POST', '/api/ai/conversations/'.$conversation->id.'/actions/'.$action->id.'/'.$operation, [], [], JSON_FORCE_OBJECT);
+        $response->assertStatus($status === 'expired' ? 410 : 200)->assertJsonPath('data.status', $status);
+        $event = collect($this->getJson($this->url($conversation))->assertOk()->json('data'))->first(fn ($row) => isset($row['action_event']));
+        $this->assertSame($text, $event['content']);
+        $this->assertSame($status, $event['action_event']['status']);
+        $this->assertNull($event['action_event']['receipt']);
+        $this->assertDatabaseCount('tasks', 0);
+        Http::assertSentCount(2);
     }
 }

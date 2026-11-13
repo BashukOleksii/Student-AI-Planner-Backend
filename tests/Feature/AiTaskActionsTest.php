@@ -96,7 +96,7 @@ class AiTaskActionsTest extends TestCase
         $turn = $this->propose($conversation, 'propose_task_create', $arguments, $key);
         $this->assertSame($before, $this->snapshot());
         $this->assertSame('confirmation_required', $turn['action']['state']);
-        $this->assertSame('Task action proposed. Confirmation is required; no task has changed.', $turn['content']);
+        $this->assertSame('Пропозицію підготовлено до підтвердження. Зміни ще не виконано.', $turn['content']);
         $this->assertSame($turn['action']['id'], AiPendingAction::sole()->id);
         $this->assertSame($turn['tools'][0]['call_id'], AiPendingAction::sole()->call_id);
         $this->assertEquals($arguments, AiPendingAction::sole()->arguments);
@@ -183,7 +183,7 @@ class AiTaskActionsTest extends TestCase
         foreach ($future as $planned) {
             $this->assertSame('planned', $planned->fresh()->status->value);
         }
-        $this->assertStringContainsString('history are preserved', $turn['action']['preview']['effects'][0]);
+        $this->assertStringContainsString('історія сесій збережуться', $turn['action']['preview']['effects'][0]);
         $this->postAction($this->url($conversation, $turn['action']['id']).'/confirm')->assertOk()->assertJsonPath('data.receipt.task.status', 'completed');
         $this->assertSame(TaskStatus::Completed, $task->fresh()->status);
         $this->assertNotNull($task->fresh()->completed_at);
@@ -385,7 +385,7 @@ class AiTaskActionsTest extends TestCase
             foreach ([$this->url($conversation, (string) Str::uuid()), $this->url($otherConversation, $id), $this->url($foreignConversation, $id),
                 '/api/ai/conversations/999999/actions/'.$id, $this->url($conversation, 'invalid')] as $url) {
                 $response = $operation === '' ? $this->getJson($url) : $this->postJson($url.$operation, ['user_id' => $owner->id]);
-                $response->assertNotFound()->assertExactJson(['message' => 'Not found.']);
+                $response->assertNotFound()->assertExactJson(['message' => 'Розмову або дію не знайдено.']);
             }
         }
         $this->app['auth']->forgetGuards();

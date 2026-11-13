@@ -56,7 +56,7 @@ class AiSharedRateLimitTest extends TestCase
             $independent = $start($other, $otherConversation);
             foreach ([$result($two), $result($three)] as $blocked) {
                 $this->assertSame(429, $blocked['status']);
-                $this->assertSame(['message' => 'Too Many Attempts.'], $blocked['body']);
+                $this->assertSame(['message' => 'Забагато запитів. Зачекайте й спробуйте ще раз.'], $blocked['body']);
                 $this->assertSame(0, $blocked['provider_requests']);
                 $this->assertGreaterThan(0, (int) $blocked['retry_after']);
             }

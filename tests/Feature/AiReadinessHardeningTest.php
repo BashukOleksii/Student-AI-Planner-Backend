@@ -43,7 +43,7 @@ class AiReadinessHardeningTest extends TestCase
         Http::fakeSequence()->push($this->aiResponse([['type' => 'reasoning', 'id' => 'rs_1',
             'encrypted_content' => 'opaque-private', 'summary' => [], 'status' => $status], $this->aiText()]));
         $this->expectException(AiAgentException::class);
-        $this->expectExceptionMessage('invalid response');
+        $this->expectExceptionMessage('некоректну відповідь');
         app(LlmProvider::class)->respond('Server.', [], (new ToolRegistry)->definitions());
     }
 
@@ -74,7 +74,7 @@ class AiReadinessHardeningTest extends TestCase
         $this->registerBrowser();
         config(['app.debug' => true]);
         $this->browser('POST', '/api/ai/conversations', headers: ['X-XSRF-TOKEN' => 'invalid'])
-            ->assertStatus(419)->assertExactJson(['message' => 'CSRF token mismatch.']);
+            ->assertStatus(419)->assertExactJson(['message' => 'Сеанс захисту запиту завершився. Оновіть сторінку та повторіть дію.']);
     }
 
     public function test_unexpected_ai_failure_never_reports_raw_exception_context_or_private_data(): void
@@ -85,7 +85,7 @@ class AiReadinessHardeningTest extends TestCase
         AiConversation::creating(fn () => throw new RuntimeException('PRIVATE-SQL-PROMPT-protected_token-credentials'));
         try {
             $this->json('POST', '/api/ai/conversations', [], [], JSON_FORCE_OBJECT)->assertStatus(500)
-                ->assertExactJson(['message' => 'The AI conversation could not be processed.', 'code' => 'persistence_error']);
+                ->assertExactJson(['message' => 'Не вдалося опрацювати розмову з AI-помічником.', 'code' => 'persistence_error']);
         } finally {
             AiConversation::flushEventListeners();
         }

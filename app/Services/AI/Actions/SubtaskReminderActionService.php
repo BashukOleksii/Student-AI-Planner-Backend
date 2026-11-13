@@ -152,10 +152,10 @@ class SubtaskReminderActionService
                 'deadline_at' => $this->values->task($task, null)['deadline_at'],
             ], 'before' => $child === null ? null : $this->presenter->subtask($child),
                 'changes' => $this->values->values($changes), 'effects' => [match ($name) {
-                    'propose_subtask_create' => 'Append one pending subtask. The service assigns its position at confirmation.',
-                    'propose_subtask_complete' => 'Complete only this subtask and cancel its dependent scheduled reminders. Future planned sessions are cancelled; parent status and session history are preserved.',
-                    'propose_subtask_reopen' => 'Reopen only this subtask. Cancelled reminders and retired study sessions are not recreated.',
-                    default => 'Update the supplied fields. Deadline changes reconcile existing relative reminders.',
+                    'propose_subtask_create' => 'Після підтвердження буде додано одне підзавдання до виконання. Його місце у списку визначиться під час підтвердження.',
+                    'propose_subtask_complete' => 'Після підтвердження буде завершено лише це підзавдання та скасовано його залежні заплановані нагадування й майбутні заплановані сесії. Стан основного завдання та історія сесій збережуться.',
+                    'propose_subtask_reopen' => 'Після підтвердження лише це підзавдання повернеться до виконання. Скасовані нагадування та завершені, пропущені, скасовані чи перенесені сесії не створюватимуться знову.',
+                    default => 'Після підтвердження зміняться лише вказані поля. При зміні дедлайну наявні відносні нагадування буде узгоджено з новою датою.',
                 }]];
         }
         $reminder = $records['reminder'];
@@ -175,8 +175,8 @@ class SubtaskReminderActionService
 
         return ['action' => $name, 'confirmation_required' => true, 'mode' => ($data['anchor'] ?? $reminder?->anchor) === null ? 'absolute' : 'relative',
             'before' => $before, 'changes' => $changes, 'effects' => [$name === 'propose_reminder_cancel'
-                ? 'Cancel this scheduled reminder. Preserve its trigger, mode, work, sessions and delivered inbox history.'
-                : 'Schedule the reviewed reminder change. Delivery is a separate subsystem; no inbox notification is sent now.']];
+                ? 'Після підтвердження заплановане нагадування буде скасовано. Його час, спосіб прив’язки, робота, сесії та історія доставлених сповіщень збережуться.'
+                : 'Після підтвердження буде збережено переглянуту зміну нагадування. Доставка виконується окремо; зараз сповіщення не надсилається.']];
     }
 
     private function error(string $name, string $code): array

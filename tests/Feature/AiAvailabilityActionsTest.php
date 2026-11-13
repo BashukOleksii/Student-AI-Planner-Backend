@@ -179,7 +179,7 @@ class AiAvailabilityActionsTest extends TestCase
         $this->assertSame($before, $this->snapshot());
         $this->assertTrue($turn['tools'][0]['ok']);
         $this->assertSame('confirmation_required', $turn['action']['state']);
-        $this->assertStringContainsString('Confirmation is required', $turn['content']);
+        $this->assertStringContainsString('підготовлено до підтвердження', $turn['content']);
         $this->assertStringNotContainsString('target_hash', json_encode($turn));
         $preview = $turn['action']['preview'];
         $this->assertSame($name, $preview['type']);
@@ -235,7 +235,7 @@ class AiAvailabilityActionsTest extends TestCase
         $this->decide($f, $id, 'reject')->assertConflict()->assertJsonPath('code', 'action_executed');
         $event = $f['conversation']->messages()->where('tool_calls->version', 2)->sole();
         $this->assertSame($receipt, $event->tool_calls['action_event']['receipt']);
-        $this->assertSame('Availability action executed.', $event->content);
+        $this->assertSame('Підтверджені зміни виконано.', $event->content);
         $this->assertStringNotContainsString('Already changed', json_encode($f['conversation']->messages()->pluck('content')));
         $publicHistory = $this->getJson('/api/ai/conversations/'.$f['conversation']->id.'/messages')->assertOk();
         $this->assertStringNotContainsString('Already changed', $publicHistory->getContent());
@@ -528,7 +528,7 @@ class AiAvailabilityActionsTest extends TestCase
         $this->assertSame(['list_study_availability_windows', 'propose_availability_update'], array_column($turn['tools'], 'name'));
         $this->assertSame($f['window']->id, $turn['action']['preview']['after']['id']);
         $this->assertSame('24:00:00', $turn['action']['preview']['after']['ends_at']);
-        $this->assertStringContainsString('Confirmation is required', $turn['content']);
+        $this->assertStringContainsString('підготовлено до підтвердження', $turn['content']);
         $this->assertSame($before, $this->snapshot());
         Http::assertNothingSent();
     }
@@ -557,5 +557,26 @@ class AiAvailabilityActionsTest extends TestCase
         $before = $this->snapshot(true);
         $this->decide($f, $turn['action']['id'])->assertConflict()->assertJsonPath('code', 'conversation_busy');
         $this->assertSame($before, $this->snapshot(true));
+    }
+
+    #[DataProvider('actions')]
+    public function test_ukrainian_availability_summary_and_decision_keep_the_original_machine_contract(string $name): void
+    {
+        $f = $this->fixture();
+        $before = StudyAvailabilityWindow::orderBy('id')->get()->toArray();
+        $turn = $this->propose($f, $name);
+        $id = $turn['action']['id'];
+        $this->assertSame('Пропозицію підготовлено до підтвердження. Зміни ще не виконано.', $turn['content']);
+        $this->assertSame(['kind' => 'proposal_ready', 'action_id' => $id], $turn['server_message']);
+        $this->assertSame('confirmation_required', $turn['action']['state']);
+        $this->assertSame($before, StudyAvailabilityWindow::orderBy('id')->get()->toArray());
+        $receipt = $this->decide($f, $id)->assertOk()->assertJsonPath('data.status', 'executed')
+            ->assertJsonPath('data.confirmation_required', false)->json('data.receipt');
+        $this->assertSame($name, $receipt['type']);
+        $this->assertSame($id, $receipt['action_id']);
+        $this->assertSame('Підтверджені зміни виконано.', $f['conversation']->messages()->where('tool_calls->version', 2)->sole()->content);
+        $this->assertSame($receipt, $this->decide($f, $id)->assertOk()->assertJsonPath('replayed', true)->json('data.receipt'));
+        $this->assertSame(1, $f['conversation']->messages()->where('tool_calls->version', 2)->count());
+        Http::assertSentCount(2);
     }
 }

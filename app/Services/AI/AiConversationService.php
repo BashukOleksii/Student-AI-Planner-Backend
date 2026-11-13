@@ -105,6 +105,7 @@ class AiConversationService
                     'tools' => array_map(fn ($tool) => ['call_id' => $tool['call_id'], 'name' => $tool['name'], 'ok' => $tool['ok'],
                         'error_code' => $tool['error_code'],
                         ...ToolResultPresenter::errorReason($tool['name'], $tool['ok'], $tool['error_code'], $tool['error_reason'] ?? null)], $stored['tools']),
+                    ...(AiServerMessage::read($stored['server_message'] ?? null) === null ? [] : ['server_message' => AiServerMessage::read($stored['server_message'])]),
                     ...(isset($stored['action']) ? ['action' => $stored['action']] : [])]];
             }
             if ((clone $query)->whereNull('result')->where('lease_expires_at', '>', DB::raw('UTC_TIMESTAMP(6)'))->exists()) {
@@ -144,7 +145,8 @@ class AiConversationService
             foreach ($turn['messages'] as $event) {
                 $message = $conversation->messages()->create([
                     'role' => $event['role'], 'content' => $event['content'], 'tool_call_id' => $event['call_id'] ?? null,
-                    'tool_calls' => $event['role'] === 'assistant' ? ['version' => 1, 'calls' => $event['calls'], 'state' => $event['state']] : null,
+                    'tool_calls' => $event['role'] === 'assistant' ? ['version' => 1, 'calls' => $event['calls'], 'state' => $event['state'],
+                        ...(AiServerMessage::read($event['server_message'] ?? null) === null ? [] : ['server_message' => AiServerMessage::read($event['server_message'])])] : null,
                 ]);
                 if (! $message->exists || $message->getKey() === null) {
                     throw new AiAgentException('persistence_error');
@@ -177,6 +179,7 @@ class AiConversationService
             }
             $result = ['conversation_id' => $conversation->id, 'user_message_id' => $userId,
                 'assistant_message_id' => $assistantId, 'content' => $turn['answer'], 'tools' => $turn['tools'],
+                ...(AiServerMessage::read($turn['server_message'] ?? null) === null ? [] : ['server_message' => AiServerMessage::read($turn['server_message'])]),
                 ...($action === null ? [] : ['action' => ['id' => $action->id, 'state' => 'confirmation_required',
                     'call_id' => $action->call_id, 'preview' => CompletionReviewPrivacy::structured($action->preview), 'expires_at' => CarbonImmutable::parse($action->getRawOriginal('expires_at'), 'UTC')->toISOString()]])];
             if (! $conversation->touch()) {

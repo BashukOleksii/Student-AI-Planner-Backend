@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Enums\AiMessageRole;
+use App\Services\AI\AiServerMessage;
 use App\Services\AI\CompletionReviewPrivacy;
 use App\Services\AI\Tools\ToolResultPresenter;
 use Illuminate\Http\Request;
@@ -19,6 +20,9 @@ class AiMessageResource extends JsonResource
         $result = $this->role === AiMessageRole::Tool ? json_decode($this->content ?? '', true) : null;
         $content = $this->role === AiMessageRole::Tool ? null : $this->content;
 
+        $serverMessage = $this->role === AiMessageRole::Assistant && ($this->tool_calls['version'] ?? null) === 1
+            ? AiServerMessage::read($this->tool_calls['server_message'] ?? null) : null;
+
         return ['id' => $this->id, 'role' => $this->role->value,
             'content' => $content === null ? null : mb_substr($content, 0, 16000),
             'content_truncated' => $content !== null && mb_strlen($content) > 16000,
@@ -32,6 +36,7 @@ class AiMessageResource extends JsonResource
                     ...ToolResultPresenter::errorReason($result['tool'], $result['ok'], $result['error']['code'] ?? null, $result['error']['reason'] ?? null),
                 ] : null,
             ...(($this->tool_calls['version'] ?? null) === 2 ? ['action_event' => CompletionReviewPrivacy::structured($this->tool_calls['action_event'])] : []),
+            ...($serverMessage === null ? [] : ['server_message' => $serverMessage]),
             'created_at' => $this->created_at?->utc()->toISOString()];
     }
 }
