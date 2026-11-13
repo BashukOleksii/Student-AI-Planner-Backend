@@ -6,7 +6,7 @@ class CompleteStudySessionRequest extends StudySessionActionRequest
 {
     public function rules(): array
     {
-        return ['actual_minutes' => ['bail', 'required', 'integer:strict', 'min:1', 'max:65535']];
+        return ['complete_work' => ['sometimes', 'boolean:strict'], 'completion_token' => ['sometimes', 'string'], 'actual_minutes' => ['bail', 'required', 'integer:strict', 'min:1', 'max:65535']];
     }
 
     public function messages(): array

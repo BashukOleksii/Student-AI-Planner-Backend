@@ -92,14 +92,15 @@ class SubtaskService
         });
     }
 
-    public function complete(User $user, Task $task, Subtask $subtask, ?string $completionToken = null): Subtask
+    public function complete(User $user, Task $task, Subtask $subtask, ?string $completionToken = null, ?CarbonImmutable &$operationNow = null): Subtask
     {
-        return DB::transaction(function () use ($user, $task, $subtask, $completionToken): Subtask {
+        return DB::transaction(function () use ($user, $task, $subtask, $completionToken, &$operationNow): Subtask {
             $task = $this->lockParent($user, $task);
             $subtask = $task->subtasks()->lockForUpdate()->findOrFail($subtask->getKey());
             if ($subtask->status === TaskStatus::Pending) {
                 $now = CarbonImmutable::now('UTC');
                 $this->completion->cancel($user, $task, $subtask, $now, $completionToken);
+                $operationNow = $now;
                 if (! $subtask->update([
                     'status' => TaskStatus::Completed,
                     'completed_at' => $now->startOfSecond(),

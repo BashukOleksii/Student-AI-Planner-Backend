@@ -20,3 +20,13 @@ pending-action confirmation. No model tool can grant consent.
 Frontend task/subtask completion shares one review-before-write API adapter.
 Each explicit action reads a fresh review; stale/unknown writes are never retried
 automatically. The next attempt requires a fresh review and consent.
+
+Stage 2 adds `GET /api/study-sessions/{id}/completion-review`: `can_complete_work`,
+`work_type` and nullable `completion_review`. The complete POST adds optional
+strict boolean `complete_work` (default false) and `completion_token`. It accepts
+no client work ID. Required `actual_minutes` and lifecycle rules are unchanged.
+A combined write runs inside the session transaction, uses the Task/Subtask
+services and rolls back both transitions on stale consent or any write failure.
+Completed/deleted work suppresses the checkbox; session-only completion is still
+available under the existing rules. AI session proposals remain session-only;
+combined completion is available through authenticated REST/UI, not model input.

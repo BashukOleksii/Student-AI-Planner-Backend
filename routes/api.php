@@ -207,3 +207,5 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/tasks/{task}/completion-review', [TaskController::class, 'completionReview']);
     Route::get('/tasks/{task}/subtasks/{subtask}/completion-review', [SubtaskController::class, 'completionReview']);
 });
+
+Route::get('/study-sessions/{studySession}/completion-review', [StudySessionController::class, 'completionReview'])->middleware('auth:sanctum');

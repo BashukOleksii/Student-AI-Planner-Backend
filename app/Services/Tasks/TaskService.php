@@ -125,14 +125,15 @@ class TaskService
         });
     }
 
-    public function complete(User $user, Task $task, ?string $completionToken = null): Task
+    public function complete(User $user, Task $task, ?string $completionToken = null, ?CarbonImmutable &$operationNow = null): Task
     {
-        return DB::transaction(function () use ($user, $task, $completionToken): Task {
+        return DB::transaction(function () use ($user, $task, $completionToken, &$operationNow): Task {
             $this->lockOwner($user);
             $task = $user->tasks()->lockForUpdate()->findOrFail($task->getKey());
             if ($task->status->isUnfinished()) {
                 $now = CarbonImmutable::now('UTC');
                 $this->completion->cancel($user, $task, null, $now, $completionToken);
+                $operationNow = $now;
                 if (! $task->update([
                     'status' => TaskStatus::Completed,
                     'completed_at' => $now->startOfSecond(),

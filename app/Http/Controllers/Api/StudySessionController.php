@@ -19,9 +19,14 @@ use Illuminate\Support\Facades\Gate;
 
 class StudySessionController extends Controller
 {
+    public function completionReview(Request $request, string $studySession, StudySessionLifecycleService $service): array
+    {
+        return $service->completionReview($request->user(), $studySession);
+    }
+
     public function complete(CompleteStudySessionRequest $request, string $studySession, StudySessionLifecycleService $service): StudySessionResource
     {
-        return new StudySessionResource($service->complete($request->user(), $studySession, $request->validated('actual_minutes')));
+        return new StudySessionResource($service->complete($request->user(), $studySession, $request->validated('actual_minutes'), $request->validated('complete_work', false), $request->validated('completion_token')));
     }
 
     public function miss(StudySessionActionRequest $request, string $studySession, StudySessionLifecycleService $service): StudySessionResource
