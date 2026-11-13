@@ -65,6 +65,18 @@ class PlanningCompletionRulesTest extends TestCase
         $this->assertDatabaseCount('study_sessions', 0);
     }
 
+    public function test_subtask_api_exposes_parent_or_earlier_child_deadline(): void
+    {
+        $owner = User::factory()->create();
+        $task = Task::factory()->for($owner)->create(['deadline_at' => '2026-11-16 17:00:00']);
+        $inherited = Subtask::factory()->for($task)->create(['deadline_at' => null]);
+        $earlier = Subtask::factory()->for($task)->create(['deadline_at' => '2026-11-15 17:00:00']);
+        $this->actingAs($owner)->getJson('/api/tasks/'.$task->id.'/subtasks/'.$inherited->id)->assertOk()
+            ->assertJsonPath('data.deadline_at', null)->assertJsonPath('data.effective_deadline_at', '2026-11-16T17:00:00Z');
+        $this->getJson('/api/tasks/'.$task->id.'/subtasks/'.$earlier->id)->assertOk()
+            ->assertJsonPath('data.effective_deadline_at', '2026-11-15T17:00:00Z');
+    }
+
     public function test_existing_detector_reacts_to_conditions_without_mutating_sessions(): void
     {
         $this->travelTo(CarbonImmutable::parse('2026-11-16T08:00:00Z'));

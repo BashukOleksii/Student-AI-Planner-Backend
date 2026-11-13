@@ -89,3 +89,47 @@ StudyProposal та AiActionReview. Рішення описано в ADR-013.
 подальше перенесення однієї гілки та відмову rollback без втрати даних.
 Обмеження: greedy не оптимізує план глобально; single manual reschedule лишається
 однією явною заміною, множинні пропозиції формує adaptive preview.
+
+## Етап 4 — локальна демонстрація
+
+Додано SeedPlanningDemo command, PlanningDemoService і PlanningDemoCommandTest.
+Команда `planning:demo-seed --user=<exact-name|id:N> --dry-run` працює лише local
+loopback MySQL, вимагає однозначного власника і явного interactive yes для запису.
+Використовує Task/Subtask/StudyPlan Services, owner lock і transaction. Ідемпотентні
+маркери в title/description, перевірка всієї існуючої історії сесій та заборона
+перезапису settings/work захищені тестами. Пізніший кандидат для H вибирається
+через наявну DiagnosticsService, далі проходить звичайний planner/confirm.
+
+Для перевіреного `o` (User 10, Kyiv) створено tasks 62–70, subtasks 40–42,
+planned sessions 48–50. Read-only constraint gate не виявив порушень. Контрольні
+хеші всіх попередніх рядків незмінні. Лише нова additive migration застосована
+до робочої local БД. Жодного truncate/reset/destructive suite на ній не запускали.
+Точні назви/час/IDs і статус виконання кожного сценарію — в
+[інструкції ручної перевірки](planning-demo-manual-check.uk.md).
+
+Фінальна звірка вимоги етапу 2 також доповнила SubtaskResource полем
+`effective_deadline_at`, повторно використавши public effectiveDeadline method
+PlanningWorkSelectionService. SubtaskService передає parent relation для списків
+без N+1. TaskSubtasks показує ефективний строк, успадкування, прострочення та
+дію редагування. Дедлайни та алгоритм вибору не змінено; додано контрактні тести.
+
+Перевірки: 203 isolated MySQL tests / 1775 assertions, включно з 5 demo tests;
+136 focused frontend tests, PHP syntax/Pint, type-check/build — успішні.
+Окремий ширший frontend запуск: 146 passed / 3 failed (149). Усі три failures
+у subtasks.test.ts вже присутні в збереженому baseline до цих змін: старі кнопки
+complete/reopen (два випадки) та старе очікування відсутності min datetime input
+(один). Їх не видалено й не послаблено. Повний frontend suite раніше мав 53
+baseline failures; його успішне проходження тут не заявляється.
+
+Обмеження: F можна завершити лише після реального початку; G/H потребують явних
+ручних змін умов та перевірки preview. Ці зміни в робочій БД не виконувалися.
+За відсутності достатнього часу команда чесно пропускає підготовку сесії, не
+встановлює defaults і не переписує користувацькі правила. Старі DEMO-дедлайни
+повторний запуск не оновлює; після їх спливу доступна перевірка expired діагностики.
+
+Файли етапу 4: `app/Console/Commands/SeedPlanningDemo.php`,
+`app/Services/Demo/PlanningDemoService.php`, `tests/Feature/PlanningDemoCommandTest.php`,
+ця звітна документація і `planning-demo-manual-check.uk.md`. Фінальне уточнення
+ефективного строку: SubtaskResource, SubtaskService, PlanningWorkSelectionService,
+PlanningCompletionRulesTest, SubtaskApi/Reorder tests і docs/tasks.md; Frontend
+TaskSubtasks, types/api.ts, planning-diagnostics.test.ts та звіт у frontend docs.

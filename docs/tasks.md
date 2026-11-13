@@ -1,3 +1,8 @@
+> Current SubtaskResource additionally exposes read-only `effective_deadline_at`:
+> the earliest non-null parent/child deadline, calculated by the same
+> PlanningWorkSelectionService method used by planning. `deadline_at` remains
+> the child's editable value. No deadline or input validation is changed.
+
 # Tasks and Subtasks — T1–T3 and S1–S3
 
 Stage 16A adds explicit Task-only `missed`, `POST /api/tasks/{task}/miss`,

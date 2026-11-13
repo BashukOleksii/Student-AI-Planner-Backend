@@ -38,7 +38,7 @@ class SubtaskApiTest extends TestCase
         $subtask = Subtask::sole();
         $response->assertExactJson(['data' => [
             'id' => $subtask->id, 'task_id' => $task->id, 'title' => 'Підготувати звіт', 'description' => null,
-            'position' => 1, 'status' => 'pending', 'estimated_minutes' => null, 'deadline_at' => null, 'completed_at' => null,
+            'position' => 1, 'status' => 'pending', 'estimated_minutes' => null, 'deadline_at' => null, 'effective_deadline_at' => null, 'completed_at' => null,
         ]]);
         $this->assertNotSame(999999, $subtask->id);
         $this->assertNull($subtask->deleted_at);
@@ -164,7 +164,7 @@ class SubtaskApiTest extends TestCase
         $response = $this->patchJson($this->url($task, $subtask), ['title' => 'Edited', 'status' => 'pending', 'completed_at' => null,
             'position' => 1, 'task_id' => 999999, 'deleted_at' => '2000-01-01'])->assertOk()->assertExactJson(['data' => [
                 'id' => $subtask->id, 'task_id' => $task->id, 'title' => 'Edited', 'description' => 'Keep', 'position' => 8,
-                'status' => 'completed', 'estimated_minutes' => 30, 'deadline_at' => '2026-10-10T12:00:00Z', 'completed_at' => '2026-10-09T12:00:00Z',
+                'status' => 'completed', 'estimated_minutes' => 30, 'deadline_at' => '2026-10-10T12:00:00Z', 'effective_deadline_at' => '2026-10-10T12:00:00Z', 'completed_at' => '2026-10-09T12:00:00Z',
             ]]);
         $this->patchJson($this->url($task, $subtask), [])->assertOk()->assertExactJson($response->json());
         $this->patchJson($this->url($task, $subtask), ['description' => null, 'estimated_minutes' => null, 'deadline_at' => null])

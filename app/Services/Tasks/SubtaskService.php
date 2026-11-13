@@ -43,7 +43,7 @@ class SubtaskService
     {
         $task = $user->tasks()->findOrFail($task->getKey());
 
-        return $task->subtasks()->orderBy('position')->orderBy('id')->get();
+        return $task->subtasks()->orderBy('position')->orderBy('id')->get()->each(fn ($child) => $child->setRelation('task', $task));
     }
 
     public function find(User $user, Task $task, Subtask $subtask): Subtask
@@ -152,7 +152,7 @@ class SubtaskService
                 }
             }
 
-            return $task->subtasks()->orderBy('position')->orderBy('id')->get();
+            return $task->subtasks()->orderBy('position')->orderBy('id')->get()->each(fn ($child) => $child->setRelation('task', $task));
         });
     }
 

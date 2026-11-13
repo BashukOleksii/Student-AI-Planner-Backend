@@ -53,7 +53,7 @@ class SubtaskReorderTest extends TestCase
         $this->assertSame($parentBefore, $task->refresh()->getAttributes());
         $this->getJson('/api/tasks/'.$task->id.'/subtasks')->assertOk()->assertExactJson($response->json());
         if ($ids !== []) {
-            $this->assertSame(['id', 'task_id', 'title', 'description', 'position', 'status', 'estimated_minutes', 'deadline_at', 'completed_at'],
+            $this->assertSame(['id', 'task_id', 'title', 'description', 'position', 'status', 'estimated_minutes', 'deadline_at', 'effective_deadline_at', 'completed_at'],
                 array_keys($response->json('data.0')));
         }
     }

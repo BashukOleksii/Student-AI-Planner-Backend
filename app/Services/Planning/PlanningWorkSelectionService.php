@@ -239,7 +239,7 @@ class PlanningWorkSelectionService
         return $value === null ? null : $this->utcDate($value)->getTimestamp();
     }
 
-    private function effectiveDeadline(Task $task, ?Subtask $child): ?int
+    public function effectiveDeadline(Task $task, ?Subtask $child): ?int
     {
         $parent = $this->deadline($task);
         $deadline = $child === null ? null : $this->deadline($child);
