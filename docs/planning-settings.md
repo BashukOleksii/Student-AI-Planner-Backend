@@ -129,3 +129,23 @@ AI tools. PF1 free-time calculation and its read-only API are implemented
 separately; see [planning-foundation.md](planning-foundation.md). Future AI
 adapters must validate structured inputs and call these Services under trusted
 user context.
+
+## Planning completion, stage 1: read-only suitability diagnostics
+
+`GET /api/planning/diagnostics` accepts the same inclusive dates and optional
+`min_slot_minutes` as free-slots, using the authenticated owner only. Its Resource
+returns `as_of_utc`, dates, timezone, saved preferences, warning records
+(`configuration` or `calendar`), and raw slots with `can_schedule`, nullable
+`candidate` interval and observed `reason_codes`. Candidate tests reuse the pure
+existing allocator against the shared context, in one consistent read transaction.
+No Task, session, preference or availability is written. The private synthetic
+work identity is never returned. Each slot is tested independently, not as a batch
+plan, with the current future cutoff. `task_deadline_checked=false` is explicit;
+this endpoint cannot establish suitability for a specific Task.
+
+The existing two contradictory bound combinations still fail validation. A minimum
+above a daily/weekly limit or a break above max-session produces an advisory,
+not a new rejection: a session may span midnight or an ISO-week boundary. Calendar
+warnings concern only the requested horizon and do not prove global infeasibility.
+Null values keep their existing meaning; no defaults are introduced. Free-slots
+continues to expose unpadded raw free time independently.

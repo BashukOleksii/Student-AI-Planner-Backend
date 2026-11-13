@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\FreeSlotController;
 use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PasswordController;
+use App\Http\Controllers\Api\PlanningDiagnosticsController;
 use App\Http\Controllers\Api\PlanningPreferenceController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ProgressComparisonController;
@@ -85,6 +86,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
+    Route::get('/planning/diagnostics', [PlanningDiagnosticsController::class, 'index'])->name('planning.diagnostics');
     Route::get('/planning/free-slots', [FreeSlotController::class, 'index'])->name('planning.free-slots.index');
     Route::get('/planning/workload-advice', [WorkloadAdviceController::class, 'index'])->name('planning.workload-advice');
     Route::post('/planning/study-plans/preview', [StudyPlanController::class, 'preview'])->name('planning.study-plans.preview');

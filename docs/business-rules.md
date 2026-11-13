@@ -666,3 +666,11 @@ exclusions/warnings, conservative historical attribution and read-only guarantee
 C9/C10 workload remains scheduled-duration accounting and is unchanged. Stages B–D implement automatic
 allocation, reviewed session persistence and single-session lifecycle/rescheduling.
 AI orchestration remains deferred.
+
+### Personal planning completion — stage 1
+
+Read-only suitability diagnostics reuse the unchanged allocator and context, and
+separate configuration advisories from calendar feasibility in the requested
+horizon. They do not assume any task deadline. Frontend summaries refer to eligible
+work only, show exclusions separately and translate reason codes. Existing
+preference rejection rules and all confirmation writers remain unchanged.
