@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\AiTaskActionRequest;
 use App\Http\Resources\AiPendingActionResource;
 use App\Services\AI\Actions\TaskActionConfirmationService;
+use App\Services\AI\CompletionReviewPrivacy;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -33,7 +35,16 @@ class AiTaskActionController extends Controller
 
     private function decide(AiTaskActionRequest $request, string $conversation, string $action, TaskActionConfirmationService $service, string $operation): JsonResponse
     {
-        $outcome = $service->decide($request->user(), $conversation, $action, $operation, $request->validated());
+        try {
+            $outcome = $service->decide($request->user(), $conversation, $action, $operation, $request->validated());
+        } catch (HttpResponseException $exception) {
+            // WorkCompletionService also serves manual REST; filter only at this AI boundary.
+            $response = $exception->getResponse();
+            if ($response instanceof JsonResponse) {
+                $response->setData(CompletionReviewPrivacy::structured($response->getData(true)));
+            }
+            throw $exception;
+        }
 
         return response()->json(['data' => (new AiPendingActionResource($outcome['action']))->resolve($request),
             'replayed' => $outcome['replayed']], $outcome['status']);

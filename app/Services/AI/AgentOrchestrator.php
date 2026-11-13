@@ -59,7 +59,7 @@ class AgentOrchestrator
         for ($round = 0; $round < $this->limits->get('max_tool_rounds'); $round++) {
             $checkpoint();
             $this->limits->json([$instructions, $definitions, $history, $events]);
-            $response = $this->provider->respond($instructions, [...$history, ...$events], $definitions);
+            $response = $this->provider->respond($instructions, CompletionReviewPrivacy::history([...$history, ...$events]), $definitions);
             $checkpoint();
             if (! is_array($response['calls'] ?? null) || ! array_is_list($response['calls'])
                 || ! is_array($response['state'] ?? null) || ! array_key_exists('text', $response)
@@ -165,7 +165,7 @@ class AgentOrchestrator
                 } else {
                     $result = $this->executor->execute($owner, $call['name'], $call['arguments']);
                 }
-                $json = $this->limits->json($result, $this->limits->get('max_tool_result_bytes'));
+                $json = $this->limits->json(CompletionReviewPrivacy::structured($result), $this->limits->get('max_tool_result_bytes'));
                 $events[] = ['role' => 'tool', 'content' => $json, 'call_id' => $call['id']];
                 $tools[] = ['call_id' => $call['id'], 'name' => $call['name'], 'ok' => $result['ok'],
                     'error_code' => $result['error']['code'] ?? null];

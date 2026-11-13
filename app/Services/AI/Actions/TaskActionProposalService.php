@@ -52,6 +52,8 @@ class TaskActionProposalService
 
                 if ($name === 'propose_task_complete') {
                     $review = app(WorkCompletionService::class)->review($owner, $task);
+                    $proposal['protected_payload'] = ['completion_token' => $review['completion_token']];
+                    unset($review['completion_token']);
                     $proposal['preview']['completion_review'] = $review;
                     $proposal['preview']['effects'][] = $review['message'];
                 }

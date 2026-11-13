@@ -38,13 +38,16 @@ class SubtaskReminderActionService
             return DB::transaction(function () use ($owner, $name, $arguments, $callId): array {
                 $records = $this->load($owner, $name, $arguments, false);
                 $preview = $this->preview($owner, $name, $arguments, $records);
+                $protected = null;
                 if ($name === 'propose_subtask_complete') {
                     $review = app(WorkCompletionService::class)->review($owner, $records['task'], $records['child']);
+                    $protected = ['completion_token' => $review['completion_token']];
+                    unset($review['completion_token']);
                     $preview['completion_review'] = $review;
                     $preview['effects'][] = $review['message'];
                 }
                 $proposal = ['id' => (string) Str::uuid(), 'type' => $name, 'call_id' => $callId, 'arguments' => $arguments,
-                    'preview' => $preview, 'target_hash' => $this->fingerprints->hash($records)];
+                    'preview' => $preview, 'target_hash' => $this->fingerprints->hash($records), 'protected_payload' => $protected];
 
                 return ['proposal' => $proposal, 'result' => ['ok' => true, 'tool' => $name, 'data' => [
                     'state' => 'confirmation_required', 'action_id' => $proposal['id'], 'call_id' => $callId, 'preview' => $preview,
@@ -85,7 +88,7 @@ class SubtaskReminderActionService
                 $result = match ($name) {
                     'propose_subtask_create' => $this->subtasks->create($owner, $task, $data),
                     'propose_subtask_update' => $this->subtasks->update($owner, $task, $child, $data),
-                    'propose_subtask_complete' => $this->subtasks->complete($owner, $task, $child, $action->preview['completion_review']['completion_token'] ?? null),
+                    'propose_subtask_complete' => $this->subtasks->complete($owner, $task, $child, WorkCompletionConsent::token($action)),
                     'propose_subtask_reopen' => $this->subtasks->reopen($owner, $task, $child),
                 };
                 if ($name === 'propose_subtask_reopen' && $result->status !== TaskStatus::Pending) {

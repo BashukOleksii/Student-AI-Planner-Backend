@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Enums\AiMessageRole;
+use App\Services\AI\CompletionReviewPrivacy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -28,7 +29,7 @@ class AiMessageResource extends JsonResource
                     'error_code' => in_array($result['error']['code'] ?? null, ['unknown_tool', 'invalid_arguments', 'not_found', 'access_denied', 'execution_failed', 'review_too_large', 'invalid_preview'], true)
                         ? $result['error']['code'] : null,
                 ] : null,
-            ...(($this->tool_calls['version'] ?? null) === 2 ? ['action_event' => $this->tool_calls['action_event']] : []),
+            ...(($this->tool_calls['version'] ?? null) === 2 ? ['action_event' => CompletionReviewPrivacy::structured($this->tool_calls['action_event'])] : []),
             'created_at' => $this->created_at?->utc()->toISOString()];
     }
 }

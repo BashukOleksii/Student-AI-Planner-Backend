@@ -2,6 +2,11 @@
 
 Work status is a student decision. Session status and actual minutes are independent.
 
+AI privacy update: Task/Subtask completion consent now lives in the existing
+encrypted pending-action payload. Public AI reviews/history omit the token;
+legacy pending consent remains server-readable. Manual REST completion reviews
+are unchanged. See [boundaries, compatibility and verification](ai-work-completion-privacy.md).
+
 ## Правила взаємодії роботи, сесій і планувальника
 
 Перевірено за локальним Backend; назви звірено з `src/utils/tasks.ts` і

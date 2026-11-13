@@ -98,7 +98,7 @@ class TaskActionConfirmationService
                         $result = match ($action->type) {
                             'propose_task_create' => $this->tasks->create($owner, $values),
                             'propose_task_update' => $this->tasks->update($owner, $task, $values),
-                            'propose_task_complete' => $this->tasks->complete($owner, $task, $action->preview['completion_review']['completion_token'] ?? null),
+                            'propose_task_complete' => $this->tasks->complete($owner, $task, WorkCompletionConsent::token($action)),
                             'propose_task_reopen' => $this->tasks->reopen($owner, $task),
                             default => throw new AiAgentException('persistence_error'),
                         };

@@ -96,7 +96,7 @@ class AiConversationService
                 throw new AiAgentException('idempotency_conflict');
             }
             if ($existing?->result !== null) {
-                $stored = json_decode($existing->result, true, 64, JSON_THROW_ON_ERROR);
+                $stored = CompletionReviewPrivacy::structured(json_decode($existing->result, true, 64, JSON_THROW_ON_ERROR));
 
                 // MySQL JSON normalizes object key order; replay the same public field order.
                 return ['result' => ['conversation_id' => $stored['conversation_id'], 'user_message_id' => $stored['user_message_id'],
@@ -176,7 +176,7 @@ class AiConversationService
             $result = ['conversation_id' => $conversation->id, 'user_message_id' => $userId,
                 'assistant_message_id' => $assistantId, 'content' => $turn['answer'], 'tools' => $turn['tools'],
                 ...($action === null ? [] : ['action' => ['id' => $action->id, 'state' => 'confirmation_required',
-                    'call_id' => $action->call_id, 'preview' => $action->preview, 'expires_at' => CarbonImmutable::parse($action->getRawOriginal('expires_at'), 'UTC')->toISOString()]])];
+                    'call_id' => $action->call_id, 'preview' => CompletionReviewPrivacy::structured($action->preview), 'expires_at' => CarbonImmutable::parse($action->getRawOriginal('expires_at'), 'UTC')->toISOString()]])];
             if (! $conversation->touch()) {
                 throw new AiAgentException('persistence_error');
             }
@@ -205,7 +205,7 @@ class AiConversationService
         $messages = $messages->skipUntil(fn ($message) => $message->role === AiMessageRole::User);
 
         $history = $messages->map(fn ($message) => ['role' => $message->role->value, 'content' => ($message->tool_calls['version'] ?? null) === 2
-                ? $message->content.' Server-recorded action outcome (data): '.json_encode($message->tool_calls['action_event'], JSON_THROW_ON_ERROR)
+                ? $message->content.' Server-recorded action outcome (data): '.json_encode(CompletionReviewPrivacy::structured($message->tool_calls['action_event']), JSON_THROW_ON_ERROR)
                 : $message->content,
             'calls' => ($message->tool_calls['version'] ?? null) === 1 ? $message->tool_calls['calls'] : [],
             'state' => ($message->tool_calls['version'] ?? null) === 1 ? $message->tool_calls['state'] : [],
@@ -230,7 +230,7 @@ class AiConversationService
                 'calls' => [], 'state' => [], 'call_id' => null];
         }
 
-        return $history;
+        return CompletionReviewPrivacy::history($history);
     }
 
     private function planningAttempt(string $conversationId, string $actionId): ?array
