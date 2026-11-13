@@ -72,8 +72,13 @@ class StudySessionLifecycleTest extends TestCase
         $source->update(['subtask_id' => $child->id, 'ends_at' => '2026-10-19 10:00:01']);
         $this->travelTo(CarbonImmutable::parse('2026-10-19T10:30:00.987654Z'));
         $snapshot = $this->snapshot(['study_sessions']);
-        $data = $this->postJson($this->url($source, 'complete'), $actual === null ? [] : ['actual_minutes' => $actual])
-            ->assertOk()->assertJsonPath('data.status', 'completed')->assertJsonPath('data.completed_at', '2026-10-19T10:30:00Z')->json('data');
+        if ($actual === null) {
+            // Historical completed data retains null and scheduled-second credit; no new completion writer is used.
+            $source->update(['status' => StudySessionStatus::Completed, 'completed_at' => '2026-10-19 10:30:00', 'actual_minutes' => null]);
+        }
+        $response = $actual === null ? $this->getJson('/api/study-sessions/'.$source->id)
+            : $this->postJson($this->url($source, 'complete'), ['actual_minutes' => $actual]);
+        $data = $response->assertOk()->assertJsonPath('data.status', 'completed')->assertJsonPath('data.completed_at', '2026-10-19T10:30:00Z')->json('data');
         $this->assertSame($actual, $data['actual_minutes']);
         $this->assertSame(3601, $data['duration_seconds']);
         $this->assertSame('2026-10-19T09:00:00Z', $data['starts_at']);
@@ -102,7 +107,7 @@ class StudySessionLifecycleTest extends TestCase
         [, , $source] = $this->fixture();
         $this->travelTo(CarbonImmutable::parse($now));
         $before = $this->snapshot();
-        $this->postJson($this->url($source, $action))->assertStatus($status);
+        $this->postJson($this->url($source, $action), $action === 'complete' ? ['actual_minutes' => 45] : [])->assertStatus($status);
         if ($status === 409) {
             $this->assertSame($before, $this->snapshot());
         }
@@ -127,7 +132,7 @@ class StudySessionLifecycleTest extends TestCase
         $source->update(['status' => $status, 'completed_at' => $status === 'completed' ? '2026-10-19 08:00:00' : null,
             'actual_minutes' => $status === 'completed' ? 15 : null]);
         $snapshot = $this->snapshot();
-        $this->postJson($this->url($source, $action), $action === 'reschedule' ? $this->replacement() : [])->assertConflict();
+        $this->postJson($this->url($source, $action), $action === 'reschedule' ? $this->replacement() : ($action === 'complete' ? ['actual_minutes' => 45] : []))->assertConflict();
         $this->assertSame($snapshot, $this->snapshot());
     }
 
@@ -161,7 +166,7 @@ class StudySessionLifecycleTest extends TestCase
         [, , $source] = $this->fixture();
         $fields = array_fill_keys(['user_id', 'task_id', 'subtask_id', 'status', 'completed_at', 'rescheduled_from_session_id', 'reminders', 'unknown'], null);
         $snapshot = $this->snapshot();
-        $this->postJson($this->url($source, $action), [...($action === 'reschedule' ? $this->replacement() : []), ...$fields])
+        $this->postJson($this->url($source, $action), [...($action === 'reschedule' ? $this->replacement() : ($action === 'complete' ? ['actual_minutes' => 45] : [])), ...$fields])
             ->assertUnprocessable()->assertJsonValidationErrors(array_keys($fields));
         $this->assertSame($snapshot, $this->snapshot());
     }
@@ -176,7 +181,7 @@ class StudySessionLifecycleTest extends TestCase
         $task->delete();
         $this->travelTo(CarbonImmutable::parse($action === 'cancel' ? '2026-10-19T08:00:00Z' : '2026-10-19T10:00:00Z'));
         $snapshot = $this->snapshot(['study_sessions']);
-        $this->postJson($this->url($source, $action))->assertOk()->assertJsonPath('data.task_id', $task->id)->assertJsonPath('data.subtask_id', $child->id);
+        $this->postJson($this->url($source, $action), $action === 'complete' ? ['actual_minutes' => 45] : [])->assertOk()->assertJsonPath('data.task_id', $task->id)->assertJsonPath('data.subtask_id', $child->id);
         $this->assertSame($snapshot, $this->snapshot(['study_sessions']));
     }
 
@@ -384,7 +389,7 @@ class StudySessionLifecycleTest extends TestCase
         if (in_array($action, ['complete', 'miss'], true)) {
             $this->travelTo(CarbonImmutable::parse('2026-10-19T10:00:00Z'));
         }
-        $this->postJson($this->url($source, $action), $action === 'reschedule' ? $this->replacement() : [])->assertSuccessful();
+        $this->postJson($this->url($source, $action), $action === 'reschedule' ? $this->replacement() : ($action === 'complete' ? ['actual_minutes' => 45] : []))->assertSuccessful();
         foreach ([$absolute, $relative] as $reminder) {
             $raw = $reminder->getRawOriginal();
             $fresh = $reminder->fresh();
@@ -414,7 +419,7 @@ class StudySessionLifecycleTest extends TestCase
             $this->travelTo(CarbonImmutable::parse('2026-10-19T10:00:00Z'));
         }
         $snapshot = $this->snapshot();
-        $this->postJson($this->url($source, $action), $action === 'reschedule' ? $this->replacement() : [])->assertStatus(500)
+        $this->postJson($this->url($source, $action), $action === 'reschedule' ? $this->replacement() : ($action === 'complete' ? ['actual_minutes' => 45] : []))->assertStatus(500)
             ->assertExactJson(['message' => 'The study plan could not be processed.']);
         $this->assertSame($snapshot, $this->snapshot());
     }
@@ -600,8 +605,9 @@ class StudySessionLifecycleTest extends TestCase
         $timezone = date_default_timezone_get();
         try {
             date_default_timezone_set('Asia/Tokyo');
-            $this->postJson($this->url($source, 'complete').'?actual_minutes=45')->assertOk()
-                ->assertJsonPath('data.completed_at', '2026-10-19T09:00:00Z')->assertJsonPath('data.actual_minutes', null)
+            $this->postJson($this->url($source, 'complete').'?actual_minutes=45')->assertUnprocessable()->assertJsonValidationErrors('actual_minutes');
+            $this->postJson($this->url($source, 'complete').'?actual_minutes=45', ['actual_minutes' => 30])->assertOk()
+                ->assertJsonPath('data.completed_at', '2026-10-19T09:00:00Z')->assertJsonPath('data.actual_minutes', 30)
                 ->assertJsonPath('data.starts_at', '2026-10-19T09:00:00Z');
         } finally {
             date_default_timezone_set($timezone);

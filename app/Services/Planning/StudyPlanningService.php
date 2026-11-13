@@ -52,7 +52,11 @@ class StudyPlanningService
         $plan = $this->allocator->allocate($selection['work_items'], $context, max($notBefore, $notBeforeUtc ?? $notBefore));
 
         return ['as_of_utc' => $selection['as_of_utc'], 'start_date' => $startDate, 'end_date' => $endDate, 'timezone' => $user->timezone,
-            'sessions' => $plan['sessions'], 'work_results' => $plan['work_results'],
+            'sessions' => $plan['sessions'], 'work_results' => array_map(function ($result) use ($selection) {
+                $unit = collect($selection['work_items'])->first(fn ($item) => $item['task_id'] === $result['task_id'] && $item['subtask_id'] === $result['subtask_id']);
+
+                return [...$result, 'effective_deadline_utc' => $unit['effective_deadline_utc']];
+            }, $plan['work_results']),
             'excluded_items' => $selection['excluded_items'], 'warnings' => $selection['warnings'], 'summary' => $plan['summary']];
     }
 }

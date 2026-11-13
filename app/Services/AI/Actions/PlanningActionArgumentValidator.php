@@ -33,7 +33,7 @@ class PlanningActionArgumentValidator
             $this->intervals->durationSeconds(['start' => $this->sessions->timestamp($arguments['starts_at']),
                 'end' => $this->sessions->timestamp($arguments['ends_at'])]);
         } elseif (in_array($name, ['propose_session_mark_missed', 'propose_session_complete'], true)) {
-            $this->sessions->actualMinutes($arguments['actual_minutes'] ?? null);
+            $this->sessions->actualMinutes($arguments['actual_minutes'] ?? null, $name === 'propose_session_complete');
         } else {
             $this->context->validateDates($arguments['start_date'], $arguments['end_date']);
             if (isset($arguments['subtask_id']) && ! isset($arguments['task_id'])) {

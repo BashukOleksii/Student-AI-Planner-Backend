@@ -62,13 +62,15 @@ class StudySessionLifecycleRulesTest extends TestCase
         return [[0], [-1], [65536], [1.0], ['45'], [true], [false], [[]], [new \stdClass]];
     }
 
-    public function test_null_actual_retains_fallback_and_maximum_is_valid(): void
+    public function test_new_completion_requires_reported_actual_and_maximum_is_valid(): void
     {
         $rules = new StudySessionLifecycleRules;
         $rules->actualMinutes(65535);
-        $result = $rules->transition('complete', StudySessionStatus::Planned, ['start' => 1, 'end' => 62], new DateTimeImmutable('@62'));
-        $this->assertNull($result['actual_minutes']);
+        $result = $rules->transition('complete', StudySessionStatus::Planned, ['start' => 1, 'end' => 62], new DateTimeImmutable('@62'), 65535);
+        $this->assertSame(65535, $result['actual_minutes']);
         $this->assertSame('1970-01-01 00:01:02', $result['completed_at']);
+        $this->expectException(InvalidArgumentException::class);
+        $rules->transition('complete', StudySessionStatus::Planned, ['start' => 1, 'end' => 62], new DateTimeImmutable('@62'));
     }
 
     #[DataProvider('badTimestamps')]

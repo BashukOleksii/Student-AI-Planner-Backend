@@ -348,7 +348,7 @@ A study session has a required `task_id` and optional `subtask_id`. When present
 Study-session statuses are `planned`, `completed`, `missed`, `rescheduled`, and `cancelled`. Sessions use lifecycle states rather than soft deletes to preserve history. C9 diagnostics perform no status transitions and allow historical candidates. Stage C creates only new `planned` rows with null completion/actual/predecessor fields after reviewed confirmation. Stage D implements explicit completion after start, miss after end, and cancellation/rescheduling strictly before start. Terminal states cannot reopen or overwrite historical effort; GET never changes status. General editing and automatic missed detection remain deferred.
 
 **BR-SES-003 — Completion and actual effort**\
-Scheduled start/end define planned duration. `completed_at` is present exactly when status is `completed`; optional `actual_minutes` is positive when provided and is allowed only for completed sessions. Actual effort and planned duration are separate measures. C9 completed sessions contribute their original scheduled interval to local day/week budgets; actual completed effort does not replace this contribution. Stage A actual-first completed effort credit is separate from C9 scheduled workload. Distinct completed records remain additive, raw excess credit is diagnostic, and future reservations do not constitute completion.
+Scheduled start/end define planned duration. `completed_at` is present exactly when status is `completed`; `actual_minutes` is required and positive for new completions; historical null is retained and is allowed only for completed sessions. Actual effort and planned duration are separate measures. C9 completed sessions contribute their original scheduled interval to local day/week budgets; actual completed effort does not replace this contribution. Stage A actual-first completed effort credit is separate from C9 scheduled workload. Distinct completed records remain additive, raw excess credit is diagnostic, and future reservations do not constitute completion.
 
 ## 9. Rescheduling rules
 
@@ -368,8 +368,7 @@ application are implemented separately with explicit acceptance and atomic
 persistence. See [adaptive replanning](adaptive-replanning.md).
 
 Stage D's exact transition and transfer contracts are documented in
-[study-session-lifecycle.md](study-session-lifecycle.md). Completion accepts a
-positive 1–65535 actual-minute integer or omission, storing null on omission.
+[study-session-lifecycle.md](study-session-lifecycle.md). New completion requires a positive 1–65535 actual-minute integer; historical null values remain readable.
 It records a whole-second UTC completion instant without changing scheduled time
 or work progress. Miss requires end ≤ captured now; manual cancellation and
 rescheduling require original start > captured full-precision now. S3 deletion

@@ -206,7 +206,7 @@ class DemoStudentService
             $action = in_array($daysAgo, [8, 12], true) ? 'miss' : 'complete';
             $session->update(app(StudySessionLifecycleRules::class)->transition($action, $session->status,
                 ['start' => $from->getTimestamp(), 'end' => $from->addMinutes(45)->getTimestamp()], $from->addMinutes(50),
-                $action === 'complete' && $daysAgo % 3 !== 0 ? [40, 50, 35][$daysAgo % 3] : null));
+                $action === 'complete' ? [40, 50, 35][$daysAgo % 3] : null));
         }
         // Explicit synthetic one-to-one rescheduling history, using the same pure lifecycle rules and chain validator.
         $from = $today->subDays(5)->setHour(17);
@@ -215,7 +215,7 @@ class DemoStudentService
             ['start' => $from->getTimestamp(), 'end' => $from->addMinutes(45)->getTimestamp()], $from->subDay()));
         $next = $this->session($owner, $tasks[11], $from->setHour(19));
         $next->update(['rescheduled_from_session_id' => $old->id, ...app(StudySessionLifecycleRules::class)->transition('complete', $next->status,
-            ['start' => $from->setHour(19)->getTimestamp(), 'end' => $from->setHour(19)->addMinutes(45)->getTimestamp()], $from->setHour(20), null)]);
+            ['start' => $from->setHour(19)->getTimestamp(), 'end' => $from->setHour(19)->addMinutes(45)->getTimestamp()], $from->setHour(20), 40)]);
         app(StudySessionLifecycleRules::class)->validateChain([$old->id => [...$old->getAttributes(), 'status' => $old->status->value],
             $next->id => [...$next->getAttributes(), 'status' => $next->status->value]], $old->id);
     }

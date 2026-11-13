@@ -174,7 +174,11 @@ class PlanningActionService
         if (DB::transactionLevel() === 0) {
             throw new AiAgentException('persistence_error');
         }
-        $arguments = $this->validator->validate($action->type, $action->arguments);
+        try {
+            $arguments = $this->validator->validate($action->type, $action->arguments);
+        } catch (InvalidArgumentException) {
+            throw new AiAgentException('action_validation_failed');
+        }
         try {
             if ($this->isLifecycleAction($action->type)) {
                 $transition = $action->type === 'propose_session_mark_missed' ? 'miss' : 'complete';

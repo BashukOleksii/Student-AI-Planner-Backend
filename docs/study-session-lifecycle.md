@@ -49,11 +49,13 @@ the transaction lock. GET list/detail and Stage C contracts remain unchanged.
 | POST | `/cancel` | `study-sessions.cancel` | 200 |
 | POST | `/reschedule` | `study-sessions.reschedule` | 201 |
 
-Completion accepts `{}` or `{"actual_minutes": 45}`. A supplied value must be a
-genuine positive JSON integer, 1–65535 (the existing unsigned SMALLINT).
-Omission stores null; explicit null, zero, floats, numeric strings, booleans,
-arrays and objects return 422. Null preserves Stage A's scheduled-second fallback;
-there is no rounding of the scheduled interval into integer minutes.
+Completion requires `{"actual_minutes": 45}`: a genuine positive JSON integer,
+1–65535. Omission, null, zero, floats, numeric strings, booleans, arrays and objects
+return 422. REST validation, domain completion and AI proposal/confirmation paths
+all require the student-reported value. No scheduled duration is substituted.
+Historical completed records with null actual remain unchanged and retain the
+Stage A scheduled-second fallback. A separate read-only permission check can
+report that completion is allowed before the student supplies the duration.
 
 Miss/cancel accept `{}` only. Reschedule accepts exactly:
 

@@ -51,7 +51,7 @@ class StudyPlanningServiceTest extends TestCase
         $result = $this->plan($user);
         $this->assertSame(['as_of_utc' => '2026-10-12T08:00:00.500000Z', 'start_date' => '2026-10-12', 'end_date' => '2026-10-12', 'timezone' => 'UTC',
             'sessions' => [$this->proposal($task, null, '2026-10-12T09:00:00Z', '2026-10-12T10:00:00Z')],
-            'work_results' => [['task_id' => $task->id, 'subtask_id' => null, 'requested_seconds' => 3600, 'allocated_seconds' => 3600, 'unscheduled_seconds' => 0, 'reason_codes' => []]],
+            'work_results' => [['task_id' => $task->id, 'subtask_id' => null, 'requested_seconds' => 3600, 'allocated_seconds' => 3600, 'unscheduled_seconds' => 0, 'reason_codes' => [], 'effective_deadline_utc' => null]],
             'excluded_items' => [], 'warnings' => [], 'summary' => ['requested_seconds' => 3600, 'allocated_seconds' => 3600, 'unscheduled_seconds' => 0, 'fully_allocated' => true]], $result);
         $this->assertDatabaseCount('planning_preferences', 0);
         $this->assertDatabaseCount('study_sessions', 0);

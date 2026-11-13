@@ -27,3 +27,30 @@ Frontend: `planning.ts` (API/types/пояснення), `StudyProposal`, `Planni
 90 frontend tests, `npm run type-check`, `npm run build` — успішні.
 Обмеження: діагностика горизонту не доводить глобальної неможливості конфігурації;
 мінімум вище ліміту не є автоматично HTTP 422. Підтвердження та greedy не змінено.
+
+## Етап 2 — фактичний час, дедлайни і зміни умов
+
+Нові завершення REST/domain/AI потребують explicit actual_minutes 1–65535 strict
+integer. Form Request, lifecycle rules/service, AI schema/validator узгоджені.
+Історичний null не переписується, RemainingEffort fallback не змінено.
+Read-only lifecycle permission відділено від запису фактичного часу, щоб recovery
+могло попросити рішення без вигаданих хвилин. Старий synthetic demo writer також
+передає явно задані synthetic actual values; він не виконувався в робочій БД.
+
+StudyPlan Resource додає effective_deadline_at для selected/excluded work, frontend
+показує його і посилання на редагування простроченої роботи. Дедлайни не змінюються.
+Механізми RecoverySourceStateService, LearningRecoveryAnalysisService і scanner
+повторно використано без другого detector. Сторінка плану перечитує feed кожну
+хвилину, коли вкладка видима. Для автоматичного створення reviews має працювати
+Laravel Scheduler (scan кожні п’ять хвилин, bounded owners/horizon). Сам feed не
+пересуває сесії; timeout не повторює confirm. Зміни за межами горизонту scan
+перевіряються через явно вибраний період adaptive preview.
+
+Змінені файли етапу 2: CompleteStudySessionRequest, StudySessionLifecycleRules/
+Service, StudyRecoveryPreviewService, StudyPlanningService, StudyPlanResource,
+PlanningActionRegistry/ArgumentValidator/Service, AgentOrchestrator,
+DemoStudentService; адаптовано lifecycle/AI тести та додано
+PlanningCompletionRulesTest. Frontend: StudySessionView, studySessions API,
+StudyProposal, PlanningView і цільові tests. Оновлено чинний lifecycle контракт.
+Перевірки: 654 isolated MySQL tests (4144 assertions), 100 frontend tests,
+PHP syntax/Pint, type-check/build успішні. Реальні completed дані не змінювались.

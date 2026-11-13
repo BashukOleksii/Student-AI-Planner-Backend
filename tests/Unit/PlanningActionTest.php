@@ -91,8 +91,6 @@ class PlanningActionTest extends TestCase
         return [[PlanningActionRegistry::NAMES[0], ['start_date' => '2026-10-26', 'end_date' => '2026-11-25']],
             [PlanningActionRegistry::NAMES[1], ['start_date' => '2028-02-29', 'end_date' => '2028-02-29', 'task_id' => 1, 'subtask_id' => 2]],
             ['propose_session_mark_missed', ['study_session_id' => 1]],
-            ['propose_session_complete', ['study_session_id' => 1]],
-            ['propose_session_complete', ['study_session_id' => 1, 'actual_minutes' => null]],
             ['propose_session_complete', ['study_session_id' => 1, 'actual_minutes' => 65535]],
             [PlanningActionRegistry::NAMES[2], ['study_session_id' => PHP_INT_MAX, 'starts_at' => '2026-10-27T14:00:00Z', 'ends_at' => '2026-10-27T14:00:01Z']]];
     }
@@ -110,7 +108,7 @@ class PlanningActionTest extends TestCase
     {
         $plan = ['start_date' => '2026-10-26', 'end_date' => '2026-11-01'];
         $session = ['study_session_id' => 1, 'starts_at' => '2026-10-27T14:00:00Z', 'ends_at' => '2026-10-27T15:00:00Z'];
-        $cases = [['unknown', $plan]];
+        $cases = [['unknown', $plan], ['propose_session_complete', ['study_session_id' => 1]], ['propose_session_complete', ['study_session_id' => 1, 'actual_minutes' => null]]];
         foreach (array_slice(PlanningActionRegistry::NAMES, 0, 2) as $name) {
             $cases[] = [$name, []];
             $cases[] = [$name, ['start_date' => $plan['start_date']]];

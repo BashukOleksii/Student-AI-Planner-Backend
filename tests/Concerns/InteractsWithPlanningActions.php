@@ -41,7 +41,7 @@ trait InteractsWithPlanningActions
         $arguments = $name === 'propose_session_reschedule'
             ? ['study_session_id' => $source->id, 'starts_at' => $date->setHour(14)->format('Y-m-d\TH:i:s\Z'), 'ends_at' => $date->setHour(15)->format('Y-m-d\TH:i:s\Z')]
             : (in_array($name, ['propose_session_mark_missed', 'propose_session_complete'], true)
-                ? ['study_session_id' => $source->id]
+                ? ['study_session_id' => $source->id, ...($name === 'propose_session_complete' ? ['actual_minutes' => 37] : [])]
                 : ['start_date' => $date->toDateString(), 'end_date' => $date->toDateString()]);
         $this->app['auth']->forgetGuards();
         $this->actingAs($owner, 'web');

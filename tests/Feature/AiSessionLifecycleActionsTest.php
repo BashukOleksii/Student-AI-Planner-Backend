@@ -34,7 +34,7 @@ class AiSessionLifecycleActionsTest extends TestCase
         $f = $this->planningFixture('propose_session_reschedule');
         $f['source']->update(['starts_at' => now('UTC')->subHours(2), 'ends_at' => now('UTC')->subHour()]);
         $f['name'] = $name;
-        $f['arguments'] = ['study_session_id' => $f['source']->id];
+        $f['arguments'] = ['study_session_id' => $f['source']->id, ...($name === 'propose_session_complete' ? ['actual_minutes' => 37] : [])];
 
         return $f;
     }

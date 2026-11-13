@@ -12,9 +12,9 @@ use UnexpectedValueException;
 /** Pure whole-second intervals with full-precision comparisons to the supplied clock. */
 class StudySessionLifecycleRules
 {
-    public function actualMinutes(mixed $value): void
+    public function actualMinutes(mixed $value, bool $required = false): void
     {
-        if ($value !== null && (! is_int($value) || $value < 1 || $value > 65535)) {
+        if (($required || $value !== null) && (! is_int($value) || $value < 1 || $value > 65535)) {
             throw new InvalidArgumentException('Actual minutes must be null or a positive unsigned SMALLINT integer.');
         }
     }
@@ -36,7 +36,22 @@ class StudySessionLifecycleRules
     public function transition(string $action, StudySessionStatus $status, array $interval, DateTimeImmutable $now, mixed $actualMinutes = null): array
     {
         (new TimeIntervalService)->durationSeconds($interval);
-        $this->actualMinutes($actualMinutes);
+        $this->actualMinutes($actualMinutes, $action === 'complete');
+        $this->assertAllowed($action, $status, $interval, $now);
+
+        return ['status' => match ($action) {
+            'complete' => StudySessionStatus::Completed,
+            'miss' => StudySessionStatus::Missed,
+            'cancel' => StudySessionStatus::Cancelled,
+            'reschedule' => StudySessionStatus::Rescheduled,
+        }, 'completed_at' => $action === 'complete' ? $now->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s') : null,
+            'actual_minutes' => $action === 'complete' ? $actualMinutes : null];
+    }
+
+    /** Read-only permission check does not require a reported actual duration. */
+    public function assertAllowed(string $action, StudySessionStatus $status, array $interval, DateTimeImmutable $now): void
+    {
+        (new TimeIntervalService)->durationSeconds($interval);
         $start = new DateTimeImmutable('@'.$interval['start']);
         $end = new DateTimeImmutable('@'.$interval['end']);
         $allowed = match ($action) {
@@ -49,13 +64,6 @@ class StudySessionLifecycleRules
             throw new StudySessionConflictException;
         }
 
-        return ['status' => match ($action) {
-            'complete' => StudySessionStatus::Completed,
-            'miss' => StudySessionStatus::Missed,
-            'cancel' => StudySessionStatus::Cancelled,
-            'reschedule' => StudySessionStatus::Rescheduled,
-        }, 'completed_at' => $action === 'complete' ? $now->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s') : null,
-            'actual_minutes' => $action === 'complete' ? $actualMinutes : null];
     }
 
     /** Connected records discovered by the application, keyed by integer ID. No input mutation. */

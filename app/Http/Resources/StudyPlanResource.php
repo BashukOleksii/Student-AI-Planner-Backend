@@ -18,9 +18,11 @@ class StudyPlanResource extends JsonResource
                 'ends_at' => gmdate('Y-m-d\TH:i:s\Z', $session['end']), 'duration_seconds' => $session['duration_seconds'],
             ], $plan['sessions']);
 
+        $deadline = fn ($row) => [...$row, 'effective_deadline_at' => isset($row['effective_deadline_utc']) ? gmdate('Y-m-d\TH:i:s\Z', $row['effective_deadline_utc']) : null];
+
         return ['as_of_utc' => $plan['as_of_utc'], 'start_date' => $plan['start_date'], 'end_date' => $plan['end_date'],
-            'timezone' => $plan['timezone'], 'sessions' => $sessions, 'work_results' => $plan['work_results'],
-            'excluded_items' => $plan['excluded_items'], 'warnings' => $plan['warnings'], 'summary' => $plan['summary'],
+            'timezone' => $plan['timezone'], 'sessions' => $sessions, 'work_results' => array_map($deadline, $plan['work_results']),
+            'excluded_items' => array_map($deadline, $plan['excluded_items']), 'warnings' => $plan['warnings'], 'summary' => $plan['summary'],
             'preview_token' => $this->when(isset($this->resource['preview_token']), fn () => $this->resource['preview_token']),
             'expires_at' => $this->when(isset($this->resource['expires_at']), fn () => $this->resource['expires_at'])];
     }

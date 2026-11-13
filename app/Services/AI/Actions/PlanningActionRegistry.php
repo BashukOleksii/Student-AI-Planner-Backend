@@ -13,8 +13,8 @@ class PlanningActionRegistry
         $date = ['type' => 'string', 'format' => 'date', 'pattern' => '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'];
         $id = ['type' => 'integer', 'minimum' => 1, 'maximum' => PHP_INT_MAX];
         $scope = ['start_date' => $date, 'end_date' => $date, 'task_id' => $id, 'subtask_id' => $id];
-        $actualMinutes = ['type' => ['integer', 'null'], 'minimum' => 1, 'maximum' => 65535,
-            'description' => 'Optional actual minutes spent. Null or omission preserves unknown actual effort; never estimate it.'];
+        $actualMinutes = ['type' => 'integer', 'minimum' => 1, 'maximum' => 65535,
+            'description' => 'Required actual minutes explicitly reported by the student. Ask if missing; never infer from scheduled duration.'];
         $time = ['type' => 'string', 'pattern' => '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$',
             'description' => 'Real whole-second UTC instant in years 1000–9999. Clarify missing or ambiguous local clock times.'];
 
@@ -25,8 +25,8 @@ class PlanningActionRegistry
                 ['study_session_id' => $id, 'starts_at' => $time, 'ends_at' => $time], ['study_session_id', 'starts_at', 'ends_at']),
             $this->definition(self::NAMES[3], 'Propose marking one identified owned planned study session missed. It must already have ended. Never infer that it was missed from its date. The existing session is updated only after authenticated confirmation; dependent scheduled reminders are cancelled then.',
                 ['study_session_id' => $id], ['study_session_id']),
-            $this->definition(self::NAMES[4], 'Propose marking one identified owned planned study session completed. It must have started. Supply actual_minutes only when the student states the value; otherwise leave it null. The existing session is updated only after authenticated confirmation; dependent scheduled reminders are cancelled then.',
-                ['study_session_id' => $id, 'actual_minutes' => $actualMinutes], ['study_session_id']),
+            $this->definition(self::NAMES[4], 'Propose marking one identified owned planned study session completed. It must have started. Require actual_minutes explicitly stated by the student; ask for it when missing and never substitute scheduled duration. The existing session is updated only after authenticated confirmation; dependent scheduled reminders are cancelled then.',
+                ['study_session_id' => $id, 'actual_minutes' => $actualMinutes], ['study_session_id', 'actual_minutes']),
         ];
     }
 

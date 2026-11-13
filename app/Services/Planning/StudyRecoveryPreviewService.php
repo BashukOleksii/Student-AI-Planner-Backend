@@ -49,7 +49,7 @@ class StudyRecoveryPreviewService
                 if ($session->status === StudySessionStatus::Planned) {
                     foreach (['complete', 'miss'] as $action) {
                         try {
-                            $this->lifecycle->transition($action, $session->status, $interval, $now);
+                            $this->lifecycle->assertAllowed($action, $session->status, $interval, $now);
                             $actions[] = $action;
                         } catch (StudySessionConflictException) {
                             // In-progress plans cannot be marked missed until their end.

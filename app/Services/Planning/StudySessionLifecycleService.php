@@ -18,7 +18,7 @@ class StudySessionLifecycleService
 
     public function complete(User $user, string $id, mixed $actualMinutes = null): StudySession
     {
-        $this->rules->actualMinutes($actualMinutes);
+        $this->rules->actualMinutes($actualMinutes, true);
 
         return $this->transition($user, $id, 'complete', $actualMinutes);
     }
@@ -41,7 +41,7 @@ class StudySessionLifecycleService
     /** AI confirmation entry point; requires the existing owner-first transaction and lock order. */
     public function completeWithinTransaction(User $user, string $id, mixed $actualMinutes, Closure $beforeTransition): StudySession
     {
-        $this->rules->actualMinutes($actualMinutes);
+        $this->rules->actualMinutes($actualMinutes, true);
 
         return $this->mutation->runWithinTransaction($user, $id, $this->action('complete', $actualMinutes, $beforeTransition));
     }
