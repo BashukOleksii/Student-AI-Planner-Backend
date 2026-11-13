@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\Planning\StudyReplanningConfirmationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -14,6 +15,7 @@ class StudyReplanningResource extends JsonResource
             'study_session_id' => $row['study_session_id'], 'task_id' => $row['task_id'], 'subtask_id' => $row['subtask_id'],
             'classification' => $row['classification'], 'original' => $this->interval($row['original']),
             'replacement' => $row['replacement'] === null ? null : $this->interval($row['replacement']),
+            'replacements' => array_map($this->interval(...), StudyReplanningConfirmationService::replacements($row)),
             'untransferred_seconds' => $row['untransferred_seconds'], 'reason_codes' => $row['reason_codes'],
             'replacement_reason_codes' => $row['replacement_reason_codes'],
         ], $result['session_results']);

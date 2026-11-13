@@ -24,6 +24,6 @@ class StudyReplanningController extends Controller
         $values = $request->validated();
 
         return new StudyReplanningConfirmationResource($service->confirm($request->user(), $values['preview_token'],
-            $values['accept_partial'] ?? false, $values['accept_unplaced_cancellation'] ?? false));
+            $values['accept_partial'] ?? false, $values['accept_unplaced_cancellation'] ?? false, $values['accept_split_replacements'] ?? false));
     }
 }

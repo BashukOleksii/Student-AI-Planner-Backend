@@ -29,7 +29,7 @@ class RecoverySuggestionController extends Controller
     public function confirm(RecoverySuggestionRequest $request, string $recoverySuggestion): JsonResponse
     {
         $outcome = $this->suggestions->confirm($request->user(), $recoverySuggestion,
-            $request->validated('accept_partial', false), $request->validated('accept_unplaced_cancellation', false));
+            $request->validated('accept_partial', false), $request->validated('accept_unplaced_cancellation', false), $request->validated('accept_split_replacements', false));
 
         return response()->json(['data' => (new RecoverySuggestionResource($outcome['suggestion']))->resolve($request),
             'replayed' => $outcome['replayed']]);

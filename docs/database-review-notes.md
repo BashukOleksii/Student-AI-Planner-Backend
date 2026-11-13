@@ -1,3 +1,10 @@
+## Current additive change (ADR-013)
+
+`2026_11_13_000001_allow_multiple_study_session_successors` replaces the unique
+predecessor index with `study_sessions_predecessor_index`. FK and records remain.
+Rollback refuses when multiple children exist. The earlier Stage 02 descriptions
+below describe their original schema; current history is a directed tree.
+
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
 Testing-stage compatibility fix: the new forward migration `2026_11_12_000003_expand_ai_action_type_length.php` widens action identity storage to VARCHAR(64), preserving names and constraints. MySQL reproduction showed 33/34-character registered semester names could not fit the prior column. No applied migration is rewritten. See [verification evidence](testing/backend-test-rebuild-report.md).
@@ -57,7 +64,7 @@ Status: historical draft review; persistence decisions resolved by the approved 
 The canonical design is [database-schema.md](database-schema.md), with [database-schema.dbml](database-schema.dbml) as its diagram source. The earlier draft below is neither the approved design nor the current application schema. New MySQL implementation issues are recorded in the canonical schema's implementation gate and must be resolved before affected migrations.
 
 Stage E2 extends current application enforcement to confirmed adaptive batches
-without changing the approved schema. The existing unique direct-successor key
+without changing the approved schema. Before ADR-013 the unique direct-successor key
 and lifecycle fields remain authoritative. F1/F2 absolute/relative Reminder management and target reconciliation are implemented; F3a in-app delivery is implemented; external delivery and
 administrative purge remain deferred; see [adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
 

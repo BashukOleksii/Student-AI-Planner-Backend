@@ -45,7 +45,7 @@ class StudySessionPersistenceTest extends TestCase
         }
         $this->assertNull($session->subtask);
         $this->assertNull($session->rescheduledFromSession);
-        $this->assertNull($session->rescheduledToSession);
+        $this->assertCount(0, $session->rescheduledToSessions);
         $minimal = StudySession::create($session->only(['user_id', 'task_id', 'starts_at', 'ends_at']))->refresh();
         $this->assertSame(StudySessionStatus::Planned, $minimal->status);
         $task = Task::factory()->create();
@@ -130,16 +130,17 @@ class StudySessionPersistenceTest extends TestCase
         $this->assertModelExists($session);
     }
 
-    public function test_rescheduling_relationships_unique_predecessor_and_set_null(): void
+    public function test_rescheduling_relationships_multiple_successors_and_set_null(): void
     {
         $original = StudySession::factory()->create();
         $successor = StudySession::factory()->for($original->task)->create(['rescheduled_from_session_id' => $original->id]);
-        $this->assertTrue($original->rescheduledToSession->is($successor));
+        $this->assertTrue($original->rescheduledToSessions->first()->is($successor));
         $this->assertTrue($successor->rescheduledFromSession->is($original));
         // Persisting a link does not perform the future Service lifecycle transition.
         $this->assertSame(StudySessionStatus::Planned, $original->refresh()->status);
         $unlinked = StudySession::factory()->for($original->task)->create();
-        $this->assertInsertAndUpdateRejected($unlinked, ['rescheduled_from_session_id' => $original->id], 1062, 'study_sessions_rescheduled_from_session_id_unique');
+        $unlinked->update(['rescheduled_from_session_id' => $original->id]);
+        $this->assertEqualsCanonicalizing([$successor->id, $unlinked->id], $original->fresh()->rescheduledToSessions->modelKeys());
         $original->delete();
         $this->assertDatabaseMissing('study_sessions', ['id' => $original->id]);
         $this->assertNull($successor->refresh()->rescheduled_from_session_id);
@@ -152,7 +153,7 @@ class StudySessionPersistenceTest extends TestCase
         // Invalid domain state: MySQL cannot enforce the self CHECK (3818/3823).
         DB::table('study_sessions')->where('id', $session->id)->update(['rescheduled_from_session_id' => $session->id]);
         $this->assertTrue($session->refresh()->rescheduledFromSession->is($session));
-        $this->assertTrue($session->rescheduledToSession->is($session));
+        $this->assertTrue($session->rescheduledToSessions->first()->is($session));
     }
 
     #[DataProvider('missingTargets')]
@@ -219,7 +220,7 @@ class StudySessionPersistenceTest extends TestCase
         $this->assertIndex('study_sessions', 'study_sessions_user_id_status_starts_at_index', ['user_id', 'status', 'starts_at']);
         $this->assertIndex('study_sessions', 'study_sessions_task_id_starts_at_index', ['task_id', 'starts_at']);
         $this->assertIndex('study_sessions', 'study_sessions_subtask_id_starts_at_index', ['subtask_id', 'starts_at']);
-        $this->assertIndex('study_sessions', 'study_sessions_rescheduled_from_session_id_unique', ['rescheduled_from_session_id'], true);
+        $this->assertIndex('study_sessions', 'study_sessions_predecessor_index', ['rescheduled_from_session_id']);
         $this->assertEnforcedChecks('study_sessions', [
             'study_sessions_valid_interval', 'study_sessions_valid_status', 'study_sessions_positive_actual_minutes',
             'study_sessions_completion_consistency', 'study_sessions_actual_requires_completion',

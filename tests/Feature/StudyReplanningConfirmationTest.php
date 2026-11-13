@@ -67,7 +67,7 @@ class StudyReplanningConfirmationTest extends TestCase
         foreach ([null, '', ' ', [], true, 1, 'invalid', ' token ', new \stdClass] as $value) {
             yield [['preview_token' => $value], ['preview_token']];
         }
-        foreach (['accept_partial', 'accept_unplaced_cancellation'] as $field) {
+        foreach (['accept_partial', 'accept_unplaced_cancellation', 'accept_split_replacements'] as $field) {
             foreach ([null, 0, 1, 'true', 'false', '0', 1.0, [], new \stdClass, ''] as $value) {
                 yield [[$field => $value], [$field]];
             }
@@ -524,6 +524,7 @@ class StudyReplanningConfirmationTest extends TestCase
         foreach ($review['session_results'] as $index => &$row) {
             $start = strtotime($case === 'availability' ? '2026-10-19T18:00:00Z' : ($index === 1 && $case === 'collective effort' ? '2026-10-19T11:00:00Z' : '2026-10-19T09:00:00Z'));
             $row['replacement'] = ['task_id' => $task->id, 'subtask_id' => null, 'start' => $start, 'end' => $start + 3600, 'duration_seconds' => 3600];
+            $row['replacements'] = [$row['replacement']];
         }
         unset($row);
         $parameters = ['start_date' => '2026-10-19', 'end_date' => '2026-10-19', 'task_id' => null, 'subtask_id' => null];

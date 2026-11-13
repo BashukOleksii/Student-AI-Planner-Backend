@@ -77,7 +77,7 @@ class RecoverySourceStateService
             'deadline_elapsed' => $row->getRawOriginal('deadline_at') === null ? null
                 : $row->getRawOriginal('deadline_at') <= $now->format('Y-m-d H:i:s')])->all();
         $attributes = fn ($rows) => $rows->map->getRawOriginal()->all();
-        $hash = $this->hash(['recovery_policy_version' => 1, 'review_lead_seconds' => LearningRecoveryAnalysisService::REVIEW_LEAD_SECONDS, 'owner_id' => $owner->id, 'timezone' => $owner->timezone, 'start_date' => $start, 'end_date' => $end,
+        $hash = $this->hash(['recovery_policy_version' => 2, 'review_lead_seconds' => LearningRecoveryAnalysisService::REVIEW_LEAD_SECONDS, 'owner_id' => $owner->id, 'timezone' => $owner->timezone, 'start_date' => $start, 'end_date' => $end,
             'tasks' => $attributes($tasks), 'subtasks' => $attributes($children), 'sessions' => $attributes($sessions),
             'scheduled_reminders' => $attributes($reminders), 'time_states' => $states,
             'task_deadline_states' => $deadlines($tasks), 'subtask_deadline_states' => $deadlines($children), 'context' => $context]);

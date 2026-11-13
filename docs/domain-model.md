@@ -20,7 +20,7 @@ H3c extends AiPendingAction to three planning operation types. A nullable encryp
 private payload holds server-owned domain review tokens and their validated UTC
 expiry; public previews and receipts omit it. Existing four action states remain.
 Failed planning attempts are safe conversation events, not new workflow states.
-StudySession history, one-to-one successors and Reminder lifecycle remain governed
+StudySession history, one-to-many (ADR-013) successors and Reminder lifecycle remain governed
 by Stage C/D/E2/F3a. See [H3c](ai-study-planning-actions.md).
 
 H3b extends AiPendingAction to Subtask create/update/complete/reopen and Reminder

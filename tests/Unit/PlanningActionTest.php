@@ -81,7 +81,7 @@ class PlanningActionTest extends TestCase
         }
         $this->assertNull($registry->find('reschedule'));
         $this->assertSame(['accept_partial'], PlanningActionConsent::fields(PlanningActionRegistry::NAMES[0]));
-        $this->assertSame(['accept_partial', 'accept_unplaced_cancellation'], PlanningActionConsent::fields(PlanningActionRegistry::NAMES[1]));
+        $this->assertSame(['accept_partial', 'accept_unplaced_cancellation', 'accept_split_replacements'], PlanningActionConsent::fields(PlanningActionRegistry::NAMES[1]));
         $this->assertSame([], PlanningActionConsent::fields(PlanningActionRegistry::NAMES[2]));
         $this->assertSame([], PlanningActionConsent::fields('propose_reminder_create'));
     }

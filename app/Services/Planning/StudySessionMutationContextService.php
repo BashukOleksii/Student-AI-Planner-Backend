@@ -111,4 +111,29 @@ class StudySessionMutationContextService
             'rescheduled_from_session_id' => $row->rescheduled_from_session_id, 'status' => $row->status->value,
         ])->all(), $sourceId);
     }
+
+    /** Read the entire connected history, including siblings outside the requested horizon. */
+    public function readChainRecords(User $owner, array $ids): Collection
+    {
+        return $this->chainRecords($owner, $ids, null, false);
+    }
+
+    public function component(Collection $records, int $sourceId): Collection
+    {
+        $ids = [$sourceId];
+        do {
+            $before = $ids;
+            foreach ($records as $record) {
+                if (in_array($record->id, $ids, true) || in_array($record->rescheduled_from_session_id, $ids, true)) {
+                    $ids[] = $record->id;
+                    if ($record->rescheduled_from_session_id !== null) {
+                        $ids[] = $record->rescheduled_from_session_id;
+                    }
+                }
+            }
+            $ids = array_values(array_unique($ids));
+        } while ($ids !== $before);
+
+        return $records->only($ids)->keyBy('id');
+    }
 }

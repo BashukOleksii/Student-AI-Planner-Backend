@@ -59,11 +59,14 @@ class LearningRecoveryAnalysisService
             } elseif ($kind === 'replan') {
                 $token = $adaptive['preview_token'];
                 $expiry = $adaptive['expires_at'];
-                if ($this->replanningTokens->acceptanceError($adaptive, false, false) === 'accept_partial') {
+                if ($this->replanningTokens->acceptanceError($adaptive, false, true, true) === 'accept_partial') {
                     $required[] = 'accept_partial';
                 }
-                if ($this->replanningTokens->acceptanceError($adaptive, true, false) === 'accept_unplaced_cancellation') {
+                if ($this->replanningTokens->acceptanceError($adaptive, true, false, true) === 'accept_unplaced_cancellation') {
                     $required[] = 'accept_unplaced_cancellation';
+                }
+                if ($this->replanningTokens->acceptanceError($adaptive, true, true, false) === 'accept_split_replacements') {
+                    $required[] = 'accept_split_replacements';
                 }
             }
             // A review expires before any source/replacement it would need to move or create starts.
@@ -71,8 +74,8 @@ class LearningRecoveryAnalysisService
             if ($kind === 'replan') {
                 foreach ($this->replanningTokens->affected($adaptive) as $row) {
                     $starts[] = $row['original']['start'];
-                    if ($row['replacement'] !== null) {
-                        $starts[] = $row['replacement']['start'];
+                    foreach ($this->replanningTokens->replacements($row) as $replacement) {
+                        $starts[] = $replacement['start'];
                     }
                 }
             }

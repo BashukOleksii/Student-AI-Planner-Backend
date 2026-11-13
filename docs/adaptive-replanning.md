@@ -1,7 +1,13 @@
+> Current extension: ADR-013 supports multiple successors. Preview `replacements[]`
+> is authoritative; `replacement` is only the single-successor alias. Confirmation
+> accepts optional strict boolean `accept_split_replacements` (default false),
+> required for any split. Tokens are version 2. Earlier E1/E2 milestones below
+> describe their original scope where explicitly identified.
+
 # Stages E1/E2 — Adaptive Replanning Preview and Atomic Confirmation
 
 H3c exposes E2 as one confirmed AI operation, retaining full release-set comparison,
-valid/cannot-replan preservation, one-to-one successors, Reminder cleanup and both
+valid/cannot-replan preservation, capped one-to-many successors, Reminder cleanup and both
 acceptance flags. Public confirm retains the outermost guard; trusted
 confirmWithinTransaction shares the same writer under the H3 transaction.
 Server-issued tokens stay encrypted/private and expire at their original deadline.
@@ -9,7 +15,7 @@ See [H3c](ai-study-planning-actions.md) and
 [ADR-004](decisions/ADR-004-ai-planning-confirmation-transaction.md).
 
 Stage E1 detects constraint-invalid future reservations and proposes deterministic
-one-to-one replacements. All operations are read-only and advisory. It does not
+one-to-many replacements. All operations are read-only and advisory. It does not
 perform Stage E2 confirmation/application, change statuses, create successors,
 cancel reminders, infer missed sessions, start jobs or invoke an LLM. Stage E2 now
 implements reviewed application in separate confirmation/persistence Services.
@@ -187,8 +193,7 @@ allocate at most one largest feasible interval for that request, disable tail
 balancing intended for two sessions, then stop. Existing default allocation and
 Stage B splitting remain unchanged. Each E1 request is capped by original scheduled
 duration and the exact unit's residual unallocated effort. Attribution is unchanged.
-No predecessor is split into several direct successors; the existing unique direct
-successor schema needs no change.
+A predecessor may have multiple direct successors; aggregate duration cannot exceed its original duration or remaining effort. See ADR-013 for the additive index migration.
 
 Accepted proposals consume projected free time, become break anchors and contribute
 scheduled workload exactly once. After allocation, every proposal is independently
@@ -425,7 +430,7 @@ authentication/route models and relationships supply no mutable planning facts.
 8. Independently reload Stage A/C9 after retirement and repeat the full-batch gate
    against persisted rules. No inserts have occurred, so old reservations cannot
    block replacements and cannot count twice toward workload.
-9. Insert exactly one trusted planned successor for every non-null proposal,
+9. Insert every trusted planned successor from each source replacements list,
    setting its immediate `rescheduled_from_session_id`, exact original work IDs,
    reviewed whole-second UTC interval and null completion/actual fields.
 10. Cancel only the preflighted scheduled reminders, preserving target IDs,
@@ -438,7 +443,7 @@ authentication/route models and relationships supply no mutable planning facts.
 The shared Stage D context exposes only its chain-locking helper; E2 never calls
 `StudySessionMutationContextService::run()` or `StudyPlanPersistenceService::confirm()`
 inside its transaction. Stage D retains its own outermost boundary and rules.
-The existing unique direct-successor MySQL key remains a final defense. Terminal
+The predecessor FK and nonunique index preserve history; application locks and graph validation guard writers. Terminal
 sessions, ancestors and unaffected planned reservations are never rewritten.
 
 The independent pure gate requires unique source IDs, exact ordered release IDs
@@ -501,10 +506,10 @@ that serialization boundary. Later authorized changes may invalidate a committed
 plan. Final future checks apply at the check instant; time can advance after commit.
 No arbitrary future-start buffer or automatic missed inference is added.
 
-V1 retains E1's greedy, local one-to-one suggestions. Large reviews/tokens, history
+The allocator remains greedy and local, with capped multiple replacements per source. Large reviews/tokens, history
 reads and quadratic full-batch checks can consume memory/time and hold the owner
 lock longer; no hidden cap or throughput promise is introduced. Frontend, LLM,
-cron/jobs, global optimization, multiple direct successors, reminder creation/
+cron/jobs, global optimization, reminder creation/
 cloning/delivery, statistics and general session reopening remain outside E2.
 No schema, migration, dependencies or authentication architecture changed.
 
@@ -612,7 +617,7 @@ and formatting pass with the final shared-lock implementation.
 
 Final architecture review confirms thin Requests/Controller/Resource boundaries,
 no duplicated planner/constraint rules, no nested mutation transactions, exact
-reviewed release semantics, preserved one-direct-successor history and atomic
+reviewed release semantics, preserved immediate-predecessor history and atomic
 Reminder cleanup. A changed/untracked-file whitespace/local-document-link audit
 passes with zero errors. Approved rule identifiers and historical verification
 records remain intact.
@@ -669,7 +674,7 @@ final malformed-input and integrity-error coverage. Every PHPUnit run exited 0.
 
 Focused coverage includes exact C8 diagnoses/intervals, self-exclusion across all
 sources, genuine integer input, partial/unplaced effort, protected valid reservations,
-projected replacements, one-successor limits, repeatability, original intervals
+projected replacements, aggregate source-duration limits, repeatability, original intervals
 crossing requested boundaries, clock advancement during reads, parent/child authority,
 Kyiv gap/fold and ISO-year boundaries, reversed DB retrieval, chain corruption,
 source ownership, unchanged table snapshots and SELECT-only planning SQL.
@@ -696,7 +701,7 @@ schema, authorization and separate-process contention tests.
 | `tests/Feature/StudyReplanningPreviewTest.php` | Real MySQL API/security, compatibility, calendar, query/snapshot coverage. |
 | `docs/adaptive-replanning.md` | E1 contract, hypotheses, guarantees, limits and actual verification. |
 | `docs/architecture.md` | Shared-scenario architecture and E2 boundary. |
-| `docs/domain-model.md` | Transient adaptive result and one-to-one history semantics. |
+| `docs/domain-model.md` | Transient adaptive result and immediate-predecessor tree semantics. |
 | `docs/business-rules.md` | E1 enforcement under preserved rule identifiers. |
 | `docs/planning-foundation.md` | Shared PF1 source extraction; unchanged calculation behavior. |
 | `docs/planning-integration.md` | Opt-in identified C9 context. |

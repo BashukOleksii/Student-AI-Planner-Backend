@@ -89,7 +89,7 @@ class StudyPlanConfirmationService
 
     public function sessionAttributes(int $ownerId, array $proposal): array
     {
-        $interval = ['start' => $proposal['start'], 'end' => $proposal['end']];
+        $interval = ['start' => $proposal['start'] ?? null, 'end' => $proposal['end'] ?? null];
         if ($ownerId < 1 || ! is_int($proposal['task_id'] ?? null) || $proposal['task_id'] < 1
             || ! array_key_exists('subtask_id', $proposal)
             || ($proposal['subtask_id'] !== null && (! is_int($proposal['subtask_id']) || $proposal['subtask_id'] < 1))

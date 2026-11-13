@@ -77,7 +77,7 @@ class StudyReplanningConfirmationServiceTest extends TestCase
                 break;
             case 'stage c': $payload['purpose'] = 'study-plan-confirmation';
                 break;
-            case 'version': $payload['version'] = 2;
+            case 'version': $payload['version'] = 1;
                 break;
             case 'scalar': $payload['version'] = '1';
                 break;

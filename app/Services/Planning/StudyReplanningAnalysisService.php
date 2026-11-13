@@ -6,7 +6,7 @@ use DateTimeImmutable;
 use InvalidArgumentException;
 use LogicException;
 
-/** Pure classification and one-to-one allocation; all persistence stays in the preview adapter. */
+/** Pure classification and capped multi-session allocation; persistence belongs to the confirmation writer. */
 class StudyReplanningAnalysisService
 {
     public function __construct(
@@ -84,7 +84,7 @@ class StudyReplanningAnalysisService
                 $classification = $codes === [] ? 'valid' : 'requires_replanning';
             }
             $results[] = [...$source, 'classification' => $classification, 'reason_codes' => array_values(array_unique($codes)),
-                'replacement' => null, 'replacement_reason_codes' => [], 'untransferred_seconds' => 0];
+                'replacement' => null, 'replacements' => [], 'replacement_reason_codes' => [], 'untransferred_seconds' => 0];
         }
 
         return $results;
@@ -177,22 +177,26 @@ class StudyReplanningAnalysisService
             if ($capacity > 0 && isset($work[$key]) && ($work[$key]['reason_codes'] ?? []) === []) {
                 $unit = $work[$key];
                 $unit['effort']['unallocated_work_seconds'] = min($duration, $capacity);
-                $allocation = $this->allocator->allocate([$unit], $context, $cutoff, true);
-                $row['replacement'] = $allocation['sessions'][0] ?? null;
+                $allocation = $this->allocator->allocate([$unit], $context, $cutoff);
+                $row['replacements'] = $allocation['sessions'];
+                $row['replacement'] = count($row['replacements']) === 1 ? $row['replacements'][0] : null;
                 $row['replacement_reason_codes'] = $allocation['work_results'][0]['reason_codes'];
             } else {
                 $row['replacement_reason_codes'] = array_values(array_unique([...($work[$key]['reason_codes'] ?? []), 'no_replacement_capacity']));
             }
-            $seconds = $row['replacement']['duration_seconds'] ?? 0;
+            $row['replacements'] ??= [];
+            $seconds = array_sum(array_column($row['replacements'], 'duration_seconds'));
             if ($seconds > 0) {
-                $candidate = ['start' => $row['replacement']['start'], 'end' => $row['replacement']['end']];
-                $context['free_intervals'] = $this->intervals->subtract($context['free_intervals'], [$candidate]);
-                $context['break_anchors'][] = $candidate;
-                $context['workload_sessions'][] = $candidate;
-                $proposals[] = ['interval' => $candidate, 'deadline' => $row['effective_deadline_utc']];
+                foreach ($row['replacements'] as $replacement) {
+                    $candidate = ['start' => $replacement['start'], 'end' => $replacement['end']];
+                    $context['free_intervals'] = $this->intervals->subtract($context['free_intervals'], [$candidate]);
+                    $context['break_anchors'][] = $candidate;
+                    $context['workload_sessions'][] = $candidate;
+                    $proposals[] = ['interval' => $candidate, 'deadline' => $row['effective_deadline_utc']];
+                }
                 $totals[$key]['unallocated_after_replacements'] -= $seconds;
                 $totals[$key]['proposed_replacement_seconds'] += $seconds;
-                $summary['proposed_replacements']++;
+                $summary['proposed_replacements'] += count($row['replacements']);
                 if ($seconds < $duration) {
                     $summary['partial_replacements']++;
                     $row['replacement_reason_codes'][] = 'incomplete_relocation';

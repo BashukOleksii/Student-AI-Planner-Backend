@@ -13,7 +13,7 @@ upcoming reservation. Stage A–C and PF1/PF2/C9/C10 remain authoritative and
 unchanged. No schema, status, background job, effort total or planning-history
 table is added. A session's history is retained as ordinary lifecycle rows.
 
-Stage E2 confirms adaptive one-to-one transfers and explicitly accepted unplaced
+Stage E2 confirms adaptive one-to-many transfers and explicitly accepted unplaced
 cancellations atomically, reusing Stage D's pure lifecycle/chain rules and scheduled
 Reminder dependency Service. E2 uses only the exposed chain-locking helper inside
 its own fresh outermost transaction; it never nests `run()`. Manual Stage D
@@ -202,10 +202,10 @@ Connected predecessor/successor records are inspected in both directions. Visite
 IDs guarantee termination on cycles. Before locking, incompatible ownership/work
 edges fail closed; connected compatible rows are locked by ascending ID. Pure
 validation prohibits self/cyclic references, missing predecessors, multiple direct
-successors and attribution changes. Every predecessor must be rescheduled and have
-exactly one direct successor; other states have none. A valid upcoming planned
+unsafe successors and attribution changes. Every predecessor must be rescheduled and have
+one or more direct successors; other states have none. A valid upcoming planned
 successor can be transferred again, linking its immediate predecessor. Ancestors
-are never rewritten. The existing unique predecessor key remains a final DB defense.
+are never rewritten. ADR-013 replaces the unique predecessor index with a nonunique index; the FK remains.
 
 `ReminderDependencyService` extracts the compatible-target preflight shared with
 S3 deletion. Scheduled reminders directly targeting the source are locked by

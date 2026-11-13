@@ -105,6 +105,14 @@ class StudySessionLifecycleRulesTest extends TestCase
             'not_transferred_seconds' => 1800, 'unallocated_work_seconds' => 5400], $rules->replacementSummary(3600, 1800, 7200));
     }
 
+    public function test_split_history_accepts_multiple_successors(): void
+    {
+        $records = $this->chain();
+        $records[4] = $records[3];
+        (new StudySessionLifecycleRules)->validateChain($records, 4);
+        $this->assertCount(4, $records);
+    }
+
     #[DataProvider('chainCorruption')]
     public function test_invalid_graphs_fail_closed(string $kind): void
     {
@@ -117,7 +125,7 @@ class StudySessionLifecycleRulesTest extends TestCase
             'child' => $records[2]['subtask_id'] = 2,
             'predecessor_status' => $records[2]['status'] = 'completed',
             'missing' => $records[1]['rescheduled_from_session_id'] = 99,
-            'multiple' => $records[4] = [...$records[3]],
+            'multiple foreign work' => $records[4] = [...$records[3], 'task_id' => 2],
             'planned_successor' => $records[4] = [...$records[3], 'rescheduled_from_session_id' => 3],
         };
         $this->expectException(UnexpectedValueException::class);
@@ -126,7 +134,7 @@ class StudySessionLifecycleRulesTest extends TestCase
 
     public static function chainCorruption(): array
     {
-        return array_map(fn ($kind) => [$kind], ['self', 'cycle', 'foreign', 'task', 'child', 'predecessor_status', 'missing', 'multiple', 'planned_successor']);
+        return array_map(fn ($kind) => [$kind], ['self', 'cycle', 'foreign', 'task', 'child', 'predecessor_status', 'missing', 'multiple foreign work', 'planned_successor']);
     }
 
     #[DataProvider('invalidSummary')]

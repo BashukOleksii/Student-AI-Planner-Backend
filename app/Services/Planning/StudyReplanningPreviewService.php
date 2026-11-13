@@ -3,7 +3,6 @@
 namespace App\Services\Planning;
 
 use App\Enums\StudySessionStatus;
-use App\Models\StudySession;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use DateTimeImmutable;
@@ -20,6 +19,7 @@ class StudyReplanningPreviewService
         private PlanningScenarioService $scenario,
         private StudyReplanningAnalysisService $analysis,
         private StudySessionLifecycleRules $history,
+        private StudySessionMutationContextService $mutation,
     ) {}
 
     public function preview(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null, mixed $notBeforeUtc = null): array
@@ -97,39 +97,9 @@ class StudyReplanningPreviewService
         if ($sources->isEmpty()) {
             return;
         }
-        // A planned source having ANY successor is corrupt, including a foreign edge. Fetch no foreign metadata.
-        if (StudySession::whereIn('rescheduled_from_session_id', $sources->modelKeys())->exists()) {
-            throw new UnexpectedValueException('Invalid replanning history.');
-        }
-        $records = $sources->keyBy('id');
-        $pending = $sources->pluck('rescheduled_from_session_id')->filter()->unique()->all();
-        while ($pending !== []) {
-            $batch = $owner->studySessions()->whereKey($pending)->get();
-            if ($batch->count() !== count($pending)) {
-                throw new UnexpectedValueException('Invalid replanning history.');
-            }
-            $next = [];
-            foreach ($batch as $row) {
-                $records[$row->id] = $row;
-                if ($row->rescheduled_from_session_id !== null && ! $records->has($row->rescheduled_from_session_id)) {
-                    $next[] = $row->rescheduled_from_session_id;
-                }
-            }
-            $pending = array_values(array_unique($next));
-        }
+        $records = $this->mutation->readChainRecords($owner, $sources->modelKeys());
         foreach ($sources as $source) {
-            $component = [];
-            $id = $source->id;
-            while ($id !== null) {
-                if (isset($component[$id])) {
-                    throw new UnexpectedValueException('Invalid replanning history.');
-                }
-                $row = $records[$id];
-                $component[$id] = ['user_id' => $row->user_id, 'task_id' => $row->task_id, 'subtask_id' => $row->subtask_id,
-                    'rescheduled_from_session_id' => $row->rescheduled_from_session_id, 'status' => $row->status->value];
-                $id = $row->rescheduled_from_session_id;
-            }
-            $this->history->validateChain($component, $source->id);
+            $this->mutation->validateChain($this->mutation->component($records, $source->id), $source->id);
         }
     }
 

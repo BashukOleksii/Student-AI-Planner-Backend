@@ -24,7 +24,7 @@ class StudyReplanningConfirmationService
 
     public function issue(int $ownerId, array $parameters, array $review, int $issuedAt): string
     {
-        $payload = ['purpose' => 'adaptive-replanning-confirmation', 'version' => 1, 'owner_id' => $ownerId,
+        $payload = ['purpose' => 'adaptive-replanning-confirmation', 'version' => 2, 'owner_id' => $ownerId,
             'parameters' => $parameters, 'review' => $review, 'issued_at' => $issuedAt,
             'expires_at' => $issuedAt <= PHP_INT_MAX - self::TOKEN_LIFETIME_SECONDS ? $issuedAt + self::TOKEN_LIFETIME_SECONDS : null];
         $this->validatePayload($payload, $ownerId, $issuedAt);
@@ -48,7 +48,7 @@ class StudyReplanningConfirmationService
     {
         if ($ownerId < 1 || ! is_array($payload) || count($payload) !== 7
             || ($payload['purpose'] ?? null) !== 'adaptive-replanning-confirmation'
-            || ($payload['version'] ?? null) !== 1 || ($payload['owner_id'] ?? null) !== $ownerId
+            || ($payload['version'] ?? null) !== 2 || ($payload['owner_id'] ?? null) !== $ownerId
             || ! is_int($payload['issued_at'] ?? null) || $payload['issued_at'] < 0
             || $payload['issued_at'] > PHP_INT_MAX - self::TOKEN_LIFETIME_SECONDS
             || ! is_int($payload['expires_at'] ?? null)
@@ -87,12 +87,23 @@ class StudyReplanningConfirmationService
         $this->affected($payload['review']);
     }
 
+    /** Legacy one-to-one aliases remain readable; new previews always supply the complete list. */
+    public static function replacements(array $row): array
+    {
+        $items = $row['replacements'] ?? (($row['replacement'] ?? null) === null ? [] : [$row['replacement']]);
+        if (! is_array($items) || ! array_is_list($items)) {
+            throw new InvalidArgumentException('Expected an ordered replacement list.');
+        }
+
+        return $items;
+    }
+
     public function matches(array $reviewed, array $current): bool
     {
         return $this->fields->matches($reviewed, $current);
     }
 
-    /** Validate the exact ordered release set and one replacement per source. */
+    /** Validate the exact ordered release set and all replacements per source. */
     public function affected(array $review): array
     {
         if (! is_array($review['session_results'] ?? null) || ! array_is_list($review['session_results'])
@@ -114,16 +125,21 @@ class StudyReplanningConfirmationService
             $original = $this->intervals->durationSeconds($row['original']);
             $this->context->queryTimestamp($row['original']['start']);
             $this->context->queryTimestamp($row['original']['end']);
-            if ($row['replacement'] !== null) {
-                if (! is_array($row['replacement']) || $row['classification'] !== 'requires_replanning'
-                    || ! isset($row['replacement']['start'], $row['replacement']['end'])) {
+            $replacements = self::replacements($row);
+            $total = 0;
+            foreach ($replacements as $replacement) {
+                if (! is_array($replacement) || $row['classification'] !== 'requires_replanning') {
                     throw new InvalidArgumentException('Invalid replacement.');
                 }
-                $this->fields->sessionAttributes(1, $row['replacement']);
-                if ($row['replacement']['task_id'] !== $row['task_id'] || $row['replacement']['subtask_id'] !== $row['subtask_id']
-                    || $row['replacement']['duration_seconds'] > $original) {
-                    throw new InvalidArgumentException('Invalid replacement attribution or duration.');
+                $this->fields->sessionAttributes(1, $replacement);
+                if ($replacement['task_id'] !== $row['task_id'] || $replacement['subtask_id'] !== $row['subtask_id']
+                    || $replacement['duration_seconds'] > $original - $total) {
+                    throw new InvalidArgumentException('Invalid replacement attribution or aggregate duration.');
                 }
+                $total += $replacement['duration_seconds'];
+            }
+            if (isset($row['replacements']) && $row['replacement'] !== (count($replacements) === 1 ? $replacements[0] : null)) {
+                throw new InvalidArgumentException('Inconsistent single replacement alias.');
             }
             if ($row['classification'] === 'requires_replanning') {
                 $affected[] = $row;
@@ -136,19 +152,22 @@ class StudyReplanningConfirmationService
         return $affected;
     }
 
-    public function acceptanceError(array $review, bool $acceptPartial, bool $acceptUnplacedCancellation): ?string
+    public function acceptanceError(array $review, bool $acceptPartial, bool $acceptUnplacedCancellation, bool $acceptSplitReplacements = false): ?string
     {
         $affected = $this->affected($review);
         if ($affected === []) {
             return 'preview_token';
         }
         foreach ($affected as $row) {
-            if (($row['replacement']['duration_seconds'] ?? 0) < $this->intervals->durationSeconds($row['original']) && ! $acceptPartial) {
+            if (count(self::replacements($row)) > 1 && ! $acceptSplitReplacements) {
+                return 'accept_split_replacements';
+            }
+            if (array_sum(array_column(self::replacements($row), 'duration_seconds')) < $this->intervals->durationSeconds($row['original']) && ! $acceptPartial) {
                 return 'accept_partial';
             }
         }
         foreach ($affected as $row) {
-            if ($row['replacement'] === null && ! $acceptUnplacedCancellation) {
+            if (self::replacements($row) === [] && ! $acceptUnplacedCancellation) {
                 return 'accept_unplaced_cancellation';
             }
         }
@@ -164,7 +183,7 @@ class StudyReplanningConfirmationService
         foreach ($workItems as $item) {
             $work[$item['task_id'].':'.($item['subtask_id'] ?? 'task')] = $item;
         }
-        $proposals = array_values(array_filter(array_column($affected, 'replacement')));
+        $proposals = array_merge([], ...array_map(self::replacements(...), $affected));
         $allocated = [];
         foreach ($proposals as $index => $proposal) {
             $this->fields->sessionAttributes($ownerId, $proposal);

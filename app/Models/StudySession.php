@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['user_id', 'task_id', 'subtask_id', 'rescheduled_from_session_id', 'starts_at', 'ends_at', 'status', 'completed_at', 'actual_minutes'])]
 class StudySession extends Model
@@ -37,9 +36,9 @@ class StudySession extends Model
         return $this->belongsTo(StudySession::class, 'rescheduled_from_session_id');
     }
 
-    public function rescheduledToSession(): HasOne
+    public function rescheduledToSessions(): HasMany
     {
-        return $this->hasOne(StudySession::class, 'rescheduled_from_session_id');
+        return $this->hasMany(StudySession::class, 'rescheduled_from_session_id');
     }
 
     public function reminders(): HasMany

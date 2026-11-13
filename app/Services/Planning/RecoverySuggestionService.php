@@ -148,15 +148,15 @@ class RecoverySuggestionService
             'last_outcome' => $state?->last_outcome, 'notification_channel' => 'recovery_review_feed'];
     }
 
-    public function confirm(User $user, string $id, mixed $acceptPartial = false, mixed $acceptUnplacedCancellation = false): array
+    public function confirm(User $user, string $id, mixed $acceptPartial = false, mixed $acceptUnplacedCancellation = false, mixed $acceptSplitReplacements = false): array
     {
         $this->outermost();
-        foreach (['accept_partial' => $acceptPartial, 'accept_unplaced_cancellation' => $acceptUnplacedCancellation] as $field => $value) {
+        foreach (['accept_partial' => $acceptPartial, 'accept_unplaced_cancellation' => $acceptUnplacedCancellation, 'accept_split_replacements' => $acceptSplitReplacements] as $field => $value) {
             if (! is_bool($value)) {
                 throw ValidationException::withMessages([$field => ['This field must be a genuine boolean.']]);
             }
         }
-        $outcome = DB::transaction(function () use ($user, $id, $acceptPartial, $acceptUnplacedCancellation): array {
+        $outcome = DB::transaction(function () use ($user, $id, $acceptPartial, $acceptUnplacedCancellation, $acceptSplitReplacements): array {
             $owner = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
             $row = $owner->recoverySuggestions()->whereKey($id)->lockForUpdate()->firstOrFail();
             if ($row->status === 'applied') {
@@ -185,14 +185,14 @@ class RecoverySuggestionService
             if (! in_array($row->kind, ['create_plan', 'replan'], true)) {
                 return ['error' => 'decision_required'];
             }
-            if ($row->kind !== 'replan' && $acceptUnplacedCancellation) {
+            if ($row->kind !== 'replan' && ($acceptUnplacedCancellation || $acceptSplitReplacements)) {
                 throw ValidationException::withMessages(['accept_unplaced_cancellation' => ['Cancellation consent is only valid for adaptive replanning.']]);
             }
             try {
                 // Failed writers roll back to a savepoint before terminal review metadata is recorded.
-                $receipt = DB::transaction(function () use ($owner, $row, $acceptPartial, $acceptUnplacedCancellation): array {
+                $receipt = DB::transaction(function () use ($owner, $row, $acceptPartial, $acceptUnplacedCancellation, $acceptSplitReplacements): array {
                     $result = $row->kind === 'replan'
-                        ? $this->replanning->confirmWithinTransaction($owner, $row->protected_token, $acceptPartial, $acceptUnplacedCancellation)
+                        ? $this->replanning->confirmWithinTransaction($owner, $row->protected_token, $acceptPartial, $acceptUnplacedCancellation, $acceptSplitReplacements)
                         : $this->plans->confirmWithinTransaction($owner, $row->protected_token, $acceptPartial);
                     if ($row->expires_at <= CarbonImmutable::now('UTC')) {
                         throw new RecoverySuggestionException('suggestion_expired');
@@ -211,7 +211,7 @@ class RecoverySuggestionService
 
                 return ['error' => $exception->errorCode];
             } catch (ValidationException $exception) {
-                if (array_intersect(array_keys($exception->errors()), ['accept_partial', 'accept_unplaced_cancellation']) !== []) {
+                if (array_intersect(array_keys($exception->errors()), ['accept_partial', 'accept_unplaced_cancellation', 'accept_split_replacements']) !== []) {
                     throw $exception;
                 }
                 $this->resolve($row, 'invalidated');

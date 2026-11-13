@@ -54,3 +54,38 @@ PlanningCompletionRulesTest. Frontend: StudySessionView, studySessions API,
 StudyProposal, PlanningView і цільові tests. Оновлено чинний lifecycle контракт.
 Перевірки: 654 isolated MySQL tests (4144 assertions), 100 frontend tests,
 PHP syntax/Pint, type-check/build успішні. Реальні completed дані не змінювались.
+
+## Етап 3 — кілька наступників
+
+StudyReplanningAnalysisService повторно використовує той самий allocator без
+singlePlacement. Canonical replacements[] містить усі нові сесії; replacement —
+сумісний alias лише для однієї. Сума обмежена початковою тривалістю і залишком.
+ConfirmationService перевіряє всі запропоновані сесії разом. PersistenceService
+зберігає кожний immediate predecessor у transaction під owner lock. Preview token
+version 2 та recovery fingerprint policy version 2 відхиляють старі огляди.
+REST, recovery та AI вимагають окремої accept_split_replacements згоди, додатково
+до accept_partial та accept_unplaced_cancellation, коли вони потрібні.
+
+Additive migration замінює UNIQUE predecessor index на звичайний; FK і записи
+збережено. Модель має rescheduledToSessions HasMany. Історія перевіряє весь
+connected component, включно із siblings поза горизонтом. Rollback не видаляє
+дані і відмовляє, якщо split уже існує. Нагадування джерел скасовуються через
+наявний Service без клонування. Completed/missed не переписуються.
+
+Frontend StudyProposal показує original, кожну нову сесію та загальні неперенесені
+хвилини. PlanPreview, RecoverySuggestions та AI review мають окрему unchecked
+згоду на поділ. Після невідомого confirm потрібне явне перечитування, не retry.
+
+Основні файли: StudyReplanningAnalysis/Preview/Confirmation/PersistenceService,
+StudySessionMutationContextService/LifecycleRules, StudySession model, migration,
+replanning resources/requests/controllers; RecoverySourceState/Analysis/Suggestion,
+PlanningActionConsent/Service; frontend planning/recovery API, types, views,
+StudyProposal та AiActionReview. Рішення описано в ADR-013.
+
+Перевірки етапу 3: 872 focused isolated MySQL tests / 4911 assertions;
+додаткові split/remaining-effort/rollback regressions: 3 tests / 57 assertions.
+156 frontend tests, type-check/build і PHP syntax/Pint успішні. Перевірено 120→60+60,
+90 хв залишку при source 120, окремі згоди, stale/replay/cross-user відмову,
+подальше перенесення однієї гілки та відмову rollback без втрати даних.
+Обмеження: greedy не оптимізує план глобально; single manual reschedule лишається
+однією явною заміною, множинні пропозиції формує adaptive preview.

@@ -101,7 +101,7 @@ class StudySessionLifecycleRules
         }
         foreach ($records as $id => $record) {
             $count = count($children[$id] ?? []);
-            if ($count !== ($record['status'] === StudySessionStatus::Rescheduled->value ? 1 : 0)) {
+            if ($record['status'] === StudySessionStatus::Rescheduled->value ? $count < 1 : $count !== 0) {
                 $this->corrupt();
             }
         }

@@ -97,18 +97,21 @@ class PlanningActionService
                         $review = (new StudyReplanningResource($raw))->resolve(new Request);
                         $actionable = $this->replanningTokens->affected($raw) !== [];
                         $required = [];
-                        if ($this->replanningTokens->acceptanceError($raw, false, true) === 'accept_partial') {
+                        if ($this->replanningTokens->acceptanceError($raw, false, true, true) === 'accept_partial') {
                             $required[] = 'accept_partial';
                         }
-                        if ($this->replanningTokens->acceptanceError($raw, true, false) === 'accept_unplaced_cancellation') {
+                        if ($this->replanningTokens->acceptanceError($raw, true, false, true) === 'accept_unplaced_cancellation') {
                             $required[] = 'accept_unplaced_cancellation';
+                        }
+                        if ($this->replanningTokens->acceptanceError($raw, true, true, false) === 'accept_split_replacements') {
+                            $required[] = 'accept_split_replacements';
                         }
                     }
                 }
                 $preview = ['action' => $name, 'confirmation_required' => $actionable, 'review' => $review,
                     'required_consent' => $required, 'effects' => [match ($name) {
                         'propose_study_plan_create' => 'Create only the reviewed planned sessions. A partial allocation needs explicit accept_partial consent.',
-                        'propose_adaptive_replanning' => 'Preserve valid and cannot-replan sessions. Replace affected sources one-to-one; shorter replacements need partial consent and unplaced cancellation needs separate cancellation consent. Cancel source scheduled reminders without cloning them.',
+                        'propose_adaptive_replanning' => 'Preserve valid and cannot-replan sessions. Replace affected sources with one or more successors; splitting needs explicit split consent; shorter replacements need partial consent and unplaced cancellation needs separate cancellation consent. Cancel source scheduled reminders without cloning them.',
                         'propose_session_reschedule' => 'Preliminary lifecycle and duration review only. Confirmation revalidates remaining effort and all planning constraints; the interval is not guaranteed feasible. Retire the source, create one successor, cancel scheduled source reminders, preserve history and do not clone reminders.',
                         'propose_session_mark_missed' => 'Mark the existing session missed only after authenticated confirmation. Cancel its scheduled dependent reminders; preserve the session identity and history. No replacement is created.',
                         default => 'Mark the existing session completed only after authenticated confirmation, using only stated actual minutes. Cancel its scheduled dependent reminders; preserve the session identity and history. No replacement is created.',
@@ -221,7 +224,7 @@ class PlanningActionService
                     'summary' => $result['plan']['summary']];
             }
             $result = $this->replanning->confirmWithinTransaction($owner, $token, $consent['accept_partial'] ?? false,
-                $consent['accept_unplaced_cancellation'] ?? false);
+                $consent['accept_unplaced_cancellation'] ?? false, $consent['accept_split_replacements'] ?? false);
 
             return ['applied' => true, 'original_sessions' => $result['original_sessions']->map(fn ($row) => ['id' => $row->id, 'status' => $row->status->value])->all(),
                 'replacement_sessions' => $result['replacement_sessions']->map(fn ($row) => $this->session($row))->all(), 'summary' => $result['summary']];
@@ -233,7 +236,7 @@ class PlanningActionService
             // Invalid persisted attribution/history also invalidates the reviewed operation.
             throw new AiAgentException('action_stale');
         } catch (ValidationException $exception) {
-            $safe = array_intersect_key($exception->errors(), array_flip(['accept_partial', 'accept_unplaced_cancellation']));
+            $safe = array_intersect_key($exception->errors(), array_flip(['accept_partial', 'accept_unplaced_cancellation', 'accept_split_replacements']));
             if ($safe !== []) {
                 throw ValidationException::withMessages($safe);
             }

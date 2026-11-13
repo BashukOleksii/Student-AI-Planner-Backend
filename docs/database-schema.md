@@ -76,10 +76,9 @@ Groups 1–9 remain the completed Stage 02 persistence scope. Stage 03 materiali
 
 The companion [DBML source](database-schema.dbml) preserves the supplied `student-ai-planner.dbml` diagram. It uses numeric shorthand and omits SQL CHECK expressions; the MySQL types and constraints below remain authoritative. See [the conceptual domain model](domain-model.md), [business rules](business-rules.md), and [the earlier draft review](database-review-notes.md) for context. Known implementation issues are recorded in section 8 without changing approved tables, columns, keys, or delete actions.
 
-Stage E2 uses the existing StudySession status/history columns, unique direct
-successor key and Reminder lifecycle fields without migrations. Its owner-first
+Adaptive confirmation uses the existing StudySession status/history columns and Reminder lifecycle fields. ADR-013 adds a migration replacing the unique predecessor index with a nonunique index. Its owner-first
 atomic batch validates exact work/chain ownership, preserves original intervals,
-creates one planned successor per replacement, cancels explicitly accepted
+creates every planned successor in the reviewed replacement list, cancels explicitly accepted
 unplaced sources and cancels their scheduled reminders. See [adaptive replanning](adaptive-replanning.md#stage-e2-confirmation-contract).
 
 Stage F1 adds absolute Reminder creation, paginated list/detail, scheduled editing
@@ -822,14 +821,14 @@ DB-enforced CHECKs:
 - `study_sessions_completion_consistency`: `(status = 'completed' AND completed_at IS NOT NULL) OR (status <> 'completed' AND completed_at IS NULL)`;
 - `study_sessions_actual_requires_completion`: `actual_minutes IS NULL OR status = 'completed'`.
 
-The self-rescheduling CHECK is intentionally omitted: MySQL prohibits the AUTO_INCREMENT comparison and CHECKs involving the self-FK's `SET NULL` action (3818/3823). There is no trigger or generated-column workaround. The FK enforces predecessor existence and `UNIQUE(rescheduled_from_session_id)` enforces at most one direct successor; multiple NULL predecessors are allowed. Self-reference remains physically possible but is invalid domain data.
+The self-rescheduling CHECK is intentionally omitted: MySQL prohibits the AUTO_INCREMENT comparison and CHECKs involving the self-FK's `SET NULL` action (3818/3823). There is no trigger or generated-column workaround. The FK enforces predecessor existence and `INDEX(rescheduled_from_session_id)` supports several direct successors (ADR-013); each successor still has exactly one immediate predecessor. Self-reference remains physically possible but is invalid domain data.
 
 Indexes:
 
 - `INDEX(user_id, status, starts_at)`;
 - `INDEX(task_id, starts_at)`;
 - `INDEX(subtask_id, starts_at)`;
-- `UNIQUE(rescheduled_from_session_id)`.
+- `INDEX(rescheduled_from_session_id)` named `study_sessions_predecessor_index`.
 
 Service invariants:
 
@@ -844,7 +843,7 @@ Planned vs actual:
 
 - planned minutes = `ends_at - starts_at`;
 - actual minutes = `actual_minutes`;
-- Stage D omission stores `actual_minutes = null`, preserving Stage A’s exact scheduled-second fallback; explicit HTTP null is rejected. The schema keeps actual effort and scheduled workload separate.
+- New completion requires strict actual_minutes 1–65535 in REST/domain/AI. Historical completed null retains the exact scheduled-second fallback. The nullable schema preserves legacy history.
 
 Eloquent:
 
@@ -852,7 +851,7 @@ Eloquent:
 - `belongsTo(Task::class)`
 - `belongsTo(Subtask::class)`
 - `belongsTo(StudySession::class, 'rescheduled_from_session_id')` as `rescheduledFromSession`
-- `hasOne(StudySession::class, 'rescheduled_from_session_id')` as `rescheduledToSession`
+- `hasMany(StudySession::class, 'rescheduled_from_session_id')` as `rescheduledToSessions`
 - `hasMany(Reminder::class)`
 
 ---
@@ -1177,7 +1176,7 @@ All Stage 02 migration enforcement decisions are resolved. Approved FK actions a
 
 ### 8.1 Self-reference CHECK restrictions
 
-MySQL prohibits CHECK expressions referencing an `AUTO_INCREMENT` column. The Lesson design gate confirmed error 3818 on MySQL 8.4.10; Lessons and StudySessions deliberately omit self-comparison CHECKs and assign those prohibitions to deterministic application Services. LessonService now prohibits self-replacement; Stage D prohibits self-rescheduling and invalid inspected chains. Persistence tests explicitly demonstrate physically permitted self-reference as invalid domain data. FKs enforce referenced existence, and unique references enforce one direct replacement/successor. No triggers or generated-column workarounds are used. [MySQL CHECK constraint restrictions](https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html).
+MySQL prohibits CHECK expressions referencing an `AUTO_INCREMENT` column. The Lesson design gate confirmed error 3818 on MySQL 8.4.10; Lessons and StudySessions deliberately omit self-comparison CHECKs and assign those prohibitions to deterministic application Services. LessonService now prohibits self-replacement; Stage D prohibits self-rescheduling and invalid inspected chains. Persistence tests explicitly demonstrate physically permitted self-reference as invalid domain data. FKs enforce referenced existence, and Lesson uniqueness enforces one direct lesson replacement; StudySession successors may split under ADR-013. No triggers or generated-column workarounds are used. [MySQL CHECK constraint restrictions](https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html).
 
 ### 8.2 CHECK constraints and referential actions
 
@@ -1187,7 +1186,7 @@ Nulling a relative reminder's target leaves its persisted anchor/offset unchange
 
 | Area | Database enforcement | Future deterministic Service enforcement |
 |---|---|---|
-| StudySession | interval, status, completion consistency, positive actual minutes only when completed, FK existence/actions, unique predecessor | self-rescheduling prohibition, task/subtask compatibility, ownership, overlaps, deadlines, lifecycle transition |
+| StudySession | interval, status, completion consistency, positive actual minutes only when completed, FK existence/actions, predecessor index | self-rescheduling prohibition, task/subtask compatibility, ownership, overlaps, deadlines, lifecycle transition |
 | Reminder | status, nullable anchor vocabulary, anchor/offset pairing, sent-state consistency, FK existence/actions | max one target, target/anchor compatibility, ownership, trigger recalculation, hard-purge reconciliation |
 
 ### 8.3 Diagram representation

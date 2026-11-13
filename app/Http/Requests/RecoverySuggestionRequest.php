@@ -40,7 +40,7 @@ class RecoverySuggestionRequest extends FormRequest
                 'per_page' => ['sometimes', 'bail', $decimal, 'integer', 'between:1,10']];
         }
         if ($this->routeIs('recovery-suggestions.confirm')) {
-            return ['accept_partial' => ['sometimes', 'boolean:strict'], 'accept_unplaced_cancellation' => ['sometimes', 'boolean:strict']];
+            return ['accept_split_replacements' => ['sometimes', 'boolean:strict'], 'accept_partial' => ['sometimes', 'boolean:strict'], 'accept_unplaced_cancellation' => ['sometimes', 'boolean:strict']];
         }
 
         return [];

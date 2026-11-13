@@ -11,7 +11,7 @@ class PlanningActionConsent
     {
         return match ($type) {
             'propose_study_plan_create' => ['accept_partial'],
-            'propose_adaptive_replanning' => ['accept_partial', 'accept_unplaced_cancellation'],
+            'propose_adaptive_replanning' => ['accept_partial', 'accept_unplaced_cancellation', 'accept_split_replacements'],
             default => [],
         };
     }
