@@ -1,3 +1,5 @@
+> Current completion policy: explicit Task/Subtask completion now cancels only reviewed future planned sessions (`starts_at >` the locked operation clock), preserving elapsed sessions and actual history. Optional combined session/work completion is atomic; default session completion remains independent. This supersedes earlier stage notes that work completion preserves every session status. See [contract and verification](work-completion.md).
+
 > Current extension: successful changes of owned planning inputs initiate analysis only after commit. Analysis proposes, never moves/cancels sessions. Unchecked, failed and expired reviews cannot be presented as current; explicit confirmation/refresh policies remain. See [attention rules](planning-attention.md).
 
 # Business Rules
@@ -441,8 +443,8 @@ Task/Subtask deadline changes atomically recalculate scheduled direct relative
 reminders, preserving absolute and historical rows. Missing, elapsed or
 unrepresentable resolutions cancel with the last committed trigger retained.
 Actual Task/Subtask completion cancels affected scheduled reminders in both modes,
-including invalidated descendant/session targets, without changing sessions or
-other work. Reopening never resurrects history. Shared structural integrity checks
+including invalidated descendant/session targets. Reviewed completion also cancels
+strictly future planned sessions, without changing other work. Reopening never resurrects history. Shared structural integrity checks
 fail closed before a reminder batch write and roll back the enclosing mutation.
 Fresh owner-first application transactions and current locked sources serialize
 public writes. GET never recalculates, cancels or repairs records. S3/Stage D/E2

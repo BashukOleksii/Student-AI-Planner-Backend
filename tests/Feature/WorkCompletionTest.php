@@ -2,14 +2,20 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\AnalyzeOwnerPlan;
 use App\Models\Reminder;
+use App\Models\StudyAvailabilityWindow;
 use App\Models\StudySession;
 use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\Planning\StudyPlanningService;
+use App\Services\Tasks\TaskService;
+use App\Services\Tasks\WorkCompletionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class WorkCompletionTest extends TestCase
@@ -164,5 +170,38 @@ class WorkCompletionTest extends TestCase
         $this->getJson($base.'/completion-review')->assertJsonPath('can_complete_work', false);
         $this->postJson($base.'/complete', ['actual_minutes' => 7])->assertOk();
         $this->assertSame(7, $source->refresh()->actual_minutes);
+    }
+
+    public function test_cancelled_future_time_is_available_without_creating_a_new_plan_and_checks_dispatch_after_commit(): void
+    {
+        $owner = User::factory()->create(['timezone' => 'UTC']);
+        $task = Task::factory()->for($owner)->create(['estimated_minutes' => 60]);
+        $other = Task::factory()->for($owner)->create(['estimated_minutes' => 60]);
+        StudyAvailabilityWindow::factory()->for($owner)->create(['day_of_week' => 5, 'starts_at' => '11:00:00', 'ends_at' => '12:00:00']);
+        StudySession::factory()->for($task)->create(['starts_at' => '2026-11-13 11:00:00', 'ends_at' => '2026-11-13 12:00:00']);
+        $planner = app(StudyPlanningService::class);
+        $this->assertSame(0, $planner->plan($owner, '2026-11-13', '2026-11-13', $other->id)['summary']['allocated_seconds']);
+        $review = app(WorkCompletionService::class)->review($owner, $task);
+        Queue::fake();
+        DB::table('recovery_scan_states')->where('user_id', $owner->id)->update(['queued_token' => null, 'queued_until' => null]);
+        DB::beginTransaction();
+        app(TaskService::class)->complete($owner, $task, $review['completion_token']);
+        Queue::assertNothingPushed();
+        DB::commit();
+        Queue::assertPushed(AnalyzeOwnerPlan::class, 1);
+        $this->assertSame(3600, $planner->plan($owner, '2026-11-13', '2026-11-13', $other->id)['summary']['allocated_seconds']);
+        $this->assertDatabaseCount('study_sessions', 1);
+    }
+
+    public function test_completion_preserves_all_terminal_and_elapsed_session_records(): void
+    {
+        $task = Task::factory()->create();
+        $records = collect(['completed', 'missed', 'cancelled', 'rescheduled', 'planned'])->map(fn ($status) => StudySession::factory()->for($task)->create([
+            'status' => $status, 'actual_minutes' => $status === 'completed' ? 19 : null,
+            'completed_at' => $status === 'completed' ? '2026-10-05 10:00:00' : null,
+        ]));
+        $before = $records->map(fn ($s) => $s->refresh()->getAttributes())->all();
+        app(TaskService::class)->complete($task->user, $task);
+        $this->assertSame($before, $records->map(fn ($s) => $s->refresh()->getAttributes())->all());
     }
 }

@@ -1,3 +1,5 @@
+> Current completion policy: explicit Task/Subtask completion now cancels only reviewed future planned sessions (`starts_at >` the locked operation clock), preserving elapsed sessions and actual history. Optional combined session/work completion is atomic; default session completion remains independent. This supersedes earlier stage notes that work completion preserves every session status. See [contract and verification](work-completion.md).
+
 > Current extension: owner-scoped after-commit plan checks reuse the existing recovery detector through a debounced database queue and durable scan-state generation. A compact authenticated attention endpoint supplies one global frontend store. The bounded five-minute Scheduler remains the fallback. See [ADR-014](decisions/ADR-014-owner-plan-attention.md).
 
 # Backend Architecture

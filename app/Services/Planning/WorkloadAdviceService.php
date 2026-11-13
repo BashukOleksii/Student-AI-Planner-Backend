@@ -34,7 +34,7 @@ class WorkloadAdviceService
                     'recommendation_codes' => $this->recommendations($item['reason_codes'], $item['unscheduled_seconds'] > 0)];
             }
             $excluded = array_map(fn ($item) => [...$item,
-                'recommendation_codes' => $this->excludedRecommendations($item['reason_codes'])], $plan['excluded_items']);
+                'recommendation_codes' => $this->excludedRecommendations($item['reason_codes'], $item['subtask_id'] !== null)], $plan['excluded_items']);
             $violations = $this->persistedViolations($owner, $startDate, $endDate);
             $alerts = [];
             if (! $plan['summary']['fully_allocated']) {
@@ -110,10 +110,16 @@ class WorkloadAdviceService
         return $result;
     }
 
-    private function excludedRecommendations(array $reasons): array
+    private function excludedRecommendations(array $reasons, bool $subtask): array
     {
         if (array_intersect($reasons, ['completed_task', 'parent_task_completed', 'completed_subtask',
-            'completed_effort_satisfies_estimate', 'fully_reserved', 'subtasks_authoritative']) !== []) {
+            'subtasks_authoritative']) !== []) {
+            return [];
+        }
+        if (in_array('completed_effort_satisfies_estimate', $reasons, true)) {
+            return [$subtask ? 'review_subtask_estimated_effort' : 'review_estimated_effort'];
+        }
+        if (in_array('fully_reserved', $reasons, true)) {
             return [];
         }
         $result = [];

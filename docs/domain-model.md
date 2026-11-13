@@ -1,3 +1,5 @@
+> Current completion policy: explicit Task/Subtask completion now cancels only reviewed future planned sessions (`starts_at >` the locked operation clock), preserving elapsed sessions and actual history. Optional combined session/work completion is atomic; default session completion remains independent. This supersedes earlier stage notes that work completion preserves every session status. See [contract and verification](work-completion.md).
+
 > Current extension: recovery_scan_states also stores dirty/checked generations, queue lease/token and last-success/error metadata. These are delivery metadata, separate from StudySession and RecoverySuggestion history; no second planning domain is added. See [attention contract](planning-attention.md).
 
 # Conceptual Domain Model

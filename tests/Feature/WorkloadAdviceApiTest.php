@@ -328,4 +328,27 @@ class WorkloadAdviceApiTest extends TestCase
 
         return $result;
     }
+
+    public function test_open_work_with_completed_credit_gets_estimate_advice_for_the_authoritative_step_only(): void
+    {
+        [$owner, $task] = $this->fixture(['estimated_minutes' => 30]);
+        $child = Subtask::factory()->for($task)->create(['estimated_minutes' => 30]);
+        StudySession::factory()->for($task)->create(['subtask_id' => $child->id, 'status' => 'completed', 'actual_minutes' => 30,
+            'starts_at' => '2026-11-07 09:00:00', 'ends_at' => '2026-11-07 10:00:00', 'completed_at' => '2026-11-07 10:00:00']);
+        $items = collect($this->advice()['excluded_items']);
+        $this->assertSame(['review_subtask_estimated_effort'], $items->firstWhere('subtask_id', $child->id)['recommendation_codes']);
+        $this->assertSame([], $items->first(fn ($item) => $item['subtask_id'] === null)['recommendation_codes']);
+        $this->assertSame('pending', $child->refresh()->status->value);
+        $child->update(['status' => 'completed', 'completed_at' => now()]);
+        $this->assertSame([], collect($this->advice()['excluded_items'])->firstWhere('subtask_id', $child->id)['recommendation_codes']);
+    }
+
+    public function test_open_task_with_actual_credit_equal_to_estimate_gets_advice_without_being_completed(): void
+    {
+        [$owner, $task] = $this->fixture(['estimated_minutes' => 30]);
+        StudySession::factory()->for($task)->create(['status' => 'completed', 'actual_minutes' => 30,
+            'starts_at' => '2026-11-07 09:00:00', 'ends_at' => '2026-11-07 10:00:00', 'completed_at' => '2026-11-07 10:00:00']);
+        $this->assertSame(['review_estimated_effort'], $this->advice()['excluded_items'][0]['recommendation_codes']);
+        $this->assertSame('pending', $task->refresh()->status->value);
+    }
 }

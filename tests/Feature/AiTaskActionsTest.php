@@ -617,4 +617,18 @@ class AiTaskActionsTest extends TestCase
         $this->assertDatabaseCount('ai_pending_actions', 0);
         $this->assertDatabaseCount('tasks', 0);
     }
+
+    public function test_ai_confirmation_cannot_cancel_sessions_added_after_its_zero_session_review(): void
+    {
+        [$owner, $conversation] = $this->fixture();
+        $task = Task::factory()->for($owner)->create();
+        $turn = $this->propose($conversation, 'propose_task_complete', ['task_id' => $task->id]);
+        $this->assertSame(0, $turn['action']['preview']['completion_review']['future_sessions_count']);
+        $session = StudySession::factory()->for($task)->create(['starts_at' => now('UTC')->addDay(), 'ends_at' => now('UTC')->addDay()->addHour()]);
+        $this->postAction($this->url($conversation, $turn['action']['id']).'/confirm')->assertConflict()
+            ->assertJsonPath('completion_review.future_sessions_count', 1);
+        $this->assertSame('pending', $task->refresh()->status->value);
+        $this->assertSame('planned', $session->refresh()->status->value);
+        $this->assertNull(AiPendingAction::findOrFail($turn['action']['id'])->receipt);
+    }
 }
