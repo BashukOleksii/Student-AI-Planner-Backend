@@ -3,12 +3,27 @@
 namespace App\Providers;
 
 use App\Exceptions\AiAgentException;
+use App\Models\AcademicPeriod;
+use App\Models\Lesson;
+use App\Models\PlanningPreference;
+use App\Models\ScheduleDateException;
+use App\Models\ScheduleDateExceptionLesson;
+use App\Models\SemesterSchedule;
+use App\Models\SemesterScheduleSuppressedSlot;
+use App\Models\StudyAvailabilityWindow;
+use App\Models\StudySession;
+use App\Models\Subtask;
+use App\Models\Task;
+use App\Models\User;
+use App\Models\WeeklyLessonRule;
+use App\Observers\PlanningSourceObserver;
 use App\Policies\DatabaseNotificationPolicy;
 use App\Services\AI\AgentLimits;
 use App\Services\AI\GeminiGenerateContentProvider;
 use App\Services\AI\LlmProvider;
 use App\Services\AI\OpenAiResponsesProvider;
 use App\Services\Auth\PasswordManagementService;
+use App\Services\Planning\RecoveryCheckTriggerService;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -24,6 +39,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(RecoveryCheckTriggerService::class);
         $this->app->bind(AgentLimits::class, fn () => new AgentLimits(config('ai')));
         $this->app->bind(LlmProvider::class, fn ($app) => match (config('ai.provider')) {
             'gemini' => $app->make(GeminiGenerateContentProvider::class),
@@ -37,6 +53,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        foreach ([StudyAvailabilityWindow::class, PlanningPreference::class,
+            SemesterSchedule::class, WeeklyLessonRule::class,
+            ScheduleDateException::class, ScheduleDateExceptionLesson::class,
+            SemesterScheduleSuppressedSlot::class, AcademicPeriod::class,
+            Lesson::class, Task::class, Subtask::class,
+            StudySession::class, User::class] as $source) {
+            $source::observe(PlanningSourceObserver::class);
+        }
         ResetPassword::createUrlUsing(fn ($user, $token) => app(PasswordManagementService::class)->resetUrl($user, $token));
         RateLimiter::for('auth-login', function (Request $request): array {
             $email = $request->input('email');

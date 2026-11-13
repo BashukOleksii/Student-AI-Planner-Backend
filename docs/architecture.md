@@ -1,3 +1,5 @@
+> Current extension: owner-scoped after-commit plan checks reuse the existing recovery detector through a debounced database queue and durable scan-state generation. A compact authenticated attention endpoint supplies one global frontend store. The bounded five-minute Scheduler remains the fallback. See [ADR-014](decisions/ADR-014-owner-plan-attention.md).
+
 # Backend Architecture
 
 > Current implementation update (after reference `4eb708e`): Automatic learning recovery now uses a bounded scheduled detector and durable owner-scoped reviews. Only explicit authenticated confirmation delegates to existing deterministic planning/replanning writers. See [ADR-012](decisions/ADR-012-automatic-learning-recovery.md) and [API contract](automatic-learning-recovery.md). No automatic session relocation or inferred missed status is introduced.

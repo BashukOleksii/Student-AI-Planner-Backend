@@ -9,6 +9,7 @@ use App\Services\Planning\RecoverySourceStateService;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\InteractsWithLearningRecovery;
@@ -68,7 +69,7 @@ class AutomaticRecoveryDetectionTest extends TestCase
             $this->travelTo(CarbonImmutable::parse('2026-10-19T08:00:00Z')->addSeconds($index));
             $this->assertSame(1, $f['service']->scan(1)['selected']);
             $this->assertDatabaseHas('recovery_scan_states', ['user_id' => $id]);
-            $this->assertDatabaseCount('recovery_scan_states', $index + 1);
+            $this->assertSame($index + 1, DB::table('recovery_scan_states')->whereNotNull('last_scanned_at')->count());
         }
         $this->travelTo(CarbonImmutable::parse('2026-10-19T08:00:03Z'));
         $this->assertSame(1, $f['service']->scan(1)['unchanged']);

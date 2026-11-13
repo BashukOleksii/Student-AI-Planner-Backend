@@ -1,3 +1,5 @@
+> Current extension: successful changes of owned planning inputs initiate analysis only after commit. Analysis proposes, never moves/cancels sessions. Unchecked, failed and expired reviews cannot be presented as current; explicit confirmation/refresh policies remain. See [attention rules](planning-attention.md).
+
 # Business Rules
 
 > Current implementation update (after reference `4eb708e`): Automatic recovery proposes only. A planned session with an unknown outcome remains planned; started unknown sessions require an explicit lifecycle decision before automatic allocation. Confirmed adaptive changes preserve valid/completed work and require separate consent for unplaced cancellation. Changed source state invalidates reviews. Existing deterministic allocators enforce all constraints; optional internal future cutoff makes background reviews usable without altering ordinary default planning. See [contract and limits](automatic-learning-recovery.md).

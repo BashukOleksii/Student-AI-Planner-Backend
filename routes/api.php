@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\FreeSlotController;
 use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PasswordController;
+use App\Http\Controllers\Api\PlanningAttentionStatusController;
 use App\Http\Controllers\Api\PlanningDiagnosticsController;
 use App\Http\Controllers\Api\PlanningPreferenceController;
 use App\Http\Controllers\Api\ProfileController;
@@ -44,6 +45,7 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
 });
 
 Route::middleware('auth:sanctum')->group(function (): void {
+    Route::get('/planning/attention-status', PlanningAttentionStatusController::class)->name('planning.attention-status');
     Route::get('/planning/recovery/diagnostics', [RecoverySuggestionController::class, 'diagnostics'])->name('planning.recovery.diagnostics');
     Route::prefix('planning/recovery-suggestions')->name('recovery-suggestions.')->group(function (): void {
         Route::get('/', [RecoverySuggestionController::class, 'index'])->name('index');

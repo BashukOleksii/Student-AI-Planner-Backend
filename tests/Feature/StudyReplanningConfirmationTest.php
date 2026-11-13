@@ -110,7 +110,7 @@ class StudyReplanningConfirmationTest extends TestCase
         $preview = $this->preview();
         $sourceBefore = $source->fresh()->getAttributes();
         $reminderBefore = $scheduled->fresh()->getAttributes();
-        $otherTables = $this->snapshot(['study_sessions', 'reminders']);
+        $otherTables = $this->snapshot(['study_sessions', 'reminders', 'recovery_scan_states', 'jobs']);
         DB::enableQueryLog();
         DB::flushQueryLog();
         $data = $this->confirm($preview)->assertOk()->json('data');
@@ -135,7 +135,7 @@ class StudyReplanningConfirmationTest extends TestCase
         $this->assertSame($reminderBefore, array_replace($scheduled->fresh()->getAttributes(), ['status' => 'scheduled']));
         $this->assertSame($historical, [$ancestor->fresh()->getAttributes(), $completed->fresh()->getAttributes(), $sent->fresh()->getAttributes(),
             $cancelled->fresh()->getAttributes(), $unrelated->fresh()->getAttributes(), $general->fresh()->getAttributes()]);
-        $this->assertSame($otherTables, $this->snapshot(['study_sessions', 'reminders']));
+        $this->assertSame($otherTables, $this->snapshot(['study_sessions', 'reminders', 'recovery_scan_states', 'jobs']));
         $effort = app(PlanningWorkSelectionService::class)->select($user, $task->id)['work_items'][0]['effort'];
         $this->assertSame(1800, $effort['completed_credit_seconds']);
         $this->assertSame(3600, $effort['future_reserved_seconds']);

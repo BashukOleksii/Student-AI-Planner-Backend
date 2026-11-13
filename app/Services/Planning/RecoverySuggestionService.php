@@ -30,7 +30,8 @@ class RecoverySuggestionService
         $ids = User::query()->leftJoin('recovery_scan_states', 'users.id', '=', 'recovery_scan_states.user_id')
             ->where(fn ($query) => $query->whereHas('tasks', fn ($q) => $q->whereIn('status', ['pending', 'missed']))
                 ->orWhereHas('studySessions', fn ($q) => $q->where('status', 'planned'))
-                ->orWhereHas('recoverySuggestions', fn ($q) => $q->where('status', 'pending')))
+                ->orWhereHas('recoverySuggestions', fn ($q) => $q->where('status', 'pending'))
+                ->orWhereColumn('recovery_scan_states.requested_version', '>', 'recovery_scan_states.checked_version'))
             ->when($userId !== null, fn ($query) => $query->where('users.id', $userId))
             ->orderByRaw('recovery_scan_states.last_scanned_at IS NOT NULL')->orderBy('recovery_scan_states.last_scanned_at')
             ->orderBy('users.id')->limit($limit)->pluck('users.id');
@@ -294,7 +295,7 @@ class RecoverySuggestionService
         return $row;
     }
 
-    private function annotate(User $owner, RecoverySuggestion $row): RecoverySuggestion
+    public function annotate(User $owner, RecoverySuggestion $row): RecoverySuggestion
     {
         $row->currentStatus = $row->status;
         if ($row->status === 'pending') {
@@ -335,8 +336,18 @@ class RecoverySuggestionService
 
     private function recordScan(User $owner, ?string $hash, string $outcome): void
     {
-        DB::table('recovery_scan_states')->updateOrInsert(['user_id' => $owner->id], [
-            'last_source_hash' => $hash, 'last_outcome' => $outcome, 'last_scanned_at' => CarbonImmutable::now('UTC')->format('Y-m-d H:i:s.u')]);
+        $now = CarbonImmutable::now('UTC')->format('Y-m-d H:i:s.u');
+        $state = DB::table('recovery_scan_states')->where('user_id', $owner->id)->first();
+        $success = in_array($outcome, ['created', 'unchanged', 'no_need'], true);
+        $values = ['last_source_hash' => $hash, 'last_outcome' => $outcome, 'last_scanned_at' => $now,
+            'queued_token' => null, 'queued_until' => null, 'running_at' => null];
+        if ($success) {
+            $values += ['checked_version' => $state?->requested_version ?? 0, 'last_successful_at' => $now,
+                'last_error_at' => null, 'last_error_code' => null];
+        } else {
+            $values += ['last_error_at' => $now, 'last_error_code' => $outcome];
+        }
+        DB::table('recovery_scan_states')->updateOrInsert(['user_id' => $owner->id], $values);
     }
 
     private function period(User $owner, int $days): array

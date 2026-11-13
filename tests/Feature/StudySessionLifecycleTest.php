@@ -71,7 +71,7 @@ class StudySessionLifecycleTest extends TestCase
         $child = Subtask::factory()->for($task)->create(['estimated_minutes' => 120]);
         $source->update(['subtask_id' => $child->id, 'ends_at' => '2026-10-19 10:00:01']);
         $this->travelTo(CarbonImmutable::parse('2026-10-19T10:30:00.987654Z'));
-        $snapshot = $this->snapshot(['study_sessions']);
+        $snapshot = $this->snapshot(['study_sessions', 'recovery_scan_states', 'jobs']);
         if ($actual === null) {
             // Historical completed data retains null and scheduled-second credit; no new completion writer is used.
             $source->update(['status' => StudySessionStatus::Completed, 'completed_at' => '2026-10-19 10:30:00', 'actual_minutes' => null]);
@@ -85,7 +85,7 @@ class StudySessionLifecycleTest extends TestCase
         $this->assertSame($child->id, $data['subtask_id']);
         $this->assertArrayNotHasKey('user_id', $data);
         $this->assertArrayNotHasKey('rescheduled_from_session_id', $data);
-        $this->assertSame($snapshot, $this->snapshot(['study_sessions']));
+        $this->assertSame($snapshot, $this->snapshot(['study_sessions', 'recovery_scan_states', 'jobs']));
         $effort = app(PlanningWorkSelectionService::class)->select($user, $task->id, $child->id)['work_items'][0]['effort'];
         $this->assertSame($actual === null ? 3601 : $actual * 60, $effort['completed_credit_seconds']);
         $this->assertSame(0, $effort['future_reserved_seconds']);
@@ -180,9 +180,9 @@ class StudySessionLifecycleTest extends TestCase
         $child->delete();
         $task->delete();
         $this->travelTo(CarbonImmutable::parse($action === 'cancel' ? '2026-10-19T08:00:00Z' : '2026-10-19T10:00:00Z'));
-        $snapshot = $this->snapshot(['study_sessions']);
+        $snapshot = $this->snapshot(['study_sessions', 'recovery_scan_states', 'jobs']);
         $this->postJson($this->url($source, $action), $action === 'complete' ? ['actual_minutes' => 45] : [])->assertOk()->assertJsonPath('data.task_id', $task->id)->assertJsonPath('data.subtask_id', $child->id);
-        $this->assertSame($snapshot, $this->snapshot(['study_sessions']));
+        $this->assertSame($snapshot, $this->snapshot(['study_sessions', 'recovery_scan_states', 'jobs']));
     }
 
     public static function historicalActions(): array
@@ -225,7 +225,7 @@ class StudySessionLifecycleTest extends TestCase
         [$user, $task, $source] = $this->fixture();
         $child = Subtask::factory()->for($task)->create(['estimated_minutes' => 120, 'deadline_at' => '2026-10-19 12:00:00']);
         $source->update(['subtask_id' => $child->id]);
-        $snapshot = $this->snapshot(['study_sessions']);
+        $snapshot = $this->snapshot(['study_sessions', 'recovery_scan_states', 'jobs']);
         $data = $this->postJson($this->url($source, 'reschedule'), $this->replacement('11:00:01', '11:30:02'))->assertCreated()->json('data');
         $this->assertSame(['original_duration_seconds' => 3600, 'replacement_duration_seconds' => 1801,
             'not_transferred_seconds' => 1799, 'unallocated_work_seconds' => 5399], $data['summary']);
@@ -241,7 +241,7 @@ class StudySessionLifecycleTest extends TestCase
         $next = $this->postJson($this->url($successor, 'reschedule'), $this->replacement('11:29:59', '12:00:00'))
             ->assertCreated()->json('data');
         $this->assertSame($successor->id, StudySession::findOrFail($next['replacement']['id'])->rescheduled_from_session_id);
-        $this->assertSame($snapshot, $this->snapshot(['study_sessions']));
+        $this->assertSame($snapshot, $this->snapshot(['study_sessions', 'recovery_scan_states', 'jobs']));
         $this->assertDatabaseCount('study_sessions', 3);
         $this->postJson($this->url($source, 'reschedule'), $this->replacement())->assertConflict();
     }

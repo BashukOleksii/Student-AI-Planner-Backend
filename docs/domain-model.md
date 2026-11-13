@@ -1,3 +1,5 @@
+> Current extension: recovery_scan_states also stores dirty/checked generations, queue lease/token and last-success/error metadata. These are delivery metadata, separate from StudySession and RecoverySuggestion history; no second planning domain is added. See [attention contract](planning-attention.md).
+
 # Conceptual Domain Model
 
 > Current implementation update (after reference `4eb708e`): `RecoverySuggestion` stores a conversation-independent owner review, protected encrypted planning token, source/need fingerprints and immutable applied receipt. `recovery_scan_states` records bounded scan fairness/outcomes. Review metadata is distinct from study sessions, academic lessons, reminders and AI pending actions. See [ADR-012](decisions/ADR-012-automatic-learning-recovery.md).

@@ -1,3 +1,5 @@
+> Current additive change: 2026_11_13_000002 extends recovery_scan_states with dirty/checked versions, request/delivery lease and success/error fields. Existing records, FKs and unique suggestion deduplication are retained. See [ADR-014](decisions/ADR-014-owner-plan-attention.md).
+
 ## Current additive change (ADR-013)
 
 `2026_11_13_000001_allow_multiple_study_session_successors` replaces the unique

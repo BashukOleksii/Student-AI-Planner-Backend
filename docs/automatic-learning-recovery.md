@@ -1,3 +1,5 @@
+> Current extension: planning-source writes request a bounded owner-only check after commit through the database queue. Scheduler cadence and review dedup/confirmation stay in place. See [attention API and local processes](planning-attention.md).
+
 # Automatic learning recovery: Backend and frontend contract
 
 > Subsequent testing stage: the complete offline suite passed locally (6,782 tests, 74,032 assertions), including the recovery/calendar regressions. See [executed evidence and runtime limits](testing/backend-test-rebuild-report.md). Deferred-verification statements below describe the original implementation stage.
