@@ -9,6 +9,7 @@ use App\Http\Resources\SubtaskResource;
 use App\Models\Subtask;
 use App\Models\Task;
 use App\Services\Tasks\SubtaskService;
+use App\Services\Tasks\WorkCompletionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -56,12 +57,20 @@ class SubtaskController extends Controller
         return new SubtaskResource($service->update($request->user(), $task, $subtask, $request->validated()));
     }
 
+    public function completionReview(Request $request, Task $task, Subtask $subtask, WorkCompletionService $service): array
+    {
+        Gate::authorize('update', $task);
+        Gate::authorize('update', [$subtask, $task]);
+
+        return $service->review($request->user(), $task, $subtask);
+    }
+
     public function complete(Request $request, Task $task, Subtask $subtask, SubtaskService $service): SubtaskResource
     {
         Gate::authorize('update', $task);
         Gate::authorize('update', [$subtask, $task]);
 
-        return new SubtaskResource($service->complete($request->user(), $task, $subtask));
+        return new SubtaskResource($service->complete($request->user(), $task, $subtask, $request->validate(['completion_token' => ['sometimes', 'string']])['completion_token'] ?? null));
     }
 
     public function reopen(Request $request, Task $task, Subtask $subtask, SubtaskService $service): SubtaskResource

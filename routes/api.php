@@ -202,3 +202,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/tasks/{task}/subtasks/{subtask}/reopen', [SubtaskController::class, 'reopen'])->name('tasks.subtasks.reopen');
     });
 });
+
+Route::middleware('auth:sanctum')->group(function (): void {
+    Route::get('/tasks/{task}/completion-review', [TaskController::class, 'completionReview']);
+    Route::get('/tasks/{task}/subtasks/{subtask}/completion-review', [SubtaskController::class, 'completionReview']);
+});

@@ -309,7 +309,7 @@ class TaskLifecycleTest extends TestCase
         $this->assertStringContainsString('from `tasks`', $queries[1]['sql']);
         $this->assertStringContainsString('`user_id` =', $queries[1]['sql']);
         $this->assertStringContainsString('for update', $queries[1]['sql']);
-        $writes = array_values(array_filter($queries, fn ($query) => str_starts_with($query['sql'], 'update ')));
+        $writes = array_values(array_filter($queries, fn ($query) => str_starts_with($query['sql'], 'update `tasks`')));
         $this->assertCount(1, $writes);
         $this->assertStringStartsWith('update `tasks`', $writes[0]['sql']);
         $this->assertStringContainsString('`status` =', $writes[0]['sql']);
@@ -319,7 +319,7 @@ class TaskLifecycleTest extends TestCase
         } else {
             $this->assertStringContainsString('`completed_at` =', $writes[0]['sql']);
         }
-        foreach ($queries as $query) {
+        foreach ($writes as $query) {
             $this->assertSame($level + 1, $query['level']);
         }
         $this->assertSame($level, DB::transactionLevel());

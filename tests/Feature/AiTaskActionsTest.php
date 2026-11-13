@@ -171,7 +171,7 @@ class AiTaskActionsTest extends TestCase
             Reminder::factory()->for($owner)->create(['study_session_id' => $session->id])];
         $before = [$child->fresh()->getAttributes(), $session->fresh()->getAttributes()];
         $turn = $this->propose($conversation, 'propose_task_complete', ['task_id' => $task->id]);
-        $this->assertStringContainsString('statuses are preserved', $turn['action']['preview']['effects'][0]);
+        $this->assertStringContainsString('history are preserved', $turn['action']['preview']['effects'][0]);
         $this->postAction($this->url($conversation, $turn['action']['id']).'/confirm')->assertOk()->assertJsonPath('data.receipt.task.status', 'completed');
         $this->assertSame(TaskStatus::Completed, $task->fresh()->status);
         $this->assertNotNull($task->fresh()->completed_at);

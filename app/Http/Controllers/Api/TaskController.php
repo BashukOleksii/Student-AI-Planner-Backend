@@ -9,6 +9,7 @@ use App\Http\Resources\TaskProgressResource;
 use App\Http\Resources\TaskResource;
 use App\Models\Task;
 use App\Services\Tasks\TaskService;
+use App\Services\Tasks\WorkCompletionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -54,11 +55,18 @@ class TaskController extends Controller
         return new TaskResource($service->update($request->user(), $task, $request->validated()));
     }
 
+    public function completionReview(Request $request, Task $task, WorkCompletionService $service): array
+    {
+        Gate::authorize('update', $task);
+
+        return $service->review($request->user(), $task);
+    }
+
     public function complete(Request $request, Task $task, TaskService $service): TaskResource
     {
         Gate::authorize('update', $task);
 
-        return new TaskResource($service->complete($request->user(), $task));
+        return new TaskResource($service->complete($request->user(), $task, $request->validate(['completion_token' => ['sometimes', 'string']])['completion_token'] ?? null));
     }
 
     public function reopen(Request $request, Task $task, TaskService $service): TaskResource

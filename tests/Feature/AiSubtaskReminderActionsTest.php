@@ -152,7 +152,12 @@ class AiSubtaskReminderActionsTest extends TestCase
         }
         $after = $this->snapshot();
         $this->assertSame($before['tasks'], $after['tasks']);
-        $this->assertSame($before['study_sessions'], $after['study_sessions']);
+        if ($name === 'propose_subtask_complete') {
+            $this->assertSame('cancelled', $f['session']->fresh()->status->value);
+            $this->assertSame(count($before['study_sessions']), count($after['study_sessions']));
+        } else {
+            $this->assertSame($before['study_sessions'], $after['study_sessions']);
+        }
         $this->assertSame($before['notifications'], $after['notifications']);
         $this->decide($f, $id)->assertOk()->assertJsonPath('replayed', true)->assertJsonPath('data.receipt', $receipt);
         $this->assertSame($after, $this->snapshot());
@@ -239,7 +244,8 @@ class AiSubtaskReminderActionsTest extends TestCase
         $this->decide($f, $turn['action']['id'])->assertOk()->assertJsonPath('data.receipt.subtask.completed_at', null);
         $this->assertEquals($remindersBefore, DB::table('reminders')->orderBy('id')->get()->toArray());
         $this->assertSame($taskBefore, $f['task']->fresh()->getAttributes());
-        $this->assertSame($sessionBefore, $f['session']->fresh()->getAttributes());
+        $this->assertSame('cancelled', $f['session']->fresh()->status->value);
+        $this->assertSame($sessionBefore['starts_at'], $f['session']->fresh()->getRawOriginal('starts_at'));
     }
 
     public static function reminderModes(): array
@@ -353,7 +359,7 @@ class AiSubtaskReminderActionsTest extends TestCase
             'parent_delete' => $this->deleteJson('/api/tasks/'.$f['task']->id)->assertNoContent(),
             'child_edit' => $this->patchJson('/api/tasks/'.$f['task']->id.'/subtasks/'.$f['child']->id, ['title' => 'Concurrent child'])->assertOk(),
             'child_delete' => $this->deleteJson('/api/tasks/'.$f['task']->id.'/subtasks/'.$f['child']->id)->assertNoContent(),
-            'child_complete' => $this->postJson('/api/tasks/'.$f['task']->id.'/subtasks/'.$f['child']->id.'/complete')->assertOk(),
+            'child_complete' => $this->postJson('/api/tasks/'.$f['task']->id.'/subtasks/'.$f['child']->id.'/complete', $this->getJson('/api/tasks/'.$f['task']->id.'/subtasks/'.$f['child']->id.'/completion-review')->json())->assertOk(),
             'child_position' => $f['child']->update(['position' => 8]),
             'reminder_edit' => app(ReminderService::class)->update($f['owner'], (string) $f['reminder']->id, ['message' => 'Concurrent reminder']),
             'reminder_cancel' => app(ReminderService::class)->cancel($f['owner'], (string) $f['reminder']->id),
@@ -679,7 +685,8 @@ class AiSubtaskReminderActionsTest extends TestCase
         $turn = $this->propose($f, $name, $this->args($f, $name));
         $this->decide($f, $turn['action']['id'])->assertOk()->assertJsonPath('data.receipt.subtask.status', $expected);
         $this->assertSame($task, $f['task']->fresh()->getAttributes());
-        $this->assertSame($session, $f['session']->fresh()->getAttributes());
+        $this->assertSame($name === 'propose_subtask_complete' ? 'cancelled' : $session['status'], $f['session']->fresh()->status->value);
+        $this->assertSame($session['starts_at'], $f['session']->fresh()->getRawOriginal('starts_at'));
         $this->assertSame($deadline, $f['child']->fresh()->getRawOriginal('deadline_at'));
     }
 

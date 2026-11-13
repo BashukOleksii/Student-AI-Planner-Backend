@@ -5,6 +5,7 @@ namespace App\Services\AI\Actions;
 use App\Enums\TaskStatus;
 use App\Models\User;
 use App\Services\Tasks\TaskService;
+use App\Services\Tasks\WorkCompletionService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -48,6 +49,12 @@ class TaskActionProposalService
                 $proposal = ['id' => (string) Str::uuid(), 'type' => $name, 'call_id' => $callId, 'arguments' => $arguments,
                     'preview' => $this->presenter->preview($name, $task, $changes, $visibleSubjectId),
                     'target_hash' => $task === null ? null : $this->presenter->fingerprint($task)];
+
+                if ($name === 'propose_task_complete') {
+                    $review = app(WorkCompletionService::class)->review($owner, $task);
+                    $proposal['preview']['completion_review'] = $review;
+                    $proposal['preview']['effects'][] = $review['message'];
+                }
 
                 return ['proposal' => $proposal, 'result' => ['ok' => true, 'tool' => $name, 'data' => [
                     'state' => 'confirmation_required', 'action_id' => $proposal['id'], 'call_id' => $callId, 'preview' => $proposal['preview'],

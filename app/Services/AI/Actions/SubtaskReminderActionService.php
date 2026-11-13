@@ -11,6 +11,7 @@ use App\Services\Reminders\ReminderMutationService;
 use App\Services\Reminders\ReminderRules;
 use App\Services\Reminders\ReminderTargetService;
 use App\Services\Tasks\SubtaskService;
+use App\Services\Tasks\WorkCompletionService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -37,6 +38,11 @@ class SubtaskReminderActionService
             return DB::transaction(function () use ($owner, $name, $arguments, $callId): array {
                 $records = $this->load($owner, $name, $arguments, false);
                 $preview = $this->preview($owner, $name, $arguments, $records);
+                if ($name === 'propose_subtask_complete') {
+                    $review = app(WorkCompletionService::class)->review($owner, $records['task'], $records['child']);
+                    $preview['completion_review'] = $review;
+                    $preview['effects'][] = $review['message'];
+                }
                 $proposal = ['id' => (string) Str::uuid(), 'type' => $name, 'call_id' => $callId, 'arguments' => $arguments,
                     'preview' => $preview, 'target_hash' => $this->fingerprints->hash($records)];
 
@@ -79,7 +85,7 @@ class SubtaskReminderActionService
                 $result = match ($name) {
                     'propose_subtask_create' => $this->subtasks->create($owner, $task, $data),
                     'propose_subtask_update' => $this->subtasks->update($owner, $task, $child, $data),
-                    'propose_subtask_complete' => $this->subtasks->complete($owner, $task, $child),
+                    'propose_subtask_complete' => $this->subtasks->complete($owner, $task, $child, $action->preview['completion_review']['completion_token'] ?? null),
                     'propose_subtask_reopen' => $this->subtasks->reopen($owner, $task, $child),
                 };
                 if ($name === 'propose_subtask_reopen' && $result->status !== TaskStatus::Pending) {
@@ -144,7 +150,7 @@ class SubtaskReminderActionService
             ], 'before' => $child === null ? null : $this->presenter->subtask($child),
                 'changes' => $this->values->values($changes), 'effects' => [match ($name) {
                     'propose_subtask_create' => 'Append one pending subtask. The service assigns its position at confirmation.',
-                    'propose_subtask_complete' => 'Complete only this subtask and cancel its dependent scheduled reminders. Parent and study-session statuses are preserved.',
+                    'propose_subtask_complete' => 'Complete only this subtask and cancel its dependent scheduled reminders. Future planned sessions are cancelled; parent status and session history are preserved.',
                     'propose_subtask_reopen' => 'Reopen only this subtask. Cancelled reminders and retired study sessions are not recreated.',
                     default => 'Update the supplied fields. Deadline changes reconcile existing relative reminders.',
                 }]];

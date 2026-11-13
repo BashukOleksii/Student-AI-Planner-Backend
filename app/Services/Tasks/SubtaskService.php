@@ -19,7 +19,7 @@ class SubtaskService
     private const EDITABLE_FIELDS = ['title', 'description', 'estimated_minutes', 'deadline_at'];
 
     public function __construct(private TaskDependencyCleanupService $cleanup, private ReminderSynchronizationService $reminders,
-        private TaskEstimateService $estimates) {}
+        private TaskEstimateService $estimates, private WorkCompletionService $completion) {}
 
     public function delete(User $user, Task $task, Subtask $subtask): void
     {
@@ -92,15 +92,17 @@ class SubtaskService
         });
     }
 
-    public function complete(User $user, Task $task, Subtask $subtask): Subtask
+    public function complete(User $user, Task $task, Subtask $subtask, ?string $completionToken = null): Subtask
     {
-        return DB::transaction(function () use ($user, $task, $subtask): Subtask {
+        return DB::transaction(function () use ($user, $task, $subtask, $completionToken): Subtask {
             $task = $this->lockParent($user, $task);
             $subtask = $task->subtasks()->lockForUpdate()->findOrFail($subtask->getKey());
             if ($subtask->status === TaskStatus::Pending) {
+                $now = CarbonImmutable::now('UTC');
+                $this->completion->cancel($user, $task, $subtask, $now, $completionToken);
                 if (! $subtask->update([
                     'status' => TaskStatus::Completed,
-                    'completed_at' => CarbonImmutable::now('UTC')->startOfSecond(),
+                    'completed_at' => $now->startOfSecond(),
                 ])) {
                     throw new ReminderIntegrityException;
                 }

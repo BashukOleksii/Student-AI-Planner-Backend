@@ -20,7 +20,7 @@ class TaskService
     private const EDITABLE_FIELDS = ['title', 'description', 'subject_id', 'priority', 'estimated_minutes', 'deadline_at'];
 
     public function __construct(private TaskDependencyCleanupService $cleanup, private ReminderSynchronizationService $reminders,
-        private TaskEstimateService $estimates) {}
+        private TaskEstimateService $estimates, private WorkCompletionService $completion) {}
 
     public function delete(User $user, Task $task): void
     {
@@ -125,15 +125,17 @@ class TaskService
         });
     }
 
-    public function complete(User $user, Task $task): Task
+    public function complete(User $user, Task $task, ?string $completionToken = null): Task
     {
-        return DB::transaction(function () use ($user, $task): Task {
+        return DB::transaction(function () use ($user, $task, $completionToken): Task {
             $this->lockOwner($user);
             $task = $user->tasks()->lockForUpdate()->findOrFail($task->getKey());
             if ($task->status->isUnfinished()) {
+                $now = CarbonImmutable::now('UTC');
+                $this->completion->cancel($user, $task, null, $now, $completionToken);
                 if (! $task->update([
                     'status' => TaskStatus::Completed,
-                    'completed_at' => CarbonImmutable::now('UTC')->startOfSecond(),
+                    'completed_at' => $now->startOfSecond(),
                 ])) {
                     throw new ReminderIntegrityException;
                 }

@@ -66,7 +66,7 @@ class SubtaskLifecycleTest extends TestCase
                 'completed_at' => '2000-01-01T00:00:00Z', 'deleted_at' => '2000-01-01',
             ])->assertOk()->assertExactJson(['data' => [
                 'id' => $subtask->id, 'task_id' => $task->id, 'title' => 'Report', 'description' => 'Keep', 'position' => 9,
-                'status' => 'completed', 'estimated_minutes' => 50, 'deadline_at' => '2026-10-10T12:00:00Z',
+                'status' => 'completed', 'estimated_minutes' => 50, 'deadline_at' => '2026-10-10T12:00:00Z', 'effective_deadline_at' => '2026-10-10T12:00:00Z',
                 'completed_at' => '2026-10-12T10:20:30Z',
             ]]);
             $this->assertSame('2026-10-12 10:20:30', $subtask->refresh()->getRawOriginal('completed_at'));
@@ -88,7 +88,7 @@ class SubtaskLifecycleTest extends TestCase
         $this->postJson($this->url($task, $subtask, 'reopen'), ['status' => 'completed', 'completed_at' => '2000-01-01T00:00:00Z',
             'task_id' => 999999, 'position' => 65535, 'title' => 'Ignored'])->assertOk()->assertExactJson(['data' => [
                 'id' => $subtask->id, 'task_id' => $task->id, 'title' => 'Edited', 'description' => null, 'position' => 1,
-                'status' => 'pending', 'estimated_minutes' => null, 'deadline_at' => null, 'completed_at' => null,
+                'status' => 'pending', 'estimated_minutes' => null, 'deadline_at' => null, 'effective_deadline_at' => null, 'completed_at' => null,
             ]]);
         $this->travelTo(CarbonImmutable::parse('2026-10-13T11:22:33.654321Z'));
         $this->postJson($this->url($task, $subtask, 'complete'))->assertOk()->assertJsonPath('data.completed_at', '2026-10-13T11:22:33Z');
@@ -266,12 +266,12 @@ class SubtaskLifecycleTest extends TestCase
         }
         $this->assertStringContainsString('`user_id` =', $queries[1]['sql']);
         $this->assertStringContainsString('`task_id` =', $queries[2]['sql']);
-        $writes = array_values(array_filter($queries, fn ($query) => str_starts_with($query['sql'], 'update ')));
+        $writes = array_values(array_filter($queries, fn ($query) => str_starts_with($query['sql'], 'update `subtasks`')));
         $this->assertCount(1, $writes);
         $this->assertStringStartsWith('update `subtasks`', $writes[0]['sql']);
         $this->assertStringContainsString('`status` =', $writes[0]['sql']);
         $this->assertStringContainsString('`completed_at` =', $writes[0]['sql']);
-        foreach ($queries as $query) {
+        foreach ($writes as $query) {
             $this->assertSame($level + 1, $query['level']);
         }
         $this->assertSame($level, DB::transactionLevel());

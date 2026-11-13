@@ -53,7 +53,7 @@ class TaskActionPresenter
         return ['action' => $name, 'confirmation_required' => true,
             'before' => $before, 'changes' => $this->values($candidate),
             'effects' => match ($name) {
-                'propose_task_complete' => ['Complete the task and cancel dependent scheduled reminders. Subtask and study-session statuses are preserved.'],
+                'propose_task_complete' => ['Complete the task and cancel dependent scheduled reminders. Future planned sessions are cancelled; subtask statuses and session history are preserved.'],
                 'propose_task_reopen' => ['Reopen the task. Previously cancelled reminders and retired study sessions are not recreated.'],
                 'propose_task_update' => ['Update the supplied fields. Deadline changes reconcile relative reminders using current lifecycle rules.'],
                 default => ['Create one pending task. No subtasks, study sessions or reminders are created.'],
