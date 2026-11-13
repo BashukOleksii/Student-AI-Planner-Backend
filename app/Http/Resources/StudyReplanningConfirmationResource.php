@@ -15,6 +15,7 @@ class StudyReplanningConfirmationResource extends JsonResource
             ])->values()->all(),
             'replacement_sessions' => StudySessionResource::collection($this->resource['replacement_sessions']),
             'replacement_groups' => $this->resource['replacement_sessions']->groupBy('rescheduled_from_session_id')->map(fn ($rows, $id) => ['original_session_id' => (int) $id, 'successor_session_ids' => $rows->modelKeys()])->values()->all(),
+            'user_summary' => ['title' => 'Зміни плану збережено', 'next_step' => 'Перегляньте оновлені сесії у своєму плані.'],
             'summary' => $this->resource['summary']];
     }
 }

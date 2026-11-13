@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\Planning\PlanningExplanationPresenter;
 use App\Services\Planning\StudyReplanningConfirmationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -11,6 +12,7 @@ class StudyReplanningResource extends JsonResource
     public function toArray(Request $request): array
     {
         $result = $this->resource;
+        $presenter = app(PlanningExplanationPresenter::class);
         $result['session_results'] = array_map(fn ($row) => [
             'study_session_id' => $row['study_session_id'], 'task_id' => $row['task_id'], 'subtask_id' => $row['subtask_id'],
             'classification' => $row['classification'], 'original' => $this->interval($row['original']),
@@ -18,7 +20,15 @@ class StudyReplanningResource extends JsonResource
             'replacements' => array_map($this->interval(...), StudyReplanningConfirmationService::replacements($row)),
             'untransferred_seconds' => $row['untransferred_seconds'], 'reason_codes' => $row['reason_codes'],
             'replacement_reason_codes' => $row['replacement_reason_codes'],
+            'explanations' => $presenter->row($row)['explanations'],
         ], $result['session_results']);
+
+        foreach (['work_results', 'excluded_items', 'warnings'] as $field) {
+            if (isset($result[$field])) {
+                $result[$field] = array_map($presenter->row(...), $result[$field]);
+            }
+        }
+        $result['user_summary'] = $presenter->summary($result['summary']);
 
         return $result;
     }

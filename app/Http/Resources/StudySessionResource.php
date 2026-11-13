@@ -18,6 +18,10 @@ class StudySessionResource extends JsonResource
             'starts_at' => $start->format('Y-m-d\TH:i:s\Z'), 'ends_at' => $end->format('Y-m-d\TH:i:s\Z'),
             'duration_seconds' => $end->getTimestamp() - $start->getTimestamp(), 'status' => $this->status->value,
             'completed_at' => $completed === null ? null : CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $completed, 'UTC')->format('Y-m-d\TH:i:s\Z'),
+            'status_label' => match ($this->status->value) {
+                'completed' => 'Сесію завершено', 'missed' => 'Сесію пропущено',
+                'cancelled' => 'Сесію скасовано', 'rescheduled' => 'Сесію перенесено', default => 'Сесію заплановано',
+            },
             'actual_minutes' => $this->actual_minutes];
     }
 }

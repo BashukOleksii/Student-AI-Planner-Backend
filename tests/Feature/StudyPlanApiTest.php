@@ -17,6 +17,7 @@ use App\Services\Planning\StudyPlanningService;
 use App\Services\Planning\StudyPlanPersistenceService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -67,7 +68,8 @@ class StudyPlanApiTest extends TestCase
         }
         $this->assertSame($snapshot, $this->snapshot());
         $this->assertSame($expected['summary'], $data['summary']);
-        $this->assertSame($expected['work_results'], $data['work_results']);
+        $this->assertSame($expected['work_results'], array_map(fn ($row) => Arr::except($row, ['explanations', 'effective_deadline_at']), $data['work_results']));
+        $this->assertSame([], $data['work_results'][0]['explanations']);
         $this->assertSame(['task_id' => $task->id, 'subtask_id' => null, 'starts_at' => '2026-10-19T09:00:00Z',
             'ends_at' => '2026-10-19T10:00:00Z', 'duration_seconds' => 3600], $data['sessions'][0]);
         $this->assertSame('2026-10-19T08:15:00Z', $data['expires_at']);
@@ -84,13 +86,15 @@ class StudyPlanApiTest extends TestCase
         PlanningPreference::factory()->for($user)->create(['max_session_minutes' => 30, 'preferred_break_minutes' => 15]);
         Reminder::factory()->for($user)->create(['subtask_id' => $child->id]);
         $data = $this->preview(['task_id' => $task->id, 'subtask_id' => $child->id]);
-        $snapshot = $this->snapshot(['study_sessions']);
+        $snapshot = $this->snapshot(['study_sessions', 'recovery_scan_states', 'jobs']);
+        $scanVersion = DB::table('recovery_scan_states')->where('user_id', $user->id)->value('requested_version');
         $this->travelTo(CarbonImmutable::parse('2026-10-19T08:01:00.250000Z'));
         $saved = $this->postJson('/api/planning/study-plans/confirm', ['preview_token' => $data['preview_token']])
             ->assertCreated()->assertJsonPath('data.summary.fully_allocated', true)->json('data');
         $this->assertArrayNotHasKey('preview_token', $saved);
         $this->assertSame($data['work_results'], $saved['work_results']);
-        $this->assertSame($snapshot, $this->snapshot(['study_sessions']));
+        $this->assertSame($snapshot, $this->snapshot(['study_sessions', 'recovery_scan_states', 'jobs']));
+        $this->assertSame($scanVersion + 1, DB::table('recovery_scan_states')->where('user_id', $user->id)->value('requested_version'));
         $this->assertCount(2, $saved['sessions']);
         foreach (StudySession::orderBy('id')->get() as $index => $session) {
             $this->assertSame($user->id, $session->user_id);

@@ -209,3 +209,5 @@ Route::middleware('auth:sanctum')->group(function (): void {
 });
 
 Route::get('/study-sessions/{studySession}/completion-review', [StudySessionController::class, 'completionReview'])->middleware('auth:sanctum');
+
+Route::get('/planning/work-options', [StudyPlanController::class, 'workOptions'])->middleware('auth:sanctum');

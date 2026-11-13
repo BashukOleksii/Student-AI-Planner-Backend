@@ -4,13 +4,20 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ConfirmStudyPlanRequest;
+use App\Http\Requests\PlanningWorkOptionsRequest;
 use App\Http\Requests\PreviewStudyPlanRequest;
 use App\Http\Resources\StudyPlanResource;
+use App\Services\Planning\PlanningWorkOptionsService;
 use App\Services\Planning\StudyPlanPersistenceService;
 use Illuminate\Http\JsonResponse;
 
 class StudyPlanController extends Controller
 {
+    public function workOptions(PlanningWorkOptionsRequest $request, PlanningWorkOptionsService $service): array
+    {
+        return $service->search($request->user(), $request->validated());
+    }
+
     public function preview(PreviewStudyPlanRequest $request, StudyPlanPersistenceService $service): StudyPlanResource
     {
         $values = $request->validated();
