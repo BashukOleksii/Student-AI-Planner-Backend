@@ -1,11 +1,16 @@
 # AI: додати одну пару на конкретну дату
 
-Стан роботи: реалізацію й регресійні сценарії підготовлено, але новий тип ще не
-можна зберегти в AiPendingAction. CHECK `ai_actions_valid_type`, запроваджений
-`2026_11_12_000001_add_ai_semester_schedule_actions.php`, містить закритий список
-типів без `propose_semester_occurrence_create`. Потрібне окремо погоджене вузьке
-розширення цього CHECK; схема винятків не потребує змін. До відповіді на запит
-про цю міграцію наскрізна перевірка нового збереженого типу не завершена.
+Блокер збереження усунено новою forward-only міграцією
+`2026_11_13_000003_add_ai_semester_occurrence_create_action.php`. Вона одним
+атомарним ALTER змінює лише `ai_actions_valid_type`: зберігає всі 32 попередні
+типи (включно з історичним `propose_lesson_replacement`) і додає тільки
+`propose_semester_occurrence_create`. Невідомі типи й надалі відхиляються.
+`down()` відмовляє без змін даних; старі міграції не редагуються.
+
+Міграцію застосовано лише в ізольованих disposable MySQL-прогонах. На робочій БД
+вона не запускалася; середовище використання нового типу потребує застосування
+цієї міграції звичайним процесом розгортання. Повний Backend-цикл перевірено
+підробним провайдером, без викликів живого LLM; результати наведено нижче.
 
 Інструмент і тип пропозиції: `propose_semester_occurrence_create`.
 Це окрема операція у чинному циклі AiPendingAction, з тим самим лімітом однієї
@@ -136,45 +141,122 @@ preview.effects.changes_legacy_lessons = false
 передавання знайдених за назвами ID в пропозицію та надані агенту інструкції.
 Це не перевірка розуміння довільного тексту реальною моделлю; живий LLM не потрібен.
 
-Фактично виконані перевірки (2026-11-13):
+Фактично виконані перевірки завершення сценарію (2026-11-13), без фільтрів:
 
 ```bash
+scripts/testing/phpunit-disposable-mysql.sh \
+  tests/Feature/AiSemesterOccurrenceCreateMigrationTest.php \
+  tests/Feature/AiSemesterActionMigrationTest.php tests/Feature/AiSemesterActionsTest.php
+# PASS: 35 tests, 702 assertions, 15282 ms
+
 vendor/bin/phpunit tests/Unit/SemesterActionSchemaTest.php \
   tests/Unit/AiCapabilityContractTest.php tests/Unit/AgentOrchestratorTest.php
-# PASS: 39 tests, 532 assertions
+# PASS: 39 tests, 532 assertions, 1187 ms
+```
 
-scripts/testing/phpunit-disposable-mysql.sh tests/Feature/AiSemesterActionsTest.php \
+Фінальний профільний прогін на поточному коді, також без фільтрів:
+
+```bash
+scripts/testing/phpunit-disposable-mysql.sh \
+  tests/Feature/AiSemesterOccurrenceCreateMigrationTest.php \
+  tests/Feature/AiSemesterActionMigrationTest.php tests/Feature/AiSemesterActionsTest.php \
   tests/Feature/SemesterScheduleManagementTest.php \
   tests/Feature/SemesterScheduleManagementPersistenceTest.php \
   tests/Feature/SemesterScheduleManagementImportTest.php \
-  --filter 'test_invalid_single_additions|SemesterScheduleManagement'
-# PASS: 78 tests, 1363 assertions (before adding the extra ambiguous-local-time case)
+  tests/Feature/SemesterScheduleManagementConcurrencyTest.php \
+  tests/Feature/AcademicCalendarApiTest.php
+# PASS: 113 tests, 2113 assertions, 42529 ms
 
-scripts/testing/phpunit-disposable-mysql.sh tests/Feature/AiSemesterActionsTest.php \
-  --filter 'test_proposal_is_read_only.*#[0-8]$|test_changed_graph|test_rejection_preserves|test_expired_confirmation|test_foreign_rule|test_discovery_reads|test_owned_semester_discovery|test_invalid_single'
-# PASS: 25 tests, 374 assertions (including ambiguous local time)
-
-scripts/testing/phpunit-disposable-mysql.sh tests/Feature/AiSemesterActionsTest.php \
-  --filter 'test_catalog_uncertainty'
-# PASS: 2 tests, 28 assertions
-
-vendor/bin/pint --test app/Services/AI/Actions/SemesterActionRegistry.php \
-  app/Services/AI/Actions/SemesterActionService.php app/Services/AI/AgentOrchestrator.php \
-  app/Services/Schedule/SemesterScheduleManagementService.php \
-  tests/Feature/AiSemesterActionsTest.php tests/Unit/SemesterActionSchemaTest.php
-git diff --check
+vendor/bin/pint --test \
+  database/migrations/2026_11_13_000003_add_ai_semester_occurrence_create_action.php \
+  tests/Feature/AiSemesterOccurrenceCreateMigrationTest.php \
+  tests/Feature/AiSemesterActionMigrationTest.php tests/Feature/AiSemesterActionsTest.php
 # PASS
+git diff --check
+# PASS (no output)
 ```
+
+Розширена регресія попередніх AI-дій і читань також виконувалася повністю:
+
+```bash
+scripts/testing/phpunit-disposable-mysql.sh \
+  tests/Feature/AiSemesterOccurrenceCreateMigrationTest.php \
+  tests/Feature/AiSemesterActionMigrationTest.php tests/Feature/AiSemesterActionsTest.php \
+  tests/Feature/SemesterScheduleManagementTest.php \
+  tests/Feature/SemesterScheduleManagementPersistenceTest.php \
+  tests/Feature/SemesterScheduleManagementImportTest.php \
+  tests/Feature/SemesterScheduleManagementConcurrencyTest.php \
+  tests/Feature/SemesterScheduleReadApiTest.php tests/Feature/AcademicCalendarApiTest.php \
+  tests/Feature/AiTaskActionsTest.php tests/Feature/AiSubtaskReminderActionsTest.php \
+  tests/Feature/AiPlanningActionsTest.php tests/Feature/AiAvailabilityActionsTest.php \
+  tests/Feature/AiLessonActionsTest.php
+# EXIT 2: 474 tests, 456 passed, 5 failures, 13 errors, 6734 assertions, 84828 ms
+```
+
+Усі 18 збоїв відтворено на початковому `3746e6f`, без нової міграції, через
+тимчасовий `git archive` export; гілка `main` і робочі файли не перемикалися.
+App/config/routes не відрізняються від `3746e6f`. Незмінні Composer dependencies
+перевикористано через symlink, БД знову створював disposable runner:
+
+```bash
+baseline_dir=$(mktemp -d /tmp/planner-baseline.XXXXXXXX)
+git archive 3746e6f | tar -x -C "$baseline_dir"
+ln -s "$PWD/vendor" "$baseline_dir/vendor"
+APP_BASE_PATH="$baseline_dir" "$baseline_dir/scripts/testing/phpunit-disposable-mysql.sh" \
+  tests/Feature/SemesterScheduleReadApiTest.php \
+  tests/Feature/AiAvailabilityActionsTest.php tests/Feature/AiLessonActionsTest.php
+# EXIT 2: 131 tests, 113 passed, the same 5 failures / 13 errors,
+# 1557 assertions, 13928 ms
+```
+
+| Набір без змін | Відтворена причина | Збоїв |
+| --- | --- | --- |
+| `SemesterScheduleReadApiTest::test_day_occurrence_is_a_stable_virtual_resource_with_optional_metadata` (рядок 151) | Старий exact JSON не очікує чинний `change_kind=base`. | 1 failure |
+| `AiAvailabilityActionsTest::test_explicit_confirmation_delegates_once_to_existing_service_and_replays_immutable_receipt` (рядок 224, datasets 0–2) | Snapshot очікує незмінний `recovery_scan_states`, але чинний observer збільшує `requested_version` 5 → 6. | 3 failures |
+| `AiLessonActionsTest` | Застаріле створення `new LessonService` без потрібної залежності (рядок 114); очікування вже вимкненої replacement-операції та відсутній `action` у таких пропозиціях (рядки 178–414). | 1 failure, 13 errors |
+
+Ці збої не виправлялися і assertions цих наборів не змінювалися. Зелений
+результат усієї розширеної регресії не заявляється. Старі дозволені типи
+збережені на рівні MySQL; `AiTaskActionsTest`, `AiSubtaskReminderActionsTest`,
+`AiPlanningActionsTest` пройшли в розширеному прогоні. Історичний тип
+`propose_lesson_replacement` у CHECK зберігає історію, а не відновлює вимкнену
+операцію.
+
+`AiSemesterOccurrenceCreateMigrationTest` перевіряє повний ланцюжок міграцій на
+чистій схемі та оновлення попередньої схеми з усіма старими типами і станами
+`pending`/`executed`/`rejected`/`expired`. Після оновлення raw записи, включно з
+arguments, preview, encrypted payload, квитанціями й timestamps, незмінні.
+Дозволений список дорівнює попередньому плюс рівно один тип; інші CHECK,
+колонки, індекси та FK не змінені. Перевірено INSERT усіх попередніх типів і
+нового типу, відмову INSERT/UPDATE невідомого типу та відмову `down()` без зміни
+записів чи CHECK. Історичний `AiSemesterActionMigrationTest` тепер явно перевіряє
+свою початкову межу: новий тип ще відхиляється до нової міграції.
+
+Перший повний прогін мав 35 тестів: 30 успішних, 4 failures і 1 error;
+наступний — 34/35. Причини були в тестових fixtures: `postJson()` без даних
+надсилав `[]` замість обов'язкового `{}`, повторна пропозиція використовувала
+вичерпаний HTTP fake та однаковий call ID, а новий тест неправильно читав
+екрановані рядки CHECK із MySQL metadata. Виправлено JSON-форму запитів,
+ізоляцію fake та call IDs і нормалізацію метаданих; assertions збережено та
+доповнено. Доменний writer, REST, реєстр і ліміт однієї пропозиції не змінювалися.
+
+Сценарій names → catalog IDs → proposal тепер також підтверджує саме отриману
+дію через API й повторює confirm: збережені перші дві пари, запис винятку,
+метадані робочої суботи та щотижневі правила; повтор повертає ту саму квитанцію
+без нового заняття. Окремі сценарії перевіряють stale/reject, конфлікт номера,
+конфлікт часу, чужі посилання, скасовані дати та ізоляцію базової дати.
 
 Усі MySQL-прогони використовували створені runner-ом окремі тимчасові datadir
 та перевірені випадкові `student_planner_isolated_*` БД. Робоча БД та живий LLM
-не використовувались. Нові сценарії Saturday/base-day confirm/replay/stale,
-відхилення нового типу та names → IDs → proposal поки що не запускалися через
-зазначене обмеження CHECK. Це обмеження схеми й погодженого обсягу, не помилка
-доступності тестового середовища.
+не використовувались. Це перевірка передачі даних і детермінованих контрактів;
+вибір інструмента реальною моделлю за довільним текстом, Frontend/browser,
+розгортання й повний репозиторний набір тестів не перевірялися. Доступність
+сценарію зі сторінки Frontend цим не підтверджується.
 
-Змінені файли: `SemesterActionRegistry.php`, `SemesterActionService.php`,
-`AgentOrchestrator.php`, `SemesterScheduleManagementService.php`,
-`AiSemesterActionsTest.php`, `SemesterActionSchemaTest.php`,
-`docs/unified-academic-calendar.md` і цей документ. Validator, read tools і цикл
-підтвердження перевикористано без змін.
+У цьому завершенні змінені лише:
+
+- `database/migrations/2026_11_13_000003_add_ai_semester_occurrence_create_action.php`;
+- `tests/Feature/AiSemesterOccurrenceCreateMigrationTest.php`;
+- `tests/Feature/AiSemesterActionMigrationTest.php`;
+- `tests/Feature/AiSemesterActionsTest.php`;
+- `docs/ai-semester-occurrence-create.md`.

@@ -17,6 +17,7 @@ use App\Services\Schedule\EffectiveScheduleService;
 use App\Services\Schedule\SemesterScheduleManagementService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -80,7 +81,9 @@ class AiSemesterActionsTest extends TestCase
 
     private function propose(array $f, string $name, array $arguments): string
     {
-        $responses = [[$this->aiCall($name, json_encode($arguments), 'semester_action')], [$this->aiText('Changed everything.')]];
+        Http::swap(new Factory);
+        Http::preventStrayRequests();
+        $responses = [[$this->aiCall($name, json_encode($arguments), 'semester_'.Str::uuid())], [$this->aiText('Changed everything.')]];
         // Capture by reference because provider rounds consume distinct responses.
         Http::fake(function () use (&$responses) {
             return Http::response($this->aiResponse(array_shift($responses)));
@@ -189,7 +192,7 @@ class AiSemesterActionsTest extends TestCase
         $this->assertSame($f['owner']->teachers()->findOrFail($new['teacher_id'])->name, $new['teacher']['name']);
         $this->travelTo(CarbonImmutable::parse('2026-10-16T08:05:00Z'));
         $path = $f['base'].'/actions/'.$id.'/confirm';
-        $receipt = $this->postJson($path)->assertOk()->assertJsonPath('data.status', 'executed')->json('data.receipt');
+        $receipt = $this->json('POST', $path, [], [], JSON_FORCE_OBJECT)->assertOk()->assertJsonPath('data.status', 'executed')->json('data.receipt');
         $after = $this->snapshot();
         $this->assertSame($before['weekly_lesson_rules'], $after['weekly_lesson_rules']);
         $this->assertSame($before['schedule_date_exceptions'], $after['schedule_date_exceptions']);
@@ -200,7 +203,7 @@ class AiSemesterActionsTest extends TestCase
         $this->assertSame($effective, array_slice($lessons, 0, 2));
         $this->assertSame('added', $lessons[2]['change_kind']);
         $this->assertSame($revision + 1, $f['schedule']->fresh()->management_revision);
-        $this->assertSame($receipt, $this->postJson($path)->assertOk()->json('data.receipt'));
+        $this->assertSame($receipt, $this->json('POST', $path, [], [], JSON_FORCE_OBJECT)->assertOk()->json('data.receipt'));
         $this->assertSame($after, $this->snapshot());
     }
 
@@ -211,7 +214,7 @@ class AiSemesterActionsTest extends TestCase
         $other = app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-27');
         $id = $this->propose($f, 'propose_semester_occurrence_create', $this->addition($f));
         $this->assertSame($before, $this->snapshot());
-        $this->postJson($f['base'].'/actions/'.$id.'/confirm')->assertOk();
+        $this->json('POST', $f['base'].'/actions/'.$id.'/confirm', [], [], JSON_FORCE_OBJECT)->assertOk();
         $lessons = app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-20');
         $this->assertSame([1, 2, 3], array_column($lessons, 'pair_number'));
         $this->assertSame(['base', 'base', 'added'], array_column($lessons, 'change_kind'));
@@ -273,14 +276,14 @@ class AiSemesterActionsTest extends TestCase
         $id = $this->propose($f, 'propose_semester_occurrence_create', $this->addition($f));
         $before = $this->snapshot();
         $path = $f['base'].'/actions/'.$id;
-        $this->postJson($path.'/reject')->assertOk()->assertJsonPath('data.status', 'rejected');
-        $this->postJson($path.'/confirm')->assertConflict();
+        $this->json('POST', $path.'/reject', [], [], JSON_FORCE_OBJECT)->assertOk()->assertJsonPath('data.status', 'rejected');
+        $this->json('POST', $path.'/confirm', [], [], JSON_FORCE_OBJECT)->assertConflict();
         $this->assertSame($before, $this->snapshot());
         $id = $this->propose($f, 'propose_semester_occurrence_create', $this->addition($f));
         $f['manager']->updateRule($f['owner'], $f['schedule'], $f['rule']->id, ['room' => 'Concurrent edit',
             'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
         $before = $this->snapshot();
-        $this->postJson($f['base'].'/actions/'.$id.'/confirm')->assertConflict()->assertJsonPath('code', 'action_stale');
+        $this->json('POST', $f['base'].'/actions/'.$id.'/confirm', [], [], JSON_FORCE_OBJECT)->assertConflict()->assertJsonPath('code', 'action_stale');
         $this->assertSame($before, $this->snapshot());
         $this->assertNull(AiPendingAction::findOrFail($id)->receipt);
     }
@@ -462,6 +465,19 @@ class AiSemesterActionsTest extends TestCase
         $this->assertSame($before, $this->snapshot());
         $this->assertDatabaseCount('ai_pending_actions', 1);
         $this->assertSame(3, count($response->json('data.action.preview.after.lessons')));
+        $path = $f['base'].'/actions/'.$response->json('data.action.id').'/confirm';
+        $receipt = $this->json('POST', $path, [], [], JSON_FORCE_OBJECT)->assertOk()
+            ->assertJsonPath('data.receipt.type', 'propose_semester_occurrence_create')->json('data.receipt');
+        $this->assertSame([1, 2, 3], array_column($receipt['after']['lessons'], 'pair_number'));
+        $this->assertSame('working_saturday', $receipt['after']['kind']);
+        $this->assertSame(2, $receipt['after']['copied_weekday']);
+        $this->assertSame('numerator', $receipt['after']['source_week_parity']);
+        $after = $this->snapshot();
+        $this->assertSame($before['weekly_lesson_rules'], $after['weekly_lesson_rules']);
+        $this->assertSame($before['schedule_date_exceptions'], $after['schedule_date_exceptions']);
+        $this->assertSame($before['schedule_date_exception_lessons'], array_slice($after['schedule_date_exception_lessons'], 0, 2));
+        $this->assertSame($receipt, $this->json('POST', $path, [], [], JSON_FORCE_OBJECT)->assertOk()->json('data.receipt'));
+        $this->assertSame($after, $this->snapshot());
     }
 
     public static function unresolvedCatalogMatches(): array

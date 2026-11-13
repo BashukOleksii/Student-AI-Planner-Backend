@@ -26,8 +26,11 @@ class AiSemesterActionMigrationTest extends TestCase
     {
         $this->migrateThrough('2026_11_11_000005_add_ai_session_lifecycle_actions', true);
         $conversation = AiConversation::factory()->create();
-        $types = array_values(array_filter(AiCapabilities::names(), fn ($name) => str_starts_with($name, 'propose_')));
-        $legacy = array_diff($types, SemesterActionRegistry::NAMES);
+        // This historical test stops at the original nine-action expansion.
+        // Occurrence creation is covered by its later forward migration test.
+        $types = array_values(array_filter(AiCapabilities::names(), fn ($name) => str_starts_with($name, 'propose_') && $name !== 'propose_semester_occurrence_create'));
+        $semesterTypes = array_diff(SemesterActionRegistry::NAMES, ['propose_semester_occurrence_create']);
+        $legacy = array_diff($types, $semesterTypes);
         foreach ($legacy as $type) {
             $turn = DB::table('ai_conversation_turns')->insertGetId(['conversation_id' => $conversation->id, 'request_id' => (string) Str::uuid(), 'input_hash' => hash('sha256', $type)]);
             AiPendingAction::create(['id' => (string) Str::uuid(), 'conversation_id' => $conversation->id, 'turn_id' => $turn,
@@ -35,7 +38,7 @@ class AiSemesterActionMigrationTest extends TestCase
                 'expires_at' => now()->addMinutes(15), 'status' => 'executed', 'resolved_at' => now(), 'receipt' => ['type' => $type]]);
         }
         $action = AiPendingAction::firstOrFail();
-        foreach (SemesterActionRegistry::NAMES as $type) {
+        foreach ($semesterTypes as $type) {
             $this->assertMysqlRejects(fn () => DB::table('ai_pending_actions')->where('id', $action->id)->update(['type' => $type]), strlen($type) > 32 ? 1406 : 3819);
         }
         $rows = DB::table('ai_pending_actions')->orderBy('id')->get()->all();
@@ -56,6 +59,7 @@ class AiSemesterActionMigrationTest extends TestCase
             DB::table('ai_pending_actions')->where('id', $action->id)->update(['type' => $type]);
             $this->assertSame($type, $action->fresh()->type);
         }
+        $this->assertMysqlRejects(fn () => DB::table('ai_pending_actions')->where('id', $action->id)->update(['type' => 'propose_semester_occurrence_create']), 3819);
         $this->assertMysqlRejects(fn () => DB::table('ai_pending_actions')->where('id', $action->id)->update(['type' => 'unregistered_write']), 3819);
         $before = DB::table('ai_pending_actions')->orderBy('id')->get()->all();
         try {
