@@ -69,7 +69,6 @@ The reproducible offline smoke (guarded disposable MySQL only; no OpenAI key nee
 ```sh
 vendor/bin/phpunit tests/Feature/BackendIntegrationSmokeTest.php
 ```
-
 ## AI provider configuration
 
 ```dotenv
