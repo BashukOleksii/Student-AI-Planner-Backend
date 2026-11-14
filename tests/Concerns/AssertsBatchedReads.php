@@ -1,5 +1,6 @@
 <?php
 
+
 namespace Tests\Concerns;
 
 /** Compare sparse/dense source families rather than historical legacy-only query totals. */
