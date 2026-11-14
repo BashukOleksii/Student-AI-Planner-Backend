@@ -724,3 +724,13 @@ authentication-housekeeping scope clarification.** Existing database-backed SPA
 session maintenance is preserved; no exception to the requested guarantee is
 silently assumed and no authentication change is made without that policy decision.
 The scope question does not change the implemented planner or successful regression.
+
+### Initial intervals in confirmation results
+
+`original_sessions` retains `id` and `status` and additionally returns `starts_at`,
+`ends_at` (UTC), and `duration_seconds`, using StudySessionResource serialization.
+This supports the saved “before / after” presentation without inferring old times.
+`replacement_groups` remains the authoritative association of source sessions to
+all successors. Older receipts may omit the new interval fields; clients must
+keep that history readable without inventing intervals or associations.
+No allocation, consent, lifecycle or confirmation rules change.

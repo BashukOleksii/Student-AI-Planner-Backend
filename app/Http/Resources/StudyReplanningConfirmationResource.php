@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Arr;
 
 class StudyReplanningConfirmationResource extends JsonResource
 {
@@ -11,7 +12,7 @@ class StudyReplanningConfirmationResource extends JsonResource
     {
         return ['applied' => true,
             'original_sessions' => $this->resource['original_sessions']->map(fn ($session) => [
-                'id' => $session->id, 'status' => $session->status->value,
+                ...Arr::only((new StudySessionResource($session))->resolve($request), ['id', 'status', 'starts_at', 'ends_at', 'duration_seconds']),
             ])->values()->all(),
             'replacement_sessions' => StudySessionResource::collection($this->resource['replacement_sessions']),
             'replacement_groups' => $this->resource['replacement_sessions']->groupBy('rescheduled_from_session_id')->map(fn ($rows, $id) => ['original_session_id' => (int) $id, 'successor_session_ids' => $rows->modelKeys()])->values()->all(),
