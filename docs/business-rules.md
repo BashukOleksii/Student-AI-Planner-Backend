@@ -466,8 +466,10 @@ deliver after its start without inferring missed/completed state. Each corrupt
 candidate rolls back and is counted independently; the bounded batch continues.
 GET is read-only; owned marking-as-read is idempotent and preserves immutable
 payload and sent history. Existing retirement never clones reminders/notifications.
-Optional [email delivery](reminder-email.md) now persists one encrypted database
-job atomically with inbox delivery for an opted-in verified recipient. Each mail
+Optional [email delivery](reminder-email.md) persists one MySQL intent
+atomically with manual inbox delivery for an opted-in verified recipient. A bounded
+Scheduler dispatcher atomically inserts an encrypted job and marks the intent
+queued in a separate transaction; queue failures retain the intent for delayed retry. Each mail
 attempt rechecks the current address/revision, verification and opt-in; SMTP
 failure never alters inbox or sent history. External exactly-once delivery is not
 guaranteed. Push remains future work. Administrative hard

@@ -45,7 +45,7 @@ return [
         ],
 
         // Always the domain's default DB connection, regardless of DB_QUEUE_CONNECTION.
-        // Inbox, sent status and mail intent commit together in the existing jobs table.
+        // Manual mail handoff commits the job and intent marker together, separately from inbox delivery.
         'reminder-email' => [
             'driver' => 'database',
             'connection' => null,

@@ -9,10 +9,11 @@ and a shared Service across all current Eloquent writers, with separate per-chan
 delivery intents. Manual reminders and recovery rules retain their own lifecycle.
 See [automatic session reminders](automatic-session-reminders.md).
 
-Current reminder email extension: opt-in verified recipients use an encrypted
-database job inserted on the same connection and in the same transaction as the
-inbox notification. SMTP runs only in a separate worker; `sent` still means inbox
-delivery. See [contract and operational limits](reminder-email.md).
+Current manual reminder email extension: opt-in verified recipients get a durable
+MySQL intent committed with the inbox notification. A bounded scheduled dispatcher
+atomically inserts an encrypted database job and marks the intent queued in a
+separate transaction, isolating queue failures from inbox delivery. SMTP runs only
+in a separate worker; `sent` still means inbox delivery. See [contract and operational limits](reminder-email.md).
 
 > Current implementation update (after reference `4eb708e`): Automatic learning recovery now uses a bounded scheduled detector and durable owner-scoped reviews. Only explicit authenticated confirmation delegates to existing deterministic planning/replanning writers. See [ADR-012](decisions/ADR-012-automatic-learning-recovery.md) and [API contract](automatic-learning-recovery.md). No automatic session relocation or inferred missed status is introduced.
 

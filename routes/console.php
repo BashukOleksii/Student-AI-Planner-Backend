@@ -9,6 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('reminders:dispatch-due --limit=100')->everyMinute();
+Schedule::command('reminders:dispatch-email-intents --limit=100')->everyMinute();
 Schedule::command('sessions:dispatch-reminders --limit=100')->everyMinute();
 
 // Separate from reminder delivery: this command only creates reviews, never sessions or reminders.

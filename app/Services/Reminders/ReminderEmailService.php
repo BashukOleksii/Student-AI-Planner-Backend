@@ -20,15 +20,23 @@ class ReminderEmailService
     public function __construct(private ReminderDeliveryRules $payloads) {}
 
     /** Called once by the owner-locked inbox writer, before its transaction commits. */
-    public function enqueue(User $owner, DatabaseNotification $notification): void
+    public function recordIntent(User $owner, DatabaseNotification $notification): void
     {
         if (DB::transactionLevel() === 0) {
-            throw new LogicException('Reminder email enqueue requires the delivery transaction.');
+            throw new LogicException('Reminder email intent requires the delivery transaction.');
         }
         if (! $owner->reminder_email_enabled || ! $owner->hasVerifiedEmail()) {
             return;
         }
-        $this->push(new SendReminderEmail($owner->id, $notification->id, $this->recipientFingerprint($owner)));
+        $now = CarbonImmutable::now('UTC');
+        DB::table('reminder_email_intents')->insert([
+            'user_id' => $owner->id,
+            'notification_id' => $notification->id,
+            'recipient_fingerprint' => $this->recipientFingerprint($owner),
+            'next_attempt_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 
     public function enqueueAutomatic(User $owner, int $automaticReminderId): void

@@ -107,7 +107,7 @@ class ReminderDeliveryService
         if (! $notification->exists || ! $reminder->update(['status' => ReminderStatus::Sent, 'sent_at' => $timestamp])) {
             throw new ReminderIntegrityException;
         }
-        $this->email->enqueue($owner, $notification);
+        $this->email->recordIntent($owner, $notification);
 
         return ['status' => 'sent'];
     }
