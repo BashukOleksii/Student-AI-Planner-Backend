@@ -1,5 +1,10 @@
 # Stage H2 — Authenticated read-only AI chat
 
+For the first server-rendered Ukrainian read answer, see
+[розклад на одну дату](ai-schedule-answer.md). This narrow scenario renders verified
+`get_schedule_for_date` results without a model-generated summary. Other free-form
+answers still use the configured provider; confirmation flows remain unchanged.
+
 The provider-portability milestone makes Gemini 2.5 Flash the configured preferred
 provider and retains OpenAI Responses. The original H2 details below describe the
 OpenAI implementation; current discovery remains 9 reads + 18 proposals.

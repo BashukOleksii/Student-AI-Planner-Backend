@@ -32,12 +32,14 @@ class AgentOrchestrator
         private LessonActionRegistry $lessonRegistry, private LessonActionService $lessons,
         private AvailabilityActionRegistry $availabilityRegistry, private AvailabilityActionService $availability,
         private SemesterActionRegistry $semesterRegistry, private SemesterActionService $semesters, private SemesterReadTools $semesterReads,
-        private RecoveryReadTools $recoveryReads) {}
+        private RecoveryReadTools $recoveryReads, private ScheduleAnswerPresenter $scheduleAnswers) {}
 
     public function run(User $owner, array $history, string $content, ?callable $assertCurrent = null): array
     {
         $started = microtime(true);
-        $instructions = $this->instructions($owner);
+        $clock = CarbonImmutable::now('UTC');
+        $instructions = $this->instructions($owner, $clock);
+        $scheduleDate = $this->scheduleAnswers->requestedDate($content, $owner->timezone, $clock);
         $definitions = [...$this->registry->definitions(), ...$this->actions->definitions(), ...$this->managementRegistry->readDefinitions(), ...$this->managementRegistry->definitions(), ...$this->planningRegistry->definitions(), ...$this->lessonRegistry->definitions(), ...$this->availabilityRegistry->definitions(), ...$this->semesterRegistry->readDefinitions(), ...$this->semesterRegistry->definitions(), ...RecoveryReadTools::definitions()];
         $proposal = null;
         $proposalCalls = 0;
@@ -167,14 +169,34 @@ class AgentOrchestrator
                     'error_code' => $result['error']['code'] ?? null,
                     ...ToolResultPresenter::errorReason($call['name'], $result['ok'], $result['error']['code'] ?? null, $result['error']['reason'] ?? null)];
                 $this->limits->json([$instructions, $definitions, $history, $events]);
+                // Only a complete first batch for a self-contained single-date read qualifies.
+                // A schedule read used as context for a proposal or a mixed request never enters here.
+                if ($scheduleDate !== null && $round === 0 && count($calls) === 1 && count($tools) === 1 && $proposalCalls === 0
+                    && $call['name'] === 'get_schedule_for_date' && $call['arguments'] === ['date' => $scheduleDate]) {
+                    $answer = $this->scheduleAnswers->render($result, $scheduleDate, $owner->timezone);
+                    // Keep call/result history but remove model prose and native message items.
+                    foreach ($events as &$event) {
+                        if ($event['role'] === 'assistant') {
+                            $event['content'] = null;
+                            if (isset($event['state']['items'])) {
+                                $event['state']['items'] = array_values(array_filter($event['state']['items'], fn ($item) => ($item['type'] ?? null) !== 'message'));
+                            }
+                        }
+                    }
+                    unset($event);
+                    $events[] = ['role' => 'assistant', 'content' => $answer, 'calls' => [], 'state' => []];
+                    $checkpoint();
+                    $this->limits->json($events);
+
+                    return ['messages' => $events, 'answer' => $answer, 'tools' => $tools, 'proposal' => null];
+                }
             }
         }
         throw new AiAgentException('execution_limit_reached');
     }
 
-    private function instructions(User $owner): string
+    private function instructions(User $owner, CarbonImmutable $now): string
     {
-        $now = CarbonImmutable::now('UTC');
         $local = $now->setTimezone($owner->timezone);
 
         return <<<'PROMPT'
