@@ -51,13 +51,18 @@ empty strings are rejected. A non-null Subtask requires its explicit Task ID.
 Missing identifiers normalize to null. Explicit foreign, missing, deleted or
 incorrectly nested preview targets produce generic 404 responses.
 
-Manual POST preview captures a server UTC cutoff of preview creation time + five
-minutes, rounded up to a whole second, and passes it as the existing internal
+Manual POST preview and AI `propose_study_plan_create` share
+`StudyPlanPersistenceService::previewNotBeforeUtc()` to capture a server UTC cutoff
+of preview creation time + five minutes, rounded up to a whole second, and pass
+it as the existing internal
 `notBeforeUtc`. This is a buffer before the earliest proposed start, not a new
 preview lifetime: the token still expires 900 seconds after issuance. No public
 field or availability setting is added. If the cutoff leaves insufficient time,
 the existing partial/empty preview contract applies without extending availability,
-the requested horizon or deadlines.
+the requested horizon or deadlines. AI token-to-tool argument binding excludes only
+the validated server-owned `not_before_utc`; it is never a model argument. Both
+confirmation paths reuse the protected cutoff rather than computing another buffer.
+See [manual verification](ai-study-plan-start-buffer-manual-verification.md).
 
 Confirmation body:
 

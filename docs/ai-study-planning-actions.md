@@ -52,6 +52,16 @@ No transaction spans provider I/O. Plan and E2 previews use their existing Servi
 and token issuance; manual preview shares SELECT-only source/context/chain discovery
 and preliminary rules with the existing rescheduling writer.
 
+Plan creation captures one backend UTC cutoff of now + five minutes, rounded up
+to a whole second, using the same helper as manual POST preview. It passes the
+existing `notBeforeUtc` parameter and retains that value in the protected domain
+token. Confirmation reuses it, compares the complete current review and requires
+strictly future starts; it never replaces elapsed proposals with new sessions.
+The server-only cutoff is excluded from token-to-tool argument comparison after
+token validation; tool schema and authenticated consent remain unchanged. No
+buffer is added to adaptive replanning or recovery paths. See
+[manual verification](ai-study-plan-start-buffer-manual-verification.md).
+
 Plan review uses StudyPlanResource without its token: as_of_utc, date range,
 timezone, every proposed session's attribution/UTC interval/exact seconds, all
 work_results, excluded_items, warnings and summary including fully_allocated.

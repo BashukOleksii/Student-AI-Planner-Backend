@@ -22,6 +22,12 @@ class StudyPlanPersistenceService
         private PlanningConstraintService $constraints,
     ) {}
 
+    /** Capture once per new review; confirmation reuses the cutoff protected by its token. */
+    public function previewNotBeforeUtc(): int
+    {
+        return CarbonImmutable::now('UTC')->addMinutes(5)->ceilSecond()->getTimestamp();
+    }
+
     public function preview(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null, mixed $notBeforeUtc = null): array
     {
         $plan = $notBeforeUtc === null ? $this->planner->plan($user, $startDate, $endDate, $taskId, $subtaskId)

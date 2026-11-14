@@ -85,8 +85,14 @@ class PlanningActionService
                     $actionable = true;
                     $required = [];
                 } else {
-                    $result = ($name === 'propose_study_plan_create' ? $this->plans : $this->replanning)->preview($owner,
-                        $arguments['start_date'], $arguments['end_date'], $arguments['task_id'] ?? null, $arguments['subtask_id'] ?? null);
+                    if ($name === 'propose_study_plan_create') {
+                        $notBeforeUtc = $this->plans->previewNotBeforeUtc();
+                        $result = $this->plans->preview($owner, $arguments['start_date'], $arguments['end_date'],
+                            $arguments['task_id'] ?? null, $arguments['subtask_id'] ?? null, notBeforeUtc: $notBeforeUtc);
+                    } else {
+                        $result = $this->replanning->preview($owner, $arguments['start_date'], $arguments['end_date'],
+                            $arguments['task_id'] ?? null, $arguments['subtask_id'] ?? null);
+                    }
                     $protected = ['preview_token' => $result['preview_token'], 'expires_at' => $result['expires_at']];
                     if ($name === 'propose_study_plan_create') {
                         $review = (new StudyPlanResource(['plan' => $result['plan']]))->resolve(new Request);
@@ -160,7 +166,12 @@ class PlanningActionService
             $arguments = $proposal['arguments'];
             $expected = ['start_date' => $arguments['start_date'], 'end_date' => $arguments['end_date'],
                 'task_id' => $arguments['task_id'] ?? null, 'subtask_id' => $arguments['subtask_id'] ?? null];
-            if (! $this->planTokens->matches($expected, $payload['parameters'])
+            $parameters = $payload['parameters'];
+            if ($proposal['type'] === 'propose_study_plan_create') {
+                // This validated token parameter is server-owned, never a model/tool argument.
+                unset($parameters['not_before_utc']);
+            }
+            if (! $this->planTokens->matches($expected, $parameters)
                 || gmdate('Y-m-d\TH:i:s\Z', $payload['expires_at']) !== $protected['expires_at']) {
                 throw new InvalidArgumentException;
             }
