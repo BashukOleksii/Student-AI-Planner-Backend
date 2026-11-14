@@ -22,12 +22,15 @@ use App\Services\AI\AgentLimits;
 use App\Services\AI\GeminiGenerateContentProvider;
 use App\Services\AI\LlmProvider;
 use App\Services\AI\OpenAiResponsesProvider;
+use App\Services\Auth\EmailVerificationService;
 use App\Services\Auth\PasswordManagementService;
 use App\Services\Planning\RecoveryCheckTriggerService;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -62,6 +65,18 @@ class AppServiceProvider extends ServiceProvider
             $source::observe(PlanningSourceObserver::class);
         }
         ResetPassword::createUrlUsing(fn ($user, $token) => app(PasswordManagementService::class)->resetUrl($user, $token));
+        VerifyEmail::createUrlUsing(fn ($user) => app(EmailVerificationService::class)->verificationUrl($user));
+        VerifyEmail::toMailUsing(fn ($user, $url) => (new MailMessage)->subject('Підтвердження email-адреси')
+            ->view(['html' => 'mail.verify-email', 'text' => 'mail.verify-email-text'], ['verificationUrl' => $url]));
+        $verificationThrottle = fn ($request, $headers) => response()->json([
+            'message' => 'Забагато спроб. Спробуйте ще раз пізніше.',
+        ], 429, $headers);
+        RateLimiter::for('email-verification-send', fn (Request $request) => [
+            Limit::perMinute(1)->by('email:send:minute:'.$request->user()->id)->response($verificationThrottle),
+            Limit::perHour(6)->by('email:send:hour:'.$request->user()->id)->response($verificationThrottle),
+        ]);
+        RateLimiter::for('email-verification-confirm', fn (Request $request) => Limit::perMinute(6)
+            ->by('email:confirm:'.$request->user()->id)->response($verificationThrottle));
         RateLimiter::for('auth-login', function (Request $request): array {
             $email = $request->input('email');
             $identity = hash('sha256', is_string($email) ? mb_strtolower(trim($email)) : '');

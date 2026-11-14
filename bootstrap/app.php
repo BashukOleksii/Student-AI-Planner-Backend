@@ -11,6 +11,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -58,6 +59,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->dontFlash(['token']);
         // Password/SMTP/SQL exceptions may contain secrets; only fixed diagnostics are allowed.
         $exceptions->report(function (Throwable $exception) {
+            if (request()->is('api/profile/email/*')) {
+                try {
+                    Log::warning('email_verification.failure');
+                } catch (Throwable) {
+                }
+
+                return false;
+            }
             if (request()->is('api/profile/password', 'api/auth/forgot-password', 'api/auth/reset-password')) {
                 try {
                     Log::warning('password.failure');
@@ -84,6 +93,27 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
         $exceptions->render(function (Throwable $exception, Request $request) {
+            if ($request->is('api/profile/email/*')) {
+                if ($exception instanceof HttpResponseException) {
+                    return $exception->getResponse();
+                }
+                if ($exception instanceof ValidationException) {
+                    return response()->json(['message' => 'Перевірте дані запиту.', 'errors' => $exception->errors()], 422);
+                }
+                $status = $exception instanceof AuthenticationException ? 401
+                    : ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500 ? $exception->getStatusCode() : 503);
+                $message = match ($status) {
+                    401 => 'Увійдіть у свій акаунт для підтвердження email-адреси.',
+                    403 => 'Посилання недійсне, прострочене або не відповідає поточній email-адресі. Запросіть новий лист.',
+                    404 => 'Сторінку підтвердження не знайдено.',
+                    405 => 'Підтвердьте email-адресу кнопкою на сторінці підтвердження.',
+                    419 => 'Сесія застаріла. Оновіть сторінку та повторіть дію.',
+                    429 => 'Забагато спроб. Спробуйте ще раз пізніше.',
+                    default => 'Підтвердження email-адреси тимчасово недоступне. Спробуйте пізніше.',
+                };
+
+                return response()->json(['message' => $message], $status, $exception instanceof HttpExceptionInterface ? $exception->getHeaders() : []);
+            }
             if ($request->is('api/planning/recovery-suggestions', 'api/planning/recovery-suggestions/*', 'api/planning/recovery/diagnostics')) {
                 if ($exception instanceof RecoverySuggestionException) {
                     return response()->json(['message' => $exception->getMessage(), 'code' => $exception->errorCode], $exception->status());

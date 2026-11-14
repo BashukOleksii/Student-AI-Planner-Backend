@@ -112,7 +112,7 @@ unchanged. No successor or preview record is persisted. See [adaptive replanning
 ### Identity & Profile
 
 **User**  
-Authenticated owner of private planning data. The current profile API exposes `id`, `name`, `email`, and an IANA `timezone` (default `UTC`). Ownership comes from authenticated server context, never a payload `user_id`.
+Authenticated owner of private planning data. The current profile API exposes `id`, `name`, `email`, boolean `email_verified`, and an IANA `timezone` (default `UTC`). Voluntary [email verification](email-verification.md) uses the existing `email_verified_at`; an actual email change atomically resets it without gating application access. Ownership comes from authenticated server context, never a payload `user_id`.
 
 **Planning Preferences**  
 User-defined constraints such as maximum daily/weekly workload, breaks, and session bounds. Stage 02 permits at most one typed planning-preferences row per user, not an opaque planning JSON column. GET returns all-null values without creating a missing row; complete PUT materializes/replaces it. Nullable numeric values mean no configured value; future defaults are not introduced. The Service enforces configured session and workload bound ordering.

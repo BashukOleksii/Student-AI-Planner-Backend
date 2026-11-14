@@ -15,7 +15,8 @@ and [the frontend REST contract](frontend-api-contract.md) for current setup and
 Implemented mode: Laravel Sanctum first-party SPA cookies/sessions with Laravel's
 `web` guard. No bearer token is returned or required. The existing token table is
 preserved. Controllers use Form Requests and UserResource without additional
-Services or authentication packages.
+authentication packages. Profile updates now use `ProfileService` to serialize
+email changes with voluntary verification; see [the verification contract](email-verification.md).
 
 | Method | Route | Access | Success |
 | --- | --- | --- | --- |
@@ -24,6 +25,8 @@ Services or authentication packages.
 | POST | `/api/auth/logout` | `auth:sanctum` | 204 |
 | GET | `/api/profile` | `auth:sanctum` | 200 |
 | PATCH | `/api/profile` | `auth:sanctum` | 200 |
+| POST | `/api/profile/email/verification-notification` | `auth:sanctum`, throttle | 200 |
+| POST | `/api/profile/email/verify/{id}/{hash}?expires=…&signature=…` | `auth:sanctum`, throttle, relative signature | 200 |
 
 `GET /sanctum/csrf-cookie` is Sanctum's existing web endpoint (204), outside
 `/api`. The scaffold `/api/user` is removed. No `/api/v1` prefix is used.
@@ -50,14 +53,19 @@ authentication context. There is no arbitrary-user profile route.
 Registration, login, and profile return the same standard Resource envelope:
 
 ```json
-{"data":{"id":1,"name":"Student","email":"student@example.test","timezone":"UTC"}}
+{"data":{"id":1,"name":"Student","email":"student@example.test","email_verified":false,"timezone":"UTC"}}
 ```
 
 Password/hash, remember token, authentication metadata, and model relationships
 are never serialized. Validation errors use Laravel's `message` / `errors`
 shape and 422 status. Private endpoints return 401 for unauthenticated requests.
 Logout returns an empty 204, invalidates the current session, and regenerates the
-CSRF token. Password reset/change and email verification are deferred.
+CSRF token. Password reset/change uses the existing [password contract](stage12/password-api-contract.md).
+Email verification is voluntary: only an explicit request sends a letter; an
+authenticated signed POST verifies the current address. Actual email changes
+atomically reset verification; other profile changes preserve it. Unverified
+accounts keep application access. The Vue confirmation page is not implemented
+by this backend change; see [link format, API examples and checks](email-verification.md).
 
 ## Authentication throttles and trusted proxy deployment
 

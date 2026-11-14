@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AiConversationController;
 use App\Http\Controllers\Api\AiTaskActionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EducationInstitutionController;
+use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\FreeSlotController;
 use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\NotificationController;
@@ -88,6 +89,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::patch('/profile/password', [PasswordController::class, 'change'])->middleware('throttle:password-change')->name('profile.password');
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/email/verification-notification', [EmailVerificationController::class, 'send'])
+        ->middleware('throttle:email-verification-send')->name('verification.send');
+    Route::post('/profile/email/verify/{id}/{hash}', [EmailVerificationController::class, 'confirm'])
+        ->middleware(['throttle:email-verification-confirm', 'signed:relative'])->name('verification.verify');
 
     Route::get('/planning/diagnostics', [PlanningDiagnosticsController::class, 'index'])->name('planning.diagnostics');
     Route::get('/planning/free-slots', [FreeSlotController::class, 'index'])->name('planning.free-slots.index');
