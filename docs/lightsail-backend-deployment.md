@@ -7,9 +7,11 @@ is independent and unchanged.
 
 ## Design and boundaries
 
-`backend-verification.yml` retains PHP 8.4, disposable MySQL 8.4, migration checks,
-Pint, the complete offline PHPUnit suite and Gemini regressions. It also runs the
-offline deployment fixtures. Its `deploy` job requires `verify` success, a `push`
+`backend-verification.yml` currently runs PHP 8.4, disposable MySQL 8.4 migration
+checks and Pint. Its verification job currently omits PHPUnit, Gemini regressions
+and the offline deployment fixtures; the existing workflow contract test flags
+this gap. Run the offline deployment checks below locally. Its `deploy` job
+requires `verify` success, a `push`
 to this repository's `main`, and repository variable
 `LIGHTSAIL_BACKEND_DEPLOY_ENABLED=true`. PRs and manual workflow runs cannot deploy.
 An unset flag is disabled. The job uses Environment `production` and checks out
@@ -36,7 +38,8 @@ identity, ancestry, migration differences, runtime paths, PHP, permissions and
 existing service health. Fetch is noninteractive; it updates origin/main without
 forcing a rewritten ref. Fast-forward merge uses `--no-overwrite-ignore` to
 protect ignored server files as well as explicitly rejecting tracked runtime files.
-No reset, clean, stash, key generation, migration or database test runs.
+No reset, clean, stash, key generation or database test runs. Forward migrations
+run in the dedicated phase described below.
 
 Once preflight passes, the script creates an interruption marker, requires file
 maintenance mode and standard bootstrap cache paths, pre-renders Laravel's 503 view, and saves the maintenance gate
@@ -53,8 +56,11 @@ bootstrap caches (config, services, packages, routes-v7 and events) are removed
 before the first new Artisan bootstrap, since old manifests can reference removed
 providers. `clear-compiled` and explicit discovery then rebuild the current state. No `optimize:clear` or shared
 application cache flush is used (database cache contains live application state).
-Fresh FPM processes replace old OPcache. Queue workers are stopped gracefully and
-started fresh through systemd; no database-backed `queue:restart` signal is needed.
+After cache preparation and the final permission audit, the verified checkout runs
+`php8.4 artisan migrate --force --no-interaction` with production configuration,
+while maintenance is active and FPM/queue/scheduler are stopped. Only success
+allows services to start. Fresh FPM processes replace old OPcache. Queue workers
+are stopped gracefully and started fresh through systemd; no database-backed `queue:restart` signal is needed.
 The scheduler timer restarts after HTTP checks. `schedule:run` is never invoked by
 the deployment, so it does not manually dispatch production reminders.
 
@@ -64,8 +70,8 @@ The optional [reminder email channel](reminder-email.md) adds one forward User
 migration and a database queue named `reminder-email` in the existing application
 MySQL `jobs` table. It is off for every existing/new account. This task does not
 change production config, systemd units, SMTP credentials, AWS or deployed data.
-Apply the existing manual migration gate below before deploying this code;
-the ordinary code-only deploy must refuse this migration difference.
+The additive migration is allowed by the migration gate below and runs during
+deployment. Review compatibility and backup readiness before releasing it.
 
 The existing `student-ai-planner-scheduler.timer` / scheduler service continues
 running `php8.4 artisan schedule:run` from `/srv/student-ai-planner/backend`.
@@ -274,35 +280,42 @@ sudo -n /usr/local/sbin/student-planner-backend-control health
 These read-only checks are suitable before enablement; do not invoke the deployment
 script as a setup check, since that performs a real deployment.
 
-## Migration gate and approved schema changes
+## Migration gate and forward schema changes
 
 Automatic deployment compares **the server HEAD to the tested SHA**, not just the
-last commit, for any differences under `database/migrations` (add/modify/delete/
-rename all block). There is no automatic migration or override flag. No database
-backup is required for ordinary code-only deploys. Existing database cache/session
-access by Laravel and the unauthenticated CSRF smoke request are normal runtime
-activity; no production tests, resets, seeders or user creation take place.
+last commit, under `database/migrations`. Newly added files are allowed. Changes,
+deletions, renames and type changes to existing files require manual review and
+are refused before maintenance or checkout mutation. Rename detection is disabled
+so even a rename with substantial content changes exposes the old path deletion.
+Never edit an already-applied migration; add a reviewed forward correction.
 
-For a schema change: disable the deploy flag; review the migration and application
-compatibility; record server HEAD and target SHA; recommend and verify a restorable
-backup; test the upgrade against **disposable MySQL 8.0 matching production's exact
-patch, SQL mode, charset/collation and isolation**, including a representative
-sanitized existing schema. CI's MySQL 8.4 success does not establish MySQL 8.0
-compatibility. Review CHECK enforcement/DDL/locking and forward-only migrations
-noted in `docs/database-review-notes.md`; never edit already-applied migrations.
+Every deploy runs `php8.4 artisan migrate --force --no-interaction`, including a
+code-only deploy or the same SHA: Laravel skips migrations recorded as applied.
+The command runs after locked dependency installation, cache/config preparation
+and the permission audit, before starting any service or leaving maintenance.
+It applies **all pending migrations** in the verified checkout, including ones
+predating the server HEAD if its database is behind. Establish the actual applied
+baseline and review pending migrations before first enablement. There is no
+fresh/reset/seed/rollback operation or migration override flag.
 
-An authorized operator then takes the same server lock, establishes maintenance,
-stops background services/FPM, fetches and fast-forwards only to the reviewed tested
-SHA, installs locked dependencies, and applies **only the explicitly approved
-forward migration(s)** with `php8.4 artisan migrate --force` after checking the
-pending list matches the approval. Rebuild caches, audit permissions, start FPM,
-leave maintenance, run the exact HTTP checks below and restore queue/timer. Record
-schema/application versions and release the lock. Do not run automatic rollback:
-some repository migrations intentionally refuse `down`. On failure use a reviewed
-forward correction; involve the operator who approved the schema change. Only
-clear a recovery marker and re-enable automatic deployment after this manual
-release is verified. The next ordinary code-only push can then fast-forward from
-that manually reviewed baseline.
+Before releasing schema changes, review migration and application compatibility;
+recommend and verify a restorable backup; test the upgrade against **disposable
+MySQL 8.0 matching production's exact patch, SQL mode, charset/collation and
+isolation**, including a representative sanitized existing schema. CI's MySQL 8.4
+success does not establish MySQL 8.0 compatibility. Review CHECK enforcement,
+DDL/locking and forward-only migrations noted in `docs/database-review-notes.md`.
+The added-file gate does not establish that a migration is nondestructive.
+
+On migration failure, the script exits nonzero with `phase=migrations`, restores
+the saved maintenance gate, attempts to stop all services and retains
+`in-progress`. It does not start FPM/workers/scheduler, run HTTP smoke checks or
+record success. Migration exception output is suppressed. MySQL DDL can be
+partially applied despite failure: inspect actual schema and migration records
+under the same lock before recovery. There is no automatic rollback or blind
+retry. Disable automatic deployment during recovery and use a reviewed forward
+correction; do not clear the marker until the complete release is verified.
+Existing database cache/session access and the unauthenticated CSRF smoke request
+remain normal runtime activity; production tests and user creation never run.
 
 ## Failure, interruption and controlled recovery
 
@@ -314,8 +327,8 @@ No error claims the old version is active after code mutation.
 
 Before mutation, recoverable errors attempt to leave maintenance and restore the
 previous services. After the Git merge begins (including partial Composer install,
-cache failure, permission failure, service failure or failed HTTP smoke), the trap
-restores the saved pre-rendered gate without depending on Laravel/vendor, attempts
+cache failure, migration failure, permission failure, service failure or failed
+HTTP smoke), the trap restores the saved pre-rendered gate without depending on Laravel/vendor, attempts
 to stop FPM/queue/scheduler, retains the marker and exits nonzero. If containment
 itself fails, it emits a critical diagnostic and requires immediate operator
 inspection; it never asserts that shutdown succeeded without verification. It deliberately does not
@@ -355,8 +368,10 @@ Recovery is a manual operator operation, never an automatic destructive reset:
    `bootstrap/cache/{config,services,packages,routes-v7,events}.php` before the
    first new Artisan bootstrap. Under umask 007, repeat `config:clear`, `clear-compiled`, `package:discover`,
    `config:cache`, `route:cache`, `view:cache`; restrict config.php to 640. Verify
-   unchanged `.env`, permission audit and actual SHA. Start FPM, use `artisan up`
-   only with a consistent installation, and run HTTP checks. If checks fail,
+   unchanged `.env`, permission audit and actual SHA. Inspect the pending migrations
+   and any partially applied DDL; complete reviewed forward migrations with
+   `php8.4 artisan migrate --force --no-interaction` while services remain stopped.
+   Start FPM, use `artisan up` only with a consistent installation, and run HTTP checks. If checks fail,
    restore maintenance and stop FPM again. Start queue and timer only once HTTP
    passes; check all services and scheduler's recent/next run.
 6. Record the actual successful SHA in `last-successful-sha`; remove only the
@@ -400,7 +415,11 @@ vendor/bin/phpunit --testsuite Unit
 ```
 
 Fixtures use temporary repositories and mocked SSH/PHP/Composer/services/curl.
-They never connect to Lightsail or use production credentials/database.
+They cover added migrations across multiple commits, refusal of existing migration
+modification/deletion/rename, migration ordering and failure containment, exact SHA,
+concurrency and interrupted-deploy guards. PHP/Artisan (including `migrate`) is
+mocked: they never connect to Lightsail or use any working database or production
+credentials.
 
 Implementation references: [GitHub deployment controls](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments),
 [Laravel deployment](https://laravel.com/framework/docs/deployment),

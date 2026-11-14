@@ -148,7 +148,18 @@ esac''')
         self.assertIn('php artisan config:cache umask=0007', commands)
         self.assertLess(commands.index('service stop-fpm'), commands.index('composer install'))
         self.assertLess(commands.index('/sanctum/csrf-cookie'), commands.index('service start-queue'))
-        for forbidden in ('migrate', 'key:generate', 'composer update', 'composer setup'):
+        migration_command = 'php artisan migrate --force --no-interaction umask=0022'
+        self.assertEqual(1, commands.count(migration_command))
+        for before in ('service stop-scheduler', 'service stop-queue', 'service stop-fpm',
+                       'composer install', 'composer check-platform-reqs',
+                       'php artisan config:cache', 'php artisan view:cache'):
+            self.assertLess(commands.index(before), commands.index(migration_command))
+        self.assertLess(commands.rindex('service audit'), commands.index(migration_command))
+        for after in ('service start-fpm', 'php artisan up', 'curl ',
+                      'service start-queue', 'service start-scheduler'):
+            self.assertLess(commands.index(migration_command), commands.index(after))
+        for forbidden in ('migrate:fresh', 'migrate:refresh', 'migrate:reset', 'migrate:rollback',
+                          'db:seed', 'key:generate', 'composer update', 'composer setup'):
             self.assertNotIn(forbidden, commands)
 
     def test_stale_provider_manifests_are_removed_before_artisan_bootstrap(self):
@@ -205,26 +216,33 @@ esac''')
         self.assertNotEqual(0, self.deploy(off_branch).returncode)
         self.assertIn('not on origin/main', self.output)
 
-    def test_migration_changes_require_review(self):
+    def test_added_migration_is_allowed_from_server_head_to_tested_sha(self):
         (self.repo / 'database/migrations/new.php').write_text('schema change')
-        migration_sha = self.commit('migration')
+        self.commit('migration')
+        (self.repo / 'app/Later.php').write_text('later code-only commit')
+        migration_sha = self.commit('code after migration')
         self.git('update-ref', 'refs/remotes/origin/main', migration_sha)
         # The server stays at its old code, target contains a new migration.
         self.git('update-ref', 'refs/heads/main', self.old)
         self.git('read-tree', self.old)
         (self.repo / 'database/migrations/new.php').unlink()
-        self.assertNotEqual(0, self.deploy(migration_sha).returncode)
-        self.assertIn('Migration changes', self.output)
+        (self.repo / 'app/Later.php').unlink()
+        self.assertEqual(0, self.deploy(migration_sha).returncode, self.output)
+        self.assertEqual(migration_sha, self.git('rev-parse', 'HEAD'))
+        self.assertTrue((self.repo / 'database/migrations/new.php').exists())
+        self.assertIn('php artisan migrate --force --no-interaction', self.log.read_text())
         self.assertFalse((self.state / 'in-progress').exists())
 
-    def test_existing_migration_modification_and_deletion_require_review(self):
-        for action in ('modify', 'delete'):
+    def test_existing_migration_modification_deletion_and_rename_require_review(self):
+        for action in ('modify', 'delete', 'rename'):
             with self.subTest(action=action):
                 migration = self.repo / 'database/migrations/existing.php'
                 migration.write_text('original')
                 baseline = self.commit('existing migration baseline')
                 if action == 'modify':
                     migration.write_text('modified migration')
+                elif action == 'rename':
+                    migration.rename(migration.with_name('renamed.php'))
                 else:
                     migration.unlink()
                 target = self.commit('changed migration')
@@ -232,8 +250,12 @@ esac''')
                 self.git('checkout', '-q', baseline, '--', 'database/migrations')
                 self.git('update-ref', 'refs/heads/main', baseline)
                 self.git('read-tree', baseline)
+                if action == 'rename':
+                    (self.repo / 'database/migrations/renamed.php').unlink()
                 self.assertNotEqual(0, self.deploy(target).returncode)
-                self.assertIn('Migration changes', self.output)
+                self.assertIn('Editing or removing existing migration files', self.output)
+                self.assertFalse((self.state / 'in-progress').exists())
+                self.assertFalse(self.log.exists())
                 self.assertEqual(baseline, self.git('rev-parse', 'HEAD'))
                 self.setUpFreshFixture()
 
@@ -273,6 +295,27 @@ esac''')
     def setUpFreshFixture(self):
         # Each subcase needs independent Git/runtime state; cleanup remains registered.
         self.setUp()
+
+    def test_failed_migration_keeps_maintenance_and_marker_without_starting_services(self):
+        self.assertNotEqual(0, self.deploy(fail='migrate').returncode)
+        self.assertIn('Database migration failed; operator recovery required', self.output)
+        self.assertIn('phase=migrations smoke=not-run healthy=unverified', self.output)
+        self.assertEqual(self.sha, self.git('rev-parse', 'HEAD'))
+        for name in ('down', 'maintenance.php'):
+            self.assertEqual((self.state / name).read_bytes(),
+                             (self.repo / 'storage/framework' / name).read_bytes())
+        self.assertTrue((self.state / 'in-progress').exists())
+        self.assertFalse((self.state / 'last-successful-sha').exists())
+        commands = self.log.read_text()
+        self.assertIn('php artisan migrate --force --no-interaction', commands)
+        for action in ('stop-fpm', 'stop-queue', 'stop-scheduler'):
+            self.assertEqual(2, commands.count(f'service {action}'))
+        for forbidden in ('service start-', 'php artisan up', 'curl ', 'migrate:rollback'):
+            self.assertNotIn(forbidden, commands)
+        self.assertNotIn('DEPLOYMENT SUCCESS', self.output)
+        self.assertNotEqual(0, self.deploy().returncode)
+        self.assertIn('operator recovery', self.output)
+        self.assertEqual(commands, self.log.read_text())
 
     def test_failed_smoke_check_stops_services_and_keeps_recovery_marker(self):
         self.assertNotEqual(0, self.deploy(fail='smoke').returncode)

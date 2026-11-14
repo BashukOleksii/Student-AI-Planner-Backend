@@ -89,8 +89,9 @@ run git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main || fail 
 run git merge-base --is-ancestor "$requested" refs/remotes/origin/main || fail 'SHA is not on origin/main.'
 previous=$(git rev-parse HEAD)
 run git merge-base --is-ancestor "$previous" "$requested" || fail 'Checkout is ahead of or diverged from tested SHA.'
-migration_changes=$(git diff --name-only "$previous" "$requested" -- database/migrations) || fail 'Could not inspect migration changes.'
-[[ -z $migration_changes ]] || fail 'Migration changes require manual review.'
+# Only newly added migration files may change in an unattended release.
+changed_migrations=$(git diff --no-renames --name-only --diff-filter=DMRTUXB "$previous" "$requested" -- database/migrations) || fail 'Could not inspect migration changes.'
+[[ -z $changed_migrations ]] || fail 'Editing or removing existing migration files requires manual review.'
 runtime_entries=$(git ls-tree -r --name-only "$requested" -- .env vendor storage bootstrap/cache | sed '/^storage\/.*\.gitignore$/d; /^bootstrap\/cache\/\.gitignore$/d') || fail 'Could not inspect runtime file protection.'
 [[ -z $runtime_entries ]] || fail 'Commit tracks server-owned runtime files.'
 # Record env metadata/content in memory only; never copy it to Actions or display it.
@@ -123,7 +124,7 @@ mutated=1
 run git -c core.sharedRepository=false merge --ff-only --no-edit --no-overwrite-ignore "$requested" || fail 'Fast-forward failed.'
 [[ $(git rev-parse HEAD) == "$requested" ]] || fail 'Updated checkout SHA mismatch.'
 phase=composer
-# No plugins/scripts, root execution, updates, migrations or key generation.
+# No plugins/scripts, root execution, dependency updates or key generation.
 run composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader --no-scripts --no-plugins || fail 'Locked dependency install failed.'
 run composer check-platform-reqs --no-dev --no-plugins || fail 'Production platform requirements failed.'
 phase=laravel-caches
@@ -147,6 +148,10 @@ chmod 640 bootstrap/cache/config.php
 [[ -f .env && ! -L .env && $(sha256sum .env) == "$env_fingerprint" && $(stat -c '%a:%U:%G' .env) == 640:ubuntu:www-data ]] || fail '.env changed unexpectedly.'
 phase=permissions
 svc audit || fail 'Final www-data permission audit failed.'
+phase=migrations
+# Use the verified checkout and production config while all services are stopped.
+# Run on every deploy: Laravel skips migrations already recorded in the database.
+run php8.4 artisan migrate --force --no-interaction || fail 'Database migration failed; operator recovery required.'
 phase=services
 svc start-fpm || fail 'PHP-FPM start failed.'
 # Workers and scheduler restart only after smoke checks so they cannot process new jobs prematurely.
