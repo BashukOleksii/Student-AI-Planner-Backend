@@ -80,6 +80,7 @@ Supplied filters must be non-empty and valid, or the endpoint returns Laravel
 | Parameter | Contract |
 |---|---|
 | `status` | `pending`, `missed` or `completed` (Task only) |
+| `overdue` | Optional boolean (`1`/`0`); when enabled, only `pending`/`missed` with a non-null deadline strictly before server UTC now |
 | `priority` | 1 low, 2 normal, 3 high |
 | `subject_id` | Positive ID of an existing owned Subject |
 | `deadline_from` | Inclusive UTC lower deadline bound |
@@ -98,6 +99,8 @@ Filters combine with AND semantics. Deadline ranges match only non-null deadline
 Null Subject and null deadline Tasks remain in unfiltered results. Foreign and
 nonexistent Subject filters receive the same generic validation error. No null
 Subject filter, overdue/in-progress status or configurable sorting is supported.
+The separate `overdue` filter is applied before pagination and total counting,
+combines with the other filters using AND, and preserves the fixed ordering.
 
 Ordering is fixed: non-null deadlines first, ascending deadline, then ascending
 ID; null deadlines come last in ascending ID order. This is collection presentation

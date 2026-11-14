@@ -88,11 +88,17 @@ class TaskService
             }
         }
 
+        if ($filters['overdue'] ?? false) {
+            $query->whereIn('status', [TaskStatus::Pending->value, TaskStatus::Missed->value])
+                ->whereNotNull('deadline_at')
+                ->where('deadline_at', '<', CarbonImmutable::now('UTC'));
+        }
+
         return $query->when($from !== null, fn ($query) => $query->where('deadline_at', '>=', $from))
             ->when($to !== null, fn ($query) => $query->where('deadline_at', '<=', $to))
             ->orderByRaw('deadline_at IS NULL')->orderBy('deadline_at')->orderBy('id')
             ->paginate($perPage, ['*'], 'page', $page)
-            ->appends(Arr::only($filters, ['status', 'priority', 'subject_id', 'deadline_from', 'deadline_to', 'per_page']));
+            ->appends(Arr::only($filters, ['status', 'overdue', 'priority', 'subject_id', 'deadline_from', 'deadline_to', 'per_page']));
     }
 
     public function create(User $user, array $values): Task

@@ -27,6 +27,7 @@ class ListTasksRequest extends FormRequest
 
         return [
             'status' => ['sometimes', 'required', 'string', Rule::enum(TaskStatus::class)],
+            'overdue' => ['sometimes', 'required', 'boolean'],
             'priority' => [...$integer, Rule::enum(TaskPriority::class)],
             'subject_id' => $integer,
             'deadline_from' => $timestamp,
