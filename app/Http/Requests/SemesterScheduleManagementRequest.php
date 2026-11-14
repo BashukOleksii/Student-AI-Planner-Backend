@@ -69,7 +69,7 @@ class SemesterScheduleManagementRequest extends FormRequest
                         throw new InvalidArgumentException;
                     }
                 } catch (InvalidArgumentException) {
-                    $validator->errors()->add($field, 'The value must be a supported calendar date (a Monday for the parity anchor).');
+                    $validator->errors()->add($field, 'Укажіть коректну календарну дату; початок відліку парності має припадати на понеділок.');
                 }
             }
         }];

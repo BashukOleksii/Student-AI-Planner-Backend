@@ -48,58 +48,58 @@ class ReminderRules
             };
         $relativeCreation = $create && (array_key_exists('anchor', $data) || array_key_exists('offset_minutes', $data));
         foreach (array_diff(array_keys($data), $allowed) as $field) {
-            $errors[$field] = 'This field is not accepted.';
+            $errors[$field] = 'Це поле не дозволене в цьому запиті.';
         }
         if ($create && ! $relativeCreation && ! array_key_exists('trigger_at', $data)) {
-            $errors['trigger_at'] = 'The trigger at field is required.';
+            $errors['trigger_at'] = 'Укажіть час спрацювання нагадування.';
         }
         if (! $create && array_intersect(array_keys($data), $allowed) === []) {
-            $errors['reminder'] = 'At least one editable field is required.';
+            $errors['reminder'] = 'Укажіть хоча б одне поле для зміни.';
         }
         if (array_key_exists('trigger_at', $data)) {
             try {
                 $this->timestamp($data['trigger_at']);
             } catch (InvalidArgumentException) {
-                $errors['trigger_at'] = 'Use a real UTC timestamp in YYYY-MM-DDTHH:MM:SSZ format, within years 1000–9999.';
+                $errors['trigger_at'] = 'Укажіть справжній час UTC у форматі YYYY-MM-DDTHH:MM:SSZ, у межах років 1000–9999.';
             }
         }
         if (array_key_exists('message', $data) && $data['message'] !== null
             && (! is_string($data['message']) || ! mb_check_encoding($data['message'], 'UTF-8') || mb_strlen($data['message'], 'UTF-8') > 500)) {
-            $errors['message'] = 'The message must be null or a UTF-8 string of at most 500 characters.';
+            $errors['message'] = 'Повідомлення має бути null або текстом UTF-8 до 500 символів.';
         }
         if (array_key_exists('offset_minutes', $data) || $relativeCreation) {
             try {
                 $this->offset($data['offset_minutes'] ?? null);
             } catch (InvalidArgumentException) {
-                $errors['offset_minutes'] = 'Use a signed integer between -32768 and 32767.';
+                $errors['offset_minutes'] = 'Укажіть ціле число від -32768 до 32767.';
             }
         }
         if ($relativeCreation) {
             $anchor = $data['anchor'] ?? null;
             if (! is_string($anchor) || ReminderAnchor::tryFrom($anchor) === null) {
-                $errors['anchor'] = 'Use a supported non-null relative anchor.';
+                $errors['anchor'] = 'Укажіть підтримувану непорожню основу відносного часу.';
             }
             if (array_key_exists('trigger_at', $data)) {
-                $errors['trigger_at'] = 'A relative trigger is computed by the server; omit trigger_at.';
+                $errors['trigger_at'] = 'Час відносного нагадування обчислює сервер; не передавайте trigger_at.';
             }
             $targets = $this->targets($data);
             if (count($targets) !== 1) {
-                $errors['target'] = 'A relative reminder requires exactly one target.';
+                $errors['target'] = 'Відносне нагадування потребує рівно одну ціль.';
             } elseif (! isset($errors['anchor']) && $this->anchorFor(array_key_first($targets))->value !== $anchor) {
-                $errors['anchor'] = 'The anchor is incompatible with the target.';
+                $errors['anchor'] = 'Вибрана основа часу несумісна з ціллю нагадування.';
             }
         }
         if ($create) {
             foreach ($this->targets($data) as $field => $id) {
                 if (! is_int($id) || $id < 1) {
-                    $errors[$field] = 'The target must be a positive integer.';
+                    $errors[$field] = 'Ціль має бути додатним цілим ідентифікатором.';
                 }
             }
             if (count($this->targets($data)) > 1) {
-                $errors['target'] = 'Only one reminder target is accepted.';
+                $errors['target'] = 'Для нагадування можна вказати лише одну ціль.';
             }
             if ($this->targets($data) === [] && ! $this->meaningful($data['message'] ?? null)) {
-                $errors['message'] = 'A general reminder requires a meaningful message.';
+                $errors['message'] = 'Для загального нагадування введіть змістовне повідомлення.';
             }
         }
 

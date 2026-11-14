@@ -45,7 +45,7 @@ class SemesterScheduleManagementService
             $owner = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
             $graph = $this->state->load($owner, $values['academic_period_id'], true);
             if ($graph['schedule'] !== null) {
-                $this->invalid('academic_period_id', 'A semester schedule already exists for this academic period.');
+                $this->invalid('academic_period_id', 'Для цього навчального періоду вже є семестровий розклад.');
             }
             $candidate = new SemesterSchedule(['user_id' => $owner->id, ...Arr::only($values,
                 ['academic_period_id', 'group_name', 'parity_anchor_on', 'first_week_parity'])]);
@@ -81,7 +81,7 @@ class SemesterScheduleManagementService
             [$owner, $graph] = $this->locked($user, $schedule, $values['schedule_token']);
             if ($graph['rules']->isNotEmpty() || $graph['exceptions']->isNotEmpty() || $graph['suppressions']->isNotEmpty()
                 || $owner->semesterScheduleImports()->where('academic_period_id', $graph['period']->id)->lockForUpdate()->exists()) {
-                $this->invalid('semester_schedule', 'Remove rules, date exceptions and suppressed slots explicitly first. A schedule with semester import history cannot be deleted.');
+                $this->invalid('semester_schedule', 'Спочатку окремо видаліть заняття, винятки дат і вилучені проміжки. Розклад з історією семестрових імпортів видалити не можна.');
             }
             $this->validate($owner, $graph);
             $this->check($graph['schedule']->delete());
@@ -263,7 +263,7 @@ class SemesterScheduleManagementService
             $lessons = [];
             if ($values['mode'] === 'copy_base') {
                 if ($existing?->kind === 'working_saturday') {
-                    $this->invalid('mode', 'Edit a working Saturday with a complete replacement lesson list.');
+                    $this->invalid('mode', 'Для зміни робочої суботи передайте повний список занять на заміну.');
                 }
                 $base = $this->calculator->calculate($this->state->config($graph), $graph['rules']->map->attributesToArray()->all(), null, $date, $owner->timezone);
                 $changes = collect($values['changes'] ?? [])->keyBy('weekly_lesson_rule_id');
@@ -277,13 +277,13 @@ class SemesterScheduleManagementService
                         'source_weekly_rule_id' => $rule->id, 'is_added' => false];
                 }
                 if ($changes->isNotEmpty()) {
-                    $this->invalid('changes', 'Every changed rule must occur in the selected base day.');
+                    $this->invalid('changes', 'Кожне змінюване заняття має належати вибраному базовому дню.');
                 }
             }
             foreach ($values['lessons'] ?? [] as $row) {
                 $old = isset($row['id']) ? $oldLessons->find($row['id']) : null;
                 if (isset($row['id']) && ($old === null || $values['mode'] !== 'replace')) {
-                    $this->invalid('lessons', 'A lesson ID must belong to this saved date snapshot.');
+                    $this->invalid('lessons', 'Заняття має належати збереженому розкладу цієї дати.');
                 }
                 if ($old !== null && ! array_key_exists('lesson_type', $row)) {
                     $row['lesson_type'] = $old->lesson_type?->value;
@@ -303,26 +303,26 @@ class SemesterScheduleManagementService
             $date = $values['occurs_on'];
             $this->within($graph, $date);
             if ((new DateTimeImmutable($date.' UTC'))->format('N') !== '6') {
-                $this->invalid('occurs_on', 'A working Saturday must be a Saturday.');
+                $this->invalid('occurs_on', 'Робоча субота має припадати на суботу.');
             }
             if ($graph['exceptions']->contains(fn ($row) => $row->occurs_on->format('Y-m-d') === $date)) {
-                throw new ConflictHttpException('A date exception already exists. Edit or delete it explicitly.');
+                throw new ConflictHttpException('Для цієї дати вже є виняток. Відредагуйте або видаліть його окремо.');
             }
             if (array_key_exists('source_week_parity', $values) || array_key_exists('selected_weekly_rule_ids', $values)) {
                 $parity = $values['source_week_parity'] ?? null;
                 $selected = $values['selected_weekly_rule_ids'] ?? [];
                 if (! in_array($parity, ['numerator', 'denominator'], true)) {
-                    $this->invalid('source_week_parity', 'Select numerator or denominator together with the lesson IDs.');
+                    $this->invalid('source_week_parity', 'Разом зі списком занять виберіть чисельник або знаменник.');
                 }
                 if (! is_array($selected) || ! array_is_list($selected) || $selected === []
                     || count($selected) !== count(array_unique($selected, SORT_REGULAR))
                     || ! collect($selected)->every(fn ($id) => is_int($id) && $id > 0)) {
-                    $this->invalid('selected_weekly_rule_ids', 'Select a nonempty list of unique positive weekly rule IDs.');
+                    $this->invalid('selected_weekly_rule_ids', 'Виберіть непорожній список різних додатних ідентифікаторів занять.');
                 }
                 $eligible = $graph['rules']->filter(fn ($rule) => $rule->weekday === $values['copied_weekday']
                     && in_array($rule->week_pattern, ['all', $parity], true));
                 if (array_diff($selected, $eligible->modelKeys()) !== []) {
-                    $this->invalid('selected_weekly_rule_ids', 'Every selected rule must belong to this semester and match the chosen weekday and parity.');
+                    $this->invalid('selected_weekly_rule_ids', 'Усі вибрані заняття мають належати цьому семестру й відповідати вибраним дню та типу тижня.');
                 }
                 $lessons = $eligible->whereIn('id', $selected)->map(fn ($rule) => [
                     ...$rule->only(self::LESSON_FIELDS), 'source_weekly_rule_id' => $rule->id, 'is_added' => false,
@@ -438,7 +438,7 @@ class SemesterScheduleManagementService
     {
         $this->calculator->validateDate($date);
         if ($date < $graph['period']->starts_on->format('Y-m-d') || $date > $graph['period']->ends_on->format('Y-m-d')) {
-            $this->invalid('date', 'The date must be within the academic period.');
+            $this->invalid('date', 'Дата має бути в межах навчального періоду.');
         }
     }
 
@@ -450,7 +450,7 @@ class SemesterScheduleManagementService
                 $target = $owner->semesterSchedules()->findOrFail($schedule->id);
                 $graph = $this->state->load($owner, $target->academic_period_id);
                 if (! hash_equals($this->state->fingerprint($owner, $graph), $values['schedule_token'])) {
-                    throw new ConflictHttpException('The semester schedule changed.');
+                    throw new ConflictHttpException('Семестровий розклад змінився.');
                 }
 
                 return $operation($owner, $graph, true);
@@ -471,7 +471,7 @@ class SemesterScheduleManagementService
         $target = $owner->semesterSchedules()->findOrFail($schedule->id);
         $graph = $this->state->load($owner, $target->academic_period_id, true);
         if (! hash_equals($this->state->fingerprint($owner, $graph), $token)) {
-            throw new ConflictHttpException('The semester schedule changed. Reload its management state before retrying.');
+            throw new ConflictHttpException('Семестровий розклад змінився. Оновіть його перед повторенням дії.');
         }
 
         return [$owner, $graph];
@@ -484,33 +484,33 @@ class SemesterScheduleManagementService
             array_push($definitions, ...$snapshot['lessons']);
         }
         if ($this->lessonTeachers->assignmentErrors($definitions, $graph['teacherAssignments']) !== []) {
-            $this->invalid('teacher_id', 'A subject cannot have conflicting teacher assignments in the projected semester.');
+            $this->invalid('teacher_id', 'У семестровому розкладі предмет не може мати суперечливих призначень викладачів.');
         }
         try {
             $this->calculator->validateSemester($this->state->config($graph), $graph['rules']->map->attributesToArray()->all(), $graph['snapshots'], $owner->timezone);
         } catch (InvalidArgumentException) {
-            $this->invalid('schedule', 'The projected semester contains duplicate pairs, overlapping times, invalid dates or ambiguous/nonexistent local endpoints.');
+            $this->invalid('schedule', 'Майбутній семестр містить повторні пари, перетини, некоректні дати або неоднозначний чи неіснуючий місцевий час.');
         }
     }
 
     private function references(array $graph, array $row): void
     {
         if (! $graph['subjects']->contains('id', $row['subject_id'])) {
-            $this->invalid('subject_id', 'The selected subject must belong to you.');
+            $this->invalid('subject_id', 'Вибраний предмет має належати вам.');
         }
         $teacherId = $this->lessonTeachers->teacherId($row);
         if (! $graph['teachers']->contains('id', $teacherId)) {
-            $this->invalid('teacher_id', 'The selected teacher must belong to you.');
+            $this->invalid('teacher_id', 'Вибраний викладач має належати вам.');
         }
         if (isset($graph['teacherAssignments'][$row['subject_id']]) && $graph['teacherAssignments'][$row['subject_id']] !== $teacherId) {
-            $this->invalid('teacher_id', 'The subject is already assigned to another teacher.');
+            $this->invalid('teacher_id', 'Для предмета вже призначено іншого викладача.');
         }
     }
 
     private function notSuppressed(array $graph, array $fields): void
     {
         if ($this->planner->blockingSuppressions($fields, $graph['suppressions']->map->attributesToArray()->all()) !== []) {
-            $this->invalid('suppressed_slot', 'Release this intentionally removed slot before creating or moving a rule into it.');
+            $this->invalid('suppressed_slot', 'Спочатку відновіть цей навмисно вилучений проміжок, щоб створити або перенести до нього заняття.');
         }
     }
 

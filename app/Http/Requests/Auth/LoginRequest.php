@@ -11,7 +11,7 @@ class LoginRequest extends FormRequest
     {
         if (! $this->hasSession()) {
             throw ValidationException::withMessages([
-                'session' => ['A SPA session is required. Send an Origin or Referer from a configured frontend.'],
+                'session' => ['Сеанс застосунку відсутній. Оновіть сторінку та увійдіть знову.'],
             ]);
         }
 

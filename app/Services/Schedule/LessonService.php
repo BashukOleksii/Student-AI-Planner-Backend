@@ -39,7 +39,7 @@ class LessonService
                 $lesson->update($candidate);
             } catch (UniqueConstraintViolationException) {
                 // Only changing the period can collide with immutable persisted fingerprint history.
-                throw ValidationException::withMessages(['academic_period_id' => ['The selected academic period conflicts with existing lesson history.']]);
+                throw ValidationException::withMessages(['academic_period_id' => ['Вибраний навчальний період конфліктує з історією занять.']]);
             }
 
             return $lesson->refresh();
@@ -97,7 +97,7 @@ class LessonService
     public function prepareCancel(User $user, Lesson $lesson, bool $lock = false): void
     {
         if ($lesson->status !== LessonStatus::Active) {
-            throw ValidationException::withMessages(['status' => ['Only an active lesson can be cancelled.']]);
+            throw ValidationException::withMessages(['status' => ['Скасувати можна лише активне заняття.']]);
         }
         if ($lesson->replaces_lesson_id !== null) {
             $this->replacementOriginal($user, $lesson, $lock);
@@ -129,7 +129,7 @@ class LessonService
 
     private function invalidReplacement(): never
     {
-        throw ValidationException::withMessages(['replacement' => ['The lesson replacement operation is not available.']]);
+        throw ValidationException::withMessages(['replacement' => ['Заміна цього заняття зараз недоступна.']]);
     }
 
     private function persistedCandidate(Lesson $lesson): array
@@ -163,16 +163,16 @@ class LessonService
                 continue;
             }
             if ($user->$relation()->whereKey($candidate[$field])->when($lock, fn ($q) => $q->lockForUpdate())->first() === null) {
-                throw ValidationException::withMessages([$field => ['The selected association is invalid.']]);
+                throw ValidationException::withMessages([$field => ['Вибраний зв’язок недоступний.']]);
             }
         }
 
         if ($lesson?->import_fingerprint !== null && $candidate['academic_period_id'] === null) {
-            throw ValidationException::withMessages(['academic_period_id' => ['This lesson requires an academic period.']]);
+            throw ValidationException::withMessages(['academic_period_id' => ['Для цього заняття потрібен навчальний період.']]);
         }
 
         if ($candidate['starts_at']->greaterThanOrEqualTo($candidate['ends_at'])) {
-            throw ValidationException::withMessages(['ends_at' => ['The end time must be after the start time.']]);
+            throw ValidationException::withMessages(['ends_at' => ['Час завершення має бути пізніше часу початку.']]);
         }
 
         if ($status === LessonStatus::Active) {
@@ -182,7 +182,7 @@ class LessonService
                 ->whereNotIn('id', $excludedIds)
                 ->when($lock, fn ($q) => $q->lockForUpdate())->first();
             if ($overlap !== null) {
-                throw ValidationException::withMessages(['schedule' => ['This lesson overlaps an existing active lesson.']]);
+                throw ValidationException::withMessages(['schedule' => ['Заняття перетинається з наявним активним заняттям.']]);
             }
 
             // The writer already holds the owner lock shared with semester writers.
@@ -195,12 +195,12 @@ class LessonService
                         // All dated Lessons (including the edited row's exclusions) were
                         // checked above; calendar selection also handles semester exceptions.
                         if ($interval['source_type'] === 'semester_occurrence') {
-                            throw ValidationException::withMessages(['schedule' => ['This lesson overlaps an effective semester lesson.']]);
+                            throw ValidationException::withMessages(['schedule' => ['Заняття перетинається з чинним семестровим заняттям.']]);
                         }
                     }
                 }
             } catch (InvalidArgumentException) {
-                throw ValidationException::withMessages(['schedule' => ['The effective schedule could not be validated. Review the semester schedule and timezone before saving.']]);
+                throw ValidationException::withMessages(['schedule' => ['Не вдалося перевірити чинний розклад. Перевірте семестровий розклад і часовий пояс перед збереженням.']]);
             }
         }
     }

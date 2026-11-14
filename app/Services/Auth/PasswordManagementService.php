@@ -60,7 +60,7 @@ class PasswordManagementService
                 $updated = $user;
             });
             if ($status !== Password::PASSWORD_RESET || ! $updated instanceof User) {
-                throw ValidationException::withMessages(['token' => ['This password reset token is invalid or expired.']]);
+                throw ValidationException::withMessages(['token' => ['Посилання для скидання пароля недійсне або прострочене.']]);
             }
 
             return $updated;

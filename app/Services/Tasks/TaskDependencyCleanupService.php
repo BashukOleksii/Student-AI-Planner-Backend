@@ -63,6 +63,6 @@ class TaskDependencyCleanupService
 
     private function unsafeDependency(): never
     {
-        throw ValidationException::withMessages(['deletion' => ['This work cannot be deleted safely because of inconsistent dependencies.']]);
+        throw ValidationException::withMessages(['deletion' => ['Роботу не можна безпечно видалити через неузгоджені залежності.']]);
     }
 }

@@ -154,7 +154,7 @@ class RecoverySuggestionService
         $this->outermost();
         foreach (['accept_partial' => $acceptPartial, 'accept_unplaced_cancellation' => $acceptUnplacedCancellation, 'accept_split_replacements' => $acceptSplitReplacements] as $field => $value) {
             if (! is_bool($value)) {
-                throw ValidationException::withMessages([$field => ['This field must be a genuine boolean.']]);
+                throw ValidationException::withMessages([$field => ['Значення має бути JSON true або false.']]);
             }
         }
         $outcome = DB::transaction(function () use ($user, $id, $acceptPartial, $acceptUnplacedCancellation, $acceptSplitReplacements): array {
@@ -187,7 +187,7 @@ class RecoverySuggestionService
                 return ['error' => 'decision_required'];
             }
             if ($row->kind !== 'replan' && ($acceptUnplacedCancellation || $acceptSplitReplacements)) {
-                throw ValidationException::withMessages(['accept_unplaced_cancellation' => ['Cancellation consent is only valid for adaptive replanning.']]);
+                throw ValidationException::withMessages(['accept_unplaced_cancellation' => ['Згода на скасування застосовується лише до адаптивного перепланування.']]);
             }
             try {
                 // Failed writers roll back to a savepoint before terminal review metadata is recorded.

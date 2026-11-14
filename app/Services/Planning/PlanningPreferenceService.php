@@ -20,11 +20,11 @@ class PlanningPreferenceService
         $errors = [];
         if ($values['min_session_minutes'] !== null && $values['max_session_minutes'] !== null
             && $values['max_session_minutes'] < $values['min_session_minutes']) {
-            $errors['max_session_minutes'] = ['The maximum session duration must be at least the minimum session duration.'];
+            $errors['max_session_minutes'] = ['Максимальна тривалість сесії має бути не меншою за мінімальну.'];
         }
         if ($values['max_daily_study_minutes'] !== null && $values['max_weekly_study_minutes'] !== null
             && $values['max_weekly_study_minutes'] < $values['max_daily_study_minutes']) {
-            $errors['max_weekly_study_minutes'] = ['The weekly study limit must be at least the daily study limit.'];
+            $errors['max_weekly_study_minutes'] = ['Тижневий ліміт навчання має бути не меншим за денний.'];
         }
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);

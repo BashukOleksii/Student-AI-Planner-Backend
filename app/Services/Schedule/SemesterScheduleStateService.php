@@ -108,7 +108,7 @@ class SemesterScheduleStateService
         $institution = $period === null ? null : $owner->educationInstitutions()->whereKey($period->education_institution_id)
             ->when($lock, fn ($q) => $q->lockForUpdate())->first();
         if ($period === null || $institution === null) {
-            throw ValidationException::withMessages(['academic_period_id' => ['The selected period must belong to you and have an owned education institution.']]);
+            throw ValidationException::withMessages(['academic_period_id' => ['Виберіть свій навчальний період, пов’язаний із вашим навчальним закладом.']]);
         }
         $period->setRelation('educationInstitution', $institution);
 
@@ -147,6 +147,6 @@ class SemesterScheduleStateService
 
     private function invalidGraph(): never
     {
-        throw ValidationException::withMessages(['semester_schedule' => ['The saved schedule or import data is inconsistent. Repair it before changing the schedule.']]);
+        throw ValidationException::withMessages(['semester_schedule' => ['Збережений розклад або дані імпорту неузгоджені. Виправте їх перед зміною розкладу.']]);
     }
 }

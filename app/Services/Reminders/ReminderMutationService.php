@@ -30,7 +30,7 @@ class ReminderMutationService
             $this->save($reminder);
             $this->future($trigger);
             if (! $this->targets->eligible($context)) {
-                throw ValidationException::withMessages(['target' => 'The reminder target is unavailable.']);
+                throw ValidationException::withMessages(['target' => 'Ціль нагадування недоступна.']);
             }
 
             return $reminder;
@@ -48,7 +48,7 @@ class ReminderMutationService
             $this->save($reminder);
             $this->future($trigger);
             if ($reminder->anchor !== null && array_key_exists('offset_minutes', $data) && ! $this->targets->eligible($context)) {
-                throw ValidationException::withMessages(['target' => 'The reminder target is unavailable.']);
+                throw ValidationException::withMessages(['target' => 'Ціль нагадування недоступна.']);
             }
         });
     }
@@ -82,7 +82,7 @@ class ReminderMutationService
         $this->validate($data, false, $relative);
         if ($relative && array_key_exists('offset_minutes', $data)) {
             if (! $this->targets->eligible($context)) {
-                throw ValidationException::withMessages(['target' => 'The reminder target is unavailable.']);
+                throw ValidationException::withMessages(['target' => 'Ціль нагадування недоступна.']);
             }
             $trigger = $this->relativeTrigger($context, $data['offset_minutes']);
         } else {
@@ -91,7 +91,7 @@ class ReminderMutationService
         $this->future($trigger);
         if ($this->rules->targets($reminder->getAttributes()) === []
             && ! $this->rules->meaningful(array_key_exists('message', $data) ? $data['message'] : $reminder->message)) {
-            throw ValidationException::withMessages(['message' => 'A general reminder requires a meaningful message.']);
+            throw ValidationException::withMessages(['message' => 'Для загального нагадування введіть змістовне повідомлення.']);
         }
 
         return $trigger;
@@ -136,7 +136,7 @@ class ReminderMutationService
         try {
             return $this->rules->resolve($anchor, $offset);
         } catch (InvalidArgumentException|\OverflowException) {
-            throw ValidationException::withMessages(['anchor' => 'The relative trigger cannot be resolved.']);
+            throw ValidationException::withMessages(['anchor' => 'Не вдалося визначити час відносного нагадування.']);
         }
     }
 
@@ -152,7 +152,7 @@ class ReminderMutationService
         try {
             $this->rules->future($trigger, CarbonImmutable::now('UTC'));
         } catch (InvalidArgumentException) {
-            throw ValidationException::withMessages(['trigger_at' => 'The trigger must be strictly in the future.']);
+            throw ValidationException::withMessages(['trigger_at' => 'Час спрацювання має бути строго в майбутньому.']);
         }
     }
 

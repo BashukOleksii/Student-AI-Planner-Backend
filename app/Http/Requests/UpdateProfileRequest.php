@@ -24,4 +24,9 @@ class UpdateProfileRequest extends FormRequest
             'session_reminder_lead_minutes' => ['sometimes', 'required', 'integer:strict', 'between:1,65535'],
         ];
     }
+
+    public function attributes(): array
+    {
+        return ['name' => 'ім’я'];
+    }
 }

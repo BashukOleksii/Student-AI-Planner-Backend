@@ -70,7 +70,7 @@ class SemesterScheduleImportPlanner
                     $row['operation'] = 'duplicate';
                     $counts['duplicate']++;
                 } else {
-                    $row['errors']['duplicate'] = ['Contradictory rows use the same weekday, pair and week pattern.'];
+                    $row['errors']['duplicate'] = ['Рядки з однаковими днем, парою та типом тижня містять суперечливі дані.'];
                 }
                 $rows[] = $row;
 
@@ -85,7 +85,7 @@ class SemesterScheduleImportPlanner
             $blocked = $this->blockingSuppressions($row, $suppressions);
             if ($blocked !== []) {
                 $row['operation'] = 'suppressed';
-                $row['errors']['suppressed_slot'] = ['This recurring slot was intentionally removed. Release its suppression explicitly before importing it again.'];
+                $row['errors']['suppressed_slot'] = ['Цей повторюваний проміжок навмисно вилучено. Відновіть його окремо перед повторним імпортом.'];
                 $row['suppressed_slot_ids'] = array_values(array_column($blocked, 'id'));
                 $rows[] = $row;
 
@@ -102,7 +102,7 @@ class SemesterScheduleImportPlanner
             } else {
                 $operation = 'preserve';
                 if ($before !== $candidate) {
-                    $row['errors']['protected_rule'] = ['This slot contains a manual or manually edited rule. It will not be overwritten.'];
+                    $row['errors']['protected_rule'] = ['Проміжок містить ручне або змінене вручну заняття. Його не буде перезаписано.'];
                 }
             }
             $row['operation'] = $operation;
@@ -124,7 +124,7 @@ class SemesterScheduleImportPlanner
         try {
             $this->calculator->validateWeeklyRules(array_values($projected));
         } catch (InvalidArgumentException) {
-            $errors['schedule'] = ['The projected weekly rules overlap or contain duplicate effective pairs. Manual rules are preserved.'];
+            $errors['schedule'] = ['Тижневі заняття перетинаються або повторюють ту саму пару. Ручні заняття збережено.'];
         }
 
         return ['rows' => $rows, 'operations' => $operations, 'projected_rules' => array_values($projected), 'errors' => $errors, 'counts' => $counts];

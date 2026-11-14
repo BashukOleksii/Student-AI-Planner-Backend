@@ -10,13 +10,13 @@ class RecoverySuggestionException extends RuntimeException
     public function __construct(public readonly string $errorCode)
     {
         parent::__construct(match ($errorCode) {
-            'analysis_limit_exceeded' => 'Automatic recovery analysis exceeds its safety limits. Use a narrower manual planning workflow.',
-            'suggestion_expired' => 'This recovery review expired. Request a fresh review.',
-            'suggestion_stale' => 'The recovery sources changed. Request a fresh review.',
-            'suggestion_resolved' => 'This recovery review has already been resolved.',
-            'decision_required' => 'This review requires a student lifecycle decision or corrected planning inputs before it can be applied.',
-            'no_recovery_needed' => 'No current recovery suggestion is needed.',
-            default => 'Recovery suggestions could not be processed.',
+            'analysis_limit_exceeded' => 'Обсяг даних перевищує межі автоматичного аналізу відновлення. Скористайтеся ручним плануванням для меншого обсягу роботи.',
+            'suggestion_expired' => 'Строк цього огляду відновлення минув. Створіть новий огляд.',
+            'suggestion_stale' => 'Вихідні дані відновлення змінилися. Створіть новий огляд.',
+            'suggestion_resolved' => 'Рішення за цим оглядом відновлення вже ухвалено.',
+            'decision_required' => 'Перед застосуванням цього огляду потрібно вказати результат сесії або виправити налаштування планування.',
+            'no_recovery_needed' => 'Зараз рекомендація з відновлення не потрібна.',
+            default => 'Не вдалося опрацювати рекомендації з відновлення.',
         });
     }
 

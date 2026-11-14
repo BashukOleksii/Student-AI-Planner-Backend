@@ -29,7 +29,7 @@ class SemesterScheduleDateRequest extends ScheduleDateRequest
                     $calculator->weekDates($this->input('date'));
                 }
             } catch (InvalidArgumentException) {
-                $validator->errors()->add('date', 'The date must define a supported calendar interval.');
+                $validator->errors()->add('date', 'Дата має визначати підтримуваний календарний інтервал.');
             }
         }];
     }

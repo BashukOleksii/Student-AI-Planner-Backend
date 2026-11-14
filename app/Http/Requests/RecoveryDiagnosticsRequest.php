@@ -11,7 +11,7 @@ class RecoveryDiagnosticsRequest extends StudySessionRangeRequest
         return [...parent::after(), function (Validator $validator): void {
             foreach (['start_date', 'end_date'] as $field) {
                 if (! $validator->errors()->has($field) && $this->input($field) < '1000-01-01') {
-                    $validator->errors()->add($field, 'Use a supported database calendar date.');
+                    $validator->errors()->add($field, 'Укажіть підтримувану календарну дату.');
                 }
             }
         }];

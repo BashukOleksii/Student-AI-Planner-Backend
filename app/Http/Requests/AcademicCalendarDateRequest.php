@@ -22,7 +22,7 @@ class AcademicCalendarDateRequest extends ScheduleDateRequest
                     app(EffectiveScheduleCalculator::class)->validateDate($this->input('date'));
                 }
             } catch (InvalidArgumentException) {
-                $validator->errors()->add('date', 'The value must be a supported calendar date.');
+                $validator->errors()->add('date', 'Укажіть підтримувану календарну дату.');
             }
         }];
     }

@@ -62,7 +62,7 @@ class TaskService
     public function paginate(User $user, array $filters): LengthAwarePaginator
     {
         if (isset($filters['subject_id']) && ! $user->subjects()->whereKey($filters['subject_id'])->exists()) {
-            throw ValidationException::withMessages(['subject_id' => ['The selected subject is invalid.']]);
+            throw ValidationException::withMessages(['subject_id' => ['Вибраний предмет недоступний.']]);
         }
 
         $from = isset($filters['deadline_from'])
@@ -70,13 +70,13 @@ class TaskService
         $to = isset($filters['deadline_to'])
             ? CarbonImmutable::createFromFormat('!Y-m-d\TH:i:s\Z', $filters['deadline_to'], 'UTC') : null;
         if ($from !== null && $to !== null && $from->greaterThan($to)) {
-            throw ValidationException::withMessages(['deadline_to' => ['The upper deadline bound must not be earlier than the lower bound.']]);
+            throw ValidationException::withMessages(['deadline_to' => ['Верхня межа дедлайну не може бути раніше нижньої.']]);
         }
 
         $page = (int) ($filters['page'] ?? 1);
         $perPage = (int) ($filters['per_page'] ?? 15);
         if ($page - 1 > intdiv(PHP_INT_MAX, $perPage)) {
-            throw ValidationException::withMessages(['page' => ['The selected page is too large.']]);
+            throw ValidationException::withMessages(['page' => ['Номер сторінки завеликий.']]);
         }
 
         $query = $user->tasks()->with([
@@ -168,7 +168,7 @@ class TaskService
             $this->lockOwner($user);
             $task = $user->tasks()->lockForUpdate()->findOrFail($task->getKey());
             if ($task->status === TaskStatus::Completed) {
-                throw new ConflictHttpException('A completed task must be reopened before it can be marked missed.');
+                throw new ConflictHttpException('Спочатку поновіть виконане завдання, щоб позначити його незавершеним.');
             }
             if ($task->status !== TaskStatus::Missed) {
                 if (! $task->update(['status' => TaskStatus::Missed, 'completed_at' => null])) {
@@ -199,7 +199,7 @@ class TaskService
                 if (array_key_exists('estimated_minutes', $values)
                     && $values['estimated_minutes'] !== $resolved['estimated_minutes']) {
                     throw ValidationException::withMessages([
-                        'estimated_minutes' => ['The task estimate is derived from its active subtasks and cannot be overwritten.'],
+                        'estimated_minutes' => ['Оцінка завдання обчислюється з активних підзавдань і не може бути змінена окремо.'],
                     ]);
                 }
                 $candidate['estimated_minutes'] = $resolved['estimated_minutes'];
@@ -229,13 +229,13 @@ class TaskService
     {
         if ($candidate['subject_id'] !== null
             && $user->subjects()->whereKey($candidate['subject_id'])->when($lock, fn ($query) => $query->lockForUpdate())->first() === null) {
-            throw ValidationException::withMessages(['subject_id' => ['The selected subject is invalid.']]);
+            throw ValidationException::withMessages(['subject_id' => ['Вибраний предмет недоступний.']]);
         }
 
         if ($task !== null && $candidate['deadline_at'] !== null
             && $task->subtasks()->whereNotNull('deadline_at')->where('deadline_at', '>', $candidate['deadline_at'])
                 ->when($lock, fn ($query) => $query->lockForUpdate())->first() !== null) {
-            throw ValidationException::withMessages(['deadline_at' => ['The task deadline must not be earlier than an existing subtask deadline.']]);
+            throw ValidationException::withMessages(['deadline_at' => ['Дедлайн завдання не може бути раніше дедлайну наявного підзавдання.']]);
         }
     }
 }

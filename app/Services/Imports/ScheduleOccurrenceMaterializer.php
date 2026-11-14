@@ -29,17 +29,17 @@ class ScheduleOccurrenceMaterializer
     public function materialize(array $template, AcademicPeriod $academicPeriod, string $timezone): array
     {
         if (! in_array($timezone, DateTimeZone::listIdentifiers(DateTimeZone::ALL), true)) {
-            throw new ScheduleOccurrenceMaterializationException('Expected an IANA timezone name.');
+            throw new ScheduleOccurrenceMaterializationException('Укажіть часовий пояс IANA, наприклад Europe/Kyiv.');
         }
         $zone = new DateTimeZone($timezone);
         $start = $this->periodDate($academicPeriod, 'starts_on');
         $end = $this->periodDate($academicPeriod, 'ends_on');
         if ($start->greaterThan($end)) {
-            throw new ScheduleOccurrenceMaterializationException('AcademicPeriod.starts_on must not follow ends_on.');
+            throw new ScheduleOccurrenceMaterializationException('Початок навчального періоду не може бути пізніше його кінця.');
         }
         if (! is_string($template['group'] ?? null) || ! is_array($template['source'] ?? null)
             || ! is_array($template['rules'] ?? null) || ! array_is_list($template['rules'])) {
-            throw new ScheduleOccurrenceMaterializationException('Expected a parsed weekly schedule template.');
+            throw new ScheduleOccurrenceMaterializationException('Не вдалося розпізнати шаблон тижневого розкладу.');
         }
         foreach ($template['rules'] as $index => $rule) {
             $this->validateRule($rule, $index);
@@ -60,7 +60,7 @@ class ScheduleOccurrenceMaterializer
                 $startsAt = $this->localInstant($localDate, $rule['starts_at_local'], $zone);
                 $endsAt = $this->localInstant($localDate, $rule['ends_at_local'], $zone);
                 if (! $startsAt->lessThan($endsAt)) {
-                    throw new ScheduleOccurrenceMaterializationException('Occurrence start must precede end at '.$localDate.' in '.$timezone.'.');
+                    throw new ScheduleOccurrenceMaterializationException('Початок заняття має передувати кінцю: '.$localDate.' у часовому поясі '.$timezone.'.');
                 }
                 $occurrences[] = [
                     'local_date' => $localDate,
@@ -89,11 +89,11 @@ class ScheduleOccurrenceMaterializer
         // Read DATE attributes directly: Eloquent date casts otherwise use the server timezone.
         $value = $period->getAttributes()[$field] ?? null;
         if (! is_string($value) || ! preg_match('/^[0-9]{4}-[0-9]{2}-[0-9]{2}(?: 00:00:00)?$/D', $value)) {
-            throw new ScheduleOccurrenceMaterializationException('AcademicPeriod.'.$field.' must be a calendar date.');
+            throw new ScheduleOccurrenceMaterializationException('Дата навчального періоду, поле '.$field.' має бути календарною датою.');
         }
         $date = CarbonImmutable::createFromFormat('!Y-m-d', substr($value, 0, 10), 'UTC');
         if ($date === null || $date->toDateString() !== substr($value, 0, 10) || $date->year < 1) {
-            throw new ScheduleOccurrenceMaterializationException('AcademicPeriod.'.$field.' must be a valid calendar date.');
+            throw new ScheduleOccurrenceMaterializationException('Дата навчального періоду, поле '.$field.' має бути коректною календарною датою.');
         }
 
         return $date;
@@ -102,7 +102,7 @@ class ScheduleOccurrenceMaterializer
     private function validateRule(mixed $rule, int $index): void
     {
         if (! is_array($rule)) {
-            throw new ScheduleOccurrenceMaterializationException('Invalid weekly schedule rule at index '.$index.'.');
+            throw new ScheduleOccurrenceMaterializationException('Некоректне правило тижневого розкладу з індексом '.$index.'.');
         }
         $valid = is_int($rule['weekday'] ?? null) && $rule['weekday'] >= 1 && $rule['weekday'] <= 7
             && in_array($rule['parity'] ?? null, ['all', 'numerator', 'denominator'], true);
@@ -119,15 +119,15 @@ class ScheduleOccurrenceMaterializer
             && count($source['rows']) === 2 && is_int($source['rows'][0]) && is_int($source['rows'][1])
             && $source['rows'][0] > 0 && $source['rows'][1] >= $source['rows'][0];
         if (! $valid) {
-            throw new ScheduleOccurrenceMaterializationException('Invalid weekly schedule rule at index '.$index.'.');
+            throw new ScheduleOccurrenceMaterializationException('Некоректне правило тижневого розкладу з індексом '.$index.'.');
         }
         foreach (['starts_at_local', 'ends_at_local'] as $field) {
             if (! preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/D', $rule[$field])) {
-                throw new ScheduleOccurrenceMaterializationException('Expected local HH:MM:SS in rule '.$index.'.'.$field.'.');
+                throw new ScheduleOccurrenceMaterializationException('Потрібен місцевий час HH:MM:SS у правилі '.$index.'.'.$field.'.');
             }
         }
         if ($rule['starts_at_local'] >= $rule['ends_at_local']) {
-            throw new ScheduleOccurrenceMaterializationException('Local start must precede end in rule '.$index.'.');
+            throw new ScheduleOccurrenceMaterializationException('Початок має передувати кінцю у правилі '.$index.'.');
         }
     }
 
@@ -146,8 +146,8 @@ class ScheduleOccurrenceMaterializer
             }
         }
         if (count($matches) !== 1) {
-            throw new ScheduleOccurrenceMaterializationException((count($matches) === 0 ? 'Nonexistent' : 'Ambiguous')
-                .' local time '.$label.' in '.$zone->getName().'.');
+            throw new ScheduleOccurrenceMaterializationException((count($matches) === 0 ? 'Неіснуючий' : 'Неоднозначний')
+                .' місцевий час '.$label.' у часовому поясі '.$zone->getName().'.');
         }
 
         return $matches[0];

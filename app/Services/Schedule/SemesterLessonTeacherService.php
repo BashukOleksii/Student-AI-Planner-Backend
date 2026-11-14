@@ -15,10 +15,10 @@ class SemesterLessonTeacherService
     {
         $id = $row['teacher_id'] ?? null;
         if (! is_int($id) || $id < 1) {
-            $this->invalid('teacher_id', 'Exactly one valid owned teacher_id is required for each semester lesson.');
+            $this->invalid('teacher_id', 'Для кожного семестрового заняття виберіть одного зі своїх викладачів.');
         }
         if (array_key_exists('teacher_ids', $row) && $row['teacher_ids'] !== [$id]) {
-            $this->invalid('teacher_ids', 'Use one teacher_id. A compatibility teacher_ids list must contain only that same ID.');
+            $this->invalid('teacher_ids', 'Використайте одного викладача. Сумісний список teacher_ids має містити лише його ідентифікатор.');
         }
 
         return $id;
@@ -27,7 +27,7 @@ class SemesterLessonTeacherService
     public function assertHistoricalLesson(WeeklyLessonRule|ScheduleDateExceptionLesson $lesson): void
     {
         if (count($lesson->teacher_ids) > 1 || ($lesson->teachers->isNotEmpty() && $lesson->teacher_id === null)) {
-            $this->repair($lesson->getTable().' '.$lesson->id.' has incompatible scalar/pivot teacher relationships.');
+            $this->repair('Заняття '.$lesson->id.' має неузгоджені зв’язки з викладачами.');
         }
     }
 
@@ -37,7 +37,7 @@ class SemesterLessonTeacherService
         $assignments = [];
         foreach ($subjects as $subject) {
             if ($subject->teachers->contains(fn ($teacher) => $teacher->user_id !== $owner->id || $teacher->pivot->user_id !== $owner->id)) {
-                $this->repair('Subject '.$subject->id.' has invalid teacher ownership.');
+                $this->repair('Предмет '.$subject->id.' посилається на викладача іншого користувача.');
             }
             $assignments[$subject->id] = $subject->teachers->modelKeys();
         }
@@ -53,7 +53,7 @@ class SemesterLessonTeacherService
         foreach ($assignments as $subjectId => &$ids) {
             $ids = array_values(array_unique($ids));
             if (count($ids) > 1) {
-                $this->repair('Subject '.$subjectId.' has multiple historical teacher identities.');
+                $this->repair('Предмет '.$subjectId.' має кілька історичних записів викладачів.');
             }
             $ids = $ids[0] ?? null;
         }
@@ -81,7 +81,7 @@ class SemesterLessonTeacherService
                 $ids[] = $assignments[$row['subject_id']];
             }
             if (count(array_unique($ids)) > 1) {
-                $errors[$index] = 'The subject must use its single assigned teacher. Conflicting teacher assignments are not allowed.';
+                $errors[$index] = 'Предмет має використовувати одного призначеного викладача. Суперечливі призначення заборонено.';
             }
         }
 
@@ -93,18 +93,18 @@ class SemesterLessonTeacherService
     {
         $this->teacherId(['teacher_id' => $lesson->teacher_id]);
         if ($lesson->teacher_id !== $teacherId) {
-            $this->invalid('teacher_id', 'The scalar lesson teacher must match its compatibility link.');
+            $this->invalid('teacher_id', 'Викладач заняття має відповідати збереженому зв’язку з викладачем.');
         }
         if ($lesson->teachers()->count() > 1) {
-            $this->repair($lesson->getTable().' '.$lesson->id.' has multiple historical teachers.');
+            $this->repair('Заняття '.$lesson->id.' має кількох викладачів в історії.');
         }
         $subject = $lesson->subject()->with('teachers')->firstOrFail();
         $ids = $subject->teachers->modelKeys();
         if (count($ids) > 1) {
-            $this->repair('Subject '.$subject->id.' has multiple historical teachers.');
+            $this->repair('Предмет '.$subject->id.' має кількох викладачів в історії.');
         }
         if ($ids !== [] && $ids !== [$teacherId]) {
-            $this->invalid('teacher_id', 'The subject is already assigned to another teacher.');
+            $this->invalid('teacher_id', 'Для предмета вже призначено іншого викладача.');
         }
         $links = [$teacherId => ['user_id' => $lesson->user_id]];
         $subject->teachers()->syncWithoutDetaching($links);
@@ -114,7 +114,7 @@ class SemesterLessonTeacherService
 
     private function repair(string $detail): never
     {
-        $this->invalid('semester_teacher_repair', 'Manual repair required: '.$detail.' No teacher relationships were changed.');
+        $this->invalid('semester_teacher_repair', 'Потрібне ручне виправлення: '.$detail.' Зв’язки викладачів не змінено.');
     }
 
     private function invalid(string $field, string $message): never

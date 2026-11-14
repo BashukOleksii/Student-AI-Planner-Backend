@@ -8,6 +8,6 @@ class ReminderConflictException extends RuntimeException
 {
     public function __construct()
     {
-        parent::__construct('The reminder cannot be changed in its current state.');
+        parent::__construct('Нагадування не можна змінити в його поточному стані.');
     }
 }

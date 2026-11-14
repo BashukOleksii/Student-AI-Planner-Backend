@@ -12,7 +12,7 @@ class ChangePasswordRequest extends FormRequest
     public function authorize(): bool
     {
         if (! $this->hasSession()) {
-            throw ValidationException::withMessages(['session' => ['A SPA session is required. Send an Origin or Referer from a configured frontend.']]);
+            throw ValidationException::withMessages(['session' => ['Сеанс застосунку відсутній. Оновіть сторінку та увійдіть знову.']]);
         }
 
         return $this->user() !== null;

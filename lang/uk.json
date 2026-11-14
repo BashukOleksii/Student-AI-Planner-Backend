@@ -1,0 +1,5 @@
+{
+    "The given data was invalid.": "Надіслані дані некоректні.",
+    "(and :count more error)": "(ще помилок: :count)",
+    "(and :count more errors)": "(ще помилок: :count)"
+}

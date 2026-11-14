@@ -18,7 +18,7 @@ class EducationInstitutionService
             foreach (['academicPeriods', 'subjects', 'teachers'] as $relation) {
                 if ($institution->$relation()->where('user_id', '!=', $user->getKey())->lockForUpdate()->first() !== null) {
                     throw ValidationException::withMessages([
-                        'education_institution' => ['This education institution cannot be deleted.'],
+                        'education_institution' => ['Цей навчальний заклад не можна видалити.'],
                     ]);
                 }
             }

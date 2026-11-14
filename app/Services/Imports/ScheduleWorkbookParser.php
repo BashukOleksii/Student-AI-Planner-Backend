@@ -36,7 +36,7 @@ class ScheduleWorkbookParser
             // Keep merges; never calculate formulas or use formatted cell values.
             $workbook = (new Xlsx)->load($path);
         } catch (\Exception $exception) {
-            throw new ScheduleWorkbookParserException('Unable to read the XLSX schedule workbook.', 0, $exception);
+            throw new ScheduleWorkbookParserException('Не вдалося прочитати файл розкладу XLSX. Перевірте формат і цілісність файлу.', 0, $exception);
         }
 
         try {
@@ -57,8 +57,8 @@ class ScheduleWorkbookParser
 
             if (count($regions) !== 1) {
                 throw new ScheduleWorkbookParserException($regions === []
-                    ? 'No supported schedule region found: expected a group header and five contiguous weekday blocks with four pairs each.'
-                    : 'Ambiguous workbook: multiple supported schedule regions found.');
+                    ? 'Область розкладу не знайдено. Потрібен заголовок групи та п’ять послідовних блоків днів тижня по чотири пари.'
+                    : 'У файлі знайдено кілька областей розкладу. Залиште одну область підтримуваного формату.');
             }
 
             [$sheet, $merges, $left, $top] = $regions[0];
@@ -120,7 +120,7 @@ class ScheduleWorkbookParser
             $content = $start[0] === $left + 3 && $end[0] <= $left + 5 && $start[1] === $end[1];
             if ($start[0] < $left || $end[0] > $left + 5 || $start[1] < $top || $end[1] > $top + 80
                 || (! $structural && ! $content)) {
-                $this->fail($sheet, $start[0], $start[1], 'Unsupported merge geometry in schedule region');
+                $this->fail($sheet, $start[0], $start[1], 'Непідтримуване об’єднання клітинок в області розкладу');
             }
         }
 
@@ -131,12 +131,12 @@ class ScheduleWorkbookParser
                     continue;
                 }
                 if ($sheet->getCell($coordinate)->getDataType() === DataType::TYPE_FORMULA) {
-                    $this->fail($sheet, $column, $row, 'Formulas in schedule cells are unsupported');
+                    $this->fail($sheet, $column, $row, 'Формули в клітинках розкладу не підтримуються');
                 }
                 $merge = $this->mergeAt($merges, $column, $row);
                 if ($merge !== null && $merge[0] !== [$column, $row]
                     && $this->text($this->rawValue($sheet, $column, $row)) !== null) {
-                    $this->fail($sheet, $column, $row, 'Hidden content in a merged schedule cell');
+                    $this->fail($sheet, $column, $row, 'В об’єднаній клітинці розкладу є прихований вміст');
                 }
                 if ($row > $top && $column <= $left + 2) {
                     $offset = $row - $top - 1;
@@ -144,7 +144,7 @@ class ScheduleWorkbookParser
                         || ($column === $left + 1 && $offset % 4 === 0)
                         || ($column === $left + 2 && in_array($offset % 4, [1, 2], true));
                     if (! $allowed && $this->text($this->rawValue($sheet, $column, $row)) !== null) {
-                        $this->fail($sheet, $column, $row, 'Unexpected content in schedule labels/time columns');
+                        $this->fail($sheet, $column, $row, 'Неочікуваний вміст у стовпцях позначень або часу');
                     }
                 }
             }
@@ -156,7 +156,7 @@ class ScheduleWorkbookParser
         $start = $this->time($sheet, $left + 2, $row + 1);
         $end = $this->time($sheet, $left + 2, $row + 2);
         if ($start >= $end) {
-            $this->fail($sheet, $left + 2, $row + 1, 'Pair start must precede end on the same local day');
+            $this->fail($sheet, $left + 2, $row + 1, 'Початок пари має передувати кінцю в межах одного місцевого дня');
         }
 
         $occupied = [];
@@ -168,17 +168,17 @@ class ScheduleWorkbookParser
         $lessons = match ($occupied) {
             // Semester definitions permit a blank teacher cell; legacy parsing stays strict.
             [0], [0, 1] => $semester ? [[$row, 'numerator']]
-                : $this->fail($sheet, $left + 3, $row, 'Unsupported subject/teacher row structure'),
+                : $this->fail($sheet, $left + 3, $row, 'Непідтримувана структура рядків предмета та викладача'),
             [2], [2, 3] => $semester ? [[$row + 2, 'denominator']]
-                : $this->fail($sheet, $left + 3, $row, 'Unsupported subject/teacher row structure'),
-            [1] => $semester ? [[$row + 1, 'all']] : $this->fail($sheet, $left + 3, $row, 'Unsupported subject/teacher row structure'),
+                : $this->fail($sheet, $left + 3, $row, 'Непідтримувана структура рядків предмета та викладача'),
+            [1] => $semester ? [[$row + 1, 'all']] : $this->fail($sheet, $left + 3, $row, 'Непідтримувана структура рядків предмета та викладача'),
             [0, 2], [0, 1, 2], [0, 2, 3] => $semester ? [[$row, 'numerator'], [$row + 2, 'denominator']]
-                : $this->fail($sheet, $left + 3, $row, 'Unsupported subject/teacher row structure'),
+                : $this->fail($sheet, $left + 3, $row, 'Непідтримувана структура рядків предмета та викладача'),
             [] => [],
             [1, 2] => [[$row + 1, 'all']],
             // A four-row pair containing two subject/teacher rows is upper/lower parity.
             [0, 1, 2, 3] => [[$row, 'numerator'], [$row + 2, 'denominator']],
-            default => $this->fail($sheet, $left + 3, $row, 'Unsupported subject/teacher row structure'),
+            default => $this->fail($sheet, $left + 3, $row, 'Непідтримувана структура рядків предмета та викладача'),
         };
 
         $teacherRows = array_map(fn (array $lesson) => $lesson[0] + 1, $lessons);
@@ -186,7 +186,7 @@ class ScheduleWorkbookParser
             if ($this->text($this->rawValue($sheet, $left + 4, $contentRow)) !== null
                 || (! in_array($contentRow, $teacherRows, true) && $this->text($this->rawValue($sheet, $left + 5, $contentRow)) !== null)
                 || (in_array($contentRow, $teacherRows, true) && ($this->mergeAt($merges, $left + 3, $contentRow)[1][0] ?? 0) === $left + 5)) {
-                $this->fail($sheet, $left + 3, $contentRow, 'Unsupported teacher/room column structure');
+                $this->fail($sheet, $left + 3, $contentRow, 'Непідтримувана структура стовпців викладача й аудиторії');
             }
         }
 
@@ -258,7 +258,7 @@ class ScheduleWorkbookParser
             return sprintf('%02d:%02d:%02d', (int) $parts[1], (int) $parts[2], (int) ($parts[3] ?? 0));
         }
 
-        $this->fail($sheet, $column, $row, 'Expected an Excel time fraction or local HH:MM[:SS] time');
+        $this->fail($sheet, $column, $row, 'Укажіть час Excel або місцевий час у форматі HH:MM[:SS]');
     }
 
     private function value(Worksheet $sheet, array $merges, int $column, int $row): mixed
@@ -303,6 +303,6 @@ class ScheduleWorkbookParser
 
     private function fail(Worksheet $sheet, int $column, int $row, string $message): never
     {
-        throw new ScheduleWorkbookParserException($message.' at '.$sheet->getTitle().'!'.Coordinate::stringFromColumnIndex($column).$row.'.');
+        throw new ScheduleWorkbookParserException($message.' (аркуш «'.$sheet->getTitle().'», клітинка '.Coordinate::stringFromColumnIndex($column).$row.').');
     }
 }

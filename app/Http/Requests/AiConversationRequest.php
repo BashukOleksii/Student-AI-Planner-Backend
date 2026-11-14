@@ -33,7 +33,7 @@ class AiConversationRequest extends FormRequest
     {
         return [function (Validator $validator): void {
             foreach (array_diff(array_keys($validator->getData()), array_keys($this->rules())) as $field) {
-                $validator->errors()->add($field, 'This field is not accepted.');
+                $validator->errors()->add($field, 'Це поле не дозволене в цьому запиті.');
             }
             if ($this->isMethod('POST')) {
                 $raw = $this->getContent();
@@ -41,10 +41,10 @@ class AiConversationRequest extends FormRequest
                 if ((! $this->isJson() && $this->request->count() !== 0)
                     || ($raw !== '' && (! $this->isJson() || ! json_decode($raw) instanceof stdClass || json_last_error() !== JSON_ERROR_NONE))
                     || $this->query->count() !== 0) {
-                    $validator->errors()->add('request', 'A JSON object with only accepted fields is required.');
+                    $validator->errors()->add('request', 'Надішліть JSON-об’єкт лише з дозволеними полями.');
                 }
             } elseif (! in_array($this->getContent(), ['', '[]', '{}'], true)) {
-                $validator->errors()->add('request', 'GET bodies are not accepted.');
+                $validator->errors()->add('request', 'GET-запит не повинен містити тіло.');
             }
         }];
     }

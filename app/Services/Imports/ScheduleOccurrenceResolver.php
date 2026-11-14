@@ -40,7 +40,7 @@ class ScheduleOccurrenceResolver
         // Reload through the owner: stale or forged in-memory ownership is insufficient.
         $period = $user->academicPeriods()->whereKey($academicPeriod->getKey())->first();
         if ($period === null) {
-            throw ValidationException::withMessages(['academic_period_id' => ['The selected academic period is invalid.']]);
+            throw ValidationException::withMessages(['academic_period_id' => ['Вибраний навчальний період недоступний.']]);
         }
 
         $subjectNames = array_values(array_unique(array_column($materialized['occurrences'], 'subject_name'), SORT_STRING));
@@ -91,11 +91,12 @@ class ScheduleOccurrenceResolver
                     $display = $this->displayName($name);
                     $errors = [];
                     if (! $this->validSemesterName($display, $kind === 'teachers')) {
-                        $errors[] = 'The imported name is empty, malformed or ambiguous. Use explicit teacher separators.';
+                        $errors[] = 'Імпортоване ім’я порожнє, некоректне або неоднозначне. Розділіть імена викладачів явними роздільниками.';
                     }
                     $matches = $existing->get($normalized, collect());
                     if ($matches->count() > 1) {
-                        $errors[] = 'Multiple owned '.$kind.' match this normalized name.';
+                        $errors[] = ($kind === 'subjects' ? 'Кілька ваших предметів' : 'Кілька ваших викладачів')
+                            .' відповідають цій нормалізованій назві.';
                     }
                     $record = $matches->count() === 1 ? $matches->first() : null;
                     $prepared[$normalized] = [
@@ -173,7 +174,7 @@ class ScheduleOccurrenceResolver
             $id = $subjects[$name] ?? null;
             $result['subjects'][$name] = [
                 'id' => $id,
-                'errors' => $id === null ? ['No owned subject exactly matches this imported name.'] : [],
+                'errors' => $id === null ? ['Серед ваших предметів немає точного збігу з імпортованою назвою.'] : [],
             ];
         }
         foreach ($teacherNames as $name) {
@@ -181,8 +182,8 @@ class ScheduleOccurrenceResolver
             $result['teachers'][$name] = [
                 'id' => count($ids) === 1 ? $ids[0] : null,
                 'errors' => count($ids) === 1 ? [] : [count($ids) === 0
-                    ? 'No owned teacher exactly matches this imported name.'
-                    : 'Multiple owned teachers exactly match this imported name.'],
+                    ? 'Серед ваших викладачів немає точного збігу з імпортованим іменем.'
+                    : 'Кілька ваших викладачів точно відповідають імпортованому імені.'],
             ];
         }
 

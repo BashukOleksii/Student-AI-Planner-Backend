@@ -22,7 +22,7 @@ class ReorderSubtasksRequest extends FormRequest
             'subtask_ids' => ['bail', 'present', 'array', 'list', 'max:65535', function (string $attribute, mixed $value, Closure $fail): void {
                 $payload = json_decode($this->getContent());
                 if (! $this->isJson() || ! is_object($payload) || ! is_array($payload->subtask_ids ?? null)) {
-                    $fail('The subtask ids must be a JSON array.');
+                    $fail('Список підзавдань має бути JSON-масивом.');
                 }
             }],
             'subtask_ids.*' => ['bail', 'required', 'integer:strict', 'min:1', 'distinct:strict'],

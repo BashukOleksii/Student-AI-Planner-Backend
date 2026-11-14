@@ -40,7 +40,7 @@ class TeacherService
             $this->lockOwner($user);
             $teacher = $user->teachers()->lockForUpdate()->findOrFail($teacher->getKey());
             if ($teacher->lessons()->withTrashed()->where('user_id', '!=', $user->getKey())->lockForUpdate()->first() !== null) {
-                throw ValidationException::withMessages(['teacher' => ['This teacher cannot be deleted.']]);
+                throw ValidationException::withMessages(['teacher' => ['Цього викладача не можна видалити.']]);
             }
 
             $teacher->delete();
@@ -55,7 +55,7 @@ class TeacherService
     private function validateInstitution(User $user, ?int $institutionId): void
     {
         if ($institutionId !== null && $user->educationInstitutions()->whereKey($institutionId)->lockForUpdate()->first() === null) {
-            throw ValidationException::withMessages(['education_institution_id' => ['The selected education institution is invalid.']]);
+            throw ValidationException::withMessages(['education_institution_id' => ['Вибраний навчальний заклад недоступний.']]);
         }
     }
 }

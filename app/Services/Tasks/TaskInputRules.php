@@ -18,7 +18,7 @@ class TaskInputRules
             'description' => ['sometimes', 'nullable', 'string', function (string $attribute, mixed $value, Closure $fail): void {
                 // MySQL TEXT capacity is measured in bytes, including UTF-8 text.
                 if (is_string($value) && strlen($value) > 65535) {
-                    $fail('The description must not exceed 65535 bytes.');
+                    $fail('Опис не може перевищувати 65535 байтів.');
                 }
             }],
             'subject_id' => ['sometimes', 'nullable', Rule::when(($values['subject_id'] ?? null) !== null, ['required']), 'integer:strict', 'min:1'],

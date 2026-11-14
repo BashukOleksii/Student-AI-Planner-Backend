@@ -42,10 +42,10 @@ class SubjectService
             $this->lockOwner($user);
             $subject = $user->subjects()->lockForUpdate()->findOrFail($subject->getKey());
             if ($subject->lessons()->withTrashed()->lockForUpdate()->first() !== null) {
-                throw ValidationException::withMessages(['subject' => ['A subject with lesson history cannot be deleted.']]);
+                throw ValidationException::withMessages(['subject' => ['Предмет з історією занять не можна видалити.']]);
             }
             if ($subject->tasks()->withTrashed()->where('user_id', '!=', $user->getKey())->lockForUpdate()->first() !== null) {
-                throw ValidationException::withMessages(['subject' => ['This subject cannot be deleted.']]);
+                throw ValidationException::withMessages(['subject' => ['Цей предмет не можна видалити.']]);
             }
 
             $subject->delete();
@@ -61,13 +61,13 @@ class SubjectService
     {
         if ($candidate['education_institution_id'] !== null
             && $user->educationInstitutions()->whereKey($candidate['education_institution_id'])->lockForUpdate()->first() === null) {
-            throw ValidationException::withMessages(['education_institution_id' => ['The selected education institution is invalid.']]);
+            throw ValidationException::withMessages(['education_institution_id' => ['Вибраний навчальний заклад недоступний.']]);
         }
 
         $duplicate = $user->subjects()->where('name', $candidate['name'])
             ->when($excludeId !== null, fn ($query) => $query->whereKeyNot($excludeId))->lockForUpdate()->first();
         if ($duplicate !== null) {
-            throw ValidationException::withMessages(['name' => ['A subject with this name already exists.']]);
+            throw ValidationException::withMessages(['name' => ['Предмет із такою назвою вже існує.']]);
         }
     }
 }

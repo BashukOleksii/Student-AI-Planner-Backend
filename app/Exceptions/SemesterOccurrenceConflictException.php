@@ -14,6 +14,6 @@ class SemesterOccurrenceConflictException extends InvalidArgumentException
         if (! in_array($reason, self::REASONS, true)) {
             throw new InvalidArgumentException;
         }
-        parent::__construct('The lesson cannot be added to this date.');
+        parent::__construct('Не можна додати заняття на цю дату.');
     }
 }

@@ -70,7 +70,7 @@ class SemesterScheduleImportService
             $owner = $this->owner($user);
             $import = $owner->semesterScheduleImports()->whereKey($import->id)->lockForUpdate()->firstOrFail();
             if (! in_array($import->status, ['ready', 'invalid'], true) || $import->template === null) {
-                $this->invalid('Only an uncommitted parsed import can be revalidated.');
+                $this->invalid('Повторно перевірити можна лише розпізнаний імпорт, який ще не застосовано.');
             }
             [$review, $context] = $this->buildReview($owner, $import);
             $this->saveReview($import, $review, $context);
@@ -92,7 +92,7 @@ class SemesterScheduleImportService
                 return ['import' => $import, 'changed' => false];
             }
             if ($import->status !== 'ready') {
-                $this->invalid('This import preview is not ready to commit.');
+                $this->invalid('Цей огляд імпорту ще не готовий до застосування.');
             }
             [$review, $context, $graph] = $this->buildReview($owner, $import);
             if (! hash_equals($import->context_hash, $context) || $this->state->hash($import->review) !== $this->state->hash($review)) {
@@ -101,7 +101,7 @@ class SemesterScheduleImportService
                 return ['import' => $import, 'changed' => true];
             }
             if ($this->hasErrors($review)) {
-                $this->invalid('This import preview is not ready to commit.');
+                $this->invalid('Цей огляд імпорту ще не готовий до застосування.');
             }
             // Only after locked revalidation and token comparison may catalog writes begin.
             [$catalog, $identities] = $this->commitCatalog($owner, $review['catalog'], $graph['period']->education_institution_id);
@@ -188,7 +188,7 @@ class SemesterScheduleImportService
             $rowTeachers = collect($raw['teacher_names'])->map(fn ($name) => $references['teachers'][$name])->unique('id')->sortBy('id')->values();
             $errors = [];
             if (count($raw['teacher_names']) !== 1) {
-                $errors['teacher_name'] = ['Exactly one teacher name is required for each semester lesson.'];
+                $errors['teacher_name'] = ['Для кожного семестрового заняття потрібне ім’я одного викладача.'];
             }
             if ($subject['errors'] !== []) {
                 $errors['subject_name'] = $subject['errors'];
@@ -199,7 +199,7 @@ class SemesterScheduleImportService
                 }
             }
             if ($raw['room'] !== null && mb_strlen($raw['room']) > 100) {
-                $errors['room'] = ['The room must not exceed 100 characters.'];
+                $errors['room'] = ['Назва аудиторії не може перевищувати 100 символів.'];
             }
             $incoming[] = [...$raw, 'row_number' => $index + 1, 'pair_number' => $this->planner->pairNumber($raw['pair_label']),
                 'week_pattern' => $raw['parity'], 'subject_id' => $subject['id'],
@@ -211,7 +211,7 @@ class SemesterScheduleImportService
         }
         $plan = $this->planner->plan($incoming, $rules->map->attributesToArray()->all(), $suppressions->map->attributesToArray()->all());
         if (mb_strlen($template['group']) > 255) {
-            $plan['errors']['group_name'] = ['The group name must not exceed 255 characters.'];
+            $plan['errors']['group_name'] = ['Назва групи не може перевищувати 255 символів.'];
         }
         $after = ['group_name' => $template['group'], 'parity_anchor_on' => $this->calculator->weekDates($period->starts_on->format('Y-m-d'))[0], 'first_week_parity' => 'numerator'];
         $before = $schedule === null ? null : ['group_name' => $schedule->group_name,
@@ -220,7 +220,7 @@ class SemesterScheduleImportService
             $this->calculator->validateSemester(['id' => $schedule?->id ?? 0, 'starts_on' => $period->starts_on->format('Y-m-d'),
                 'ends_on' => $period->ends_on->format('Y-m-d'), ...$after], $plan['projected_rules'], $snapshots, $owner->timezone);
         } catch (InvalidArgumentException) {
-            $plan['errors']['schedule'] = ['The projected schedule has conflicting or invalid rules, exceptions or local timezone endpoints.'];
+            $plan['errors']['schedule'] = ['Майбутній розклад містить конфліктні або некоректні заняття, винятки чи місцевий час.'];
         }
         $deleted = array_column(array_filter($plan['operations'], fn ($op) => $op['operation'] === 'delete'), 'rule_id');
         $detach = $lessons->whereIn('source_weekly_rule_id', $deleted)->map(fn ($lesson) => [
@@ -289,6 +289,6 @@ class SemesterScheduleImportService
 
     private function invalidGraph(): never
     {
-        $this->invalid('The saved schedule or import data is inconsistent. Repair it before importing.');
+        $this->invalid('Збережений розклад або дані імпорту неузгоджені. Виправте їх перед імпортом.');
     }
 }

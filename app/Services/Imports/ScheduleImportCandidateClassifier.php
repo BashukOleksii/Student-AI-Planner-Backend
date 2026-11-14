@@ -11,9 +11,9 @@ use Illuminate\Validation\ValidationException;
 
 class ScheduleImportCandidateClassifier
 {
-    private const IDENTITY_CONFLICT = 'Multiple imported occurrences with the same identity contain conflicting data.';
+    private const IDENTITY_CONFLICT = 'Повторювані заняття з однаковими ознаками містять суперечливі дані.';
 
-    private const SCHEDULE_CONFLICT = 'This imported occurrence conflicts with the projected schedule.';
+    private const SCHEDULE_CONFLICT = 'Це імпортоване заняття конфліктує з майбутнім розкладом.';
 
     /**
      * Read-only classification of the B2 contract, preserving input order and fields.
@@ -26,7 +26,7 @@ class ScheduleImportCandidateClassifier
     {
         $period = $user->academicPeriods()->whereKey($academicPeriod->getKey())->first();
         if ($period === null || $resolved['academic_period_id'] !== $period->getKey()) {
-            throw ValidationException::withMessages(['academic_period_id' => ['The selected academic period is invalid.']]);
+            throw ValidationException::withMessages(['academic_period_id' => ['Вибраний навчальний період недоступний.']]);
         }
 
         $rows = $resolved['occurrences'];
@@ -34,10 +34,10 @@ class ScheduleImportCandidateClassifier
         foreach ($rows as $index => $row) {
             $errors = $row['resolution_errors'];
             if ($row['academic_period_id'] !== $period->getKey()) {
-                $errors['academic_period_id'] = ['The selected academic period is invalid.'];
+                $errors['academic_period_id'] = ['Вибраний навчальний період недоступний.'];
             }
             if ($errors === [] && $row['fingerprint'] === null) {
-                $errors['import_identity'] = ['The occurrence has no resolved import identity.'];
+                $errors['import_identity'] = ['Для заняття не визначено однозначної ідентичності імпорту.'];
             }
             $rows[$index] = [...$row, ...$this->classification(ScheduleImportRowStatus::Invalid, null, null, $errors)];
             if ($errors === []) {

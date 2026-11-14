@@ -61,7 +61,7 @@ class SubtaskService
             $last = $task->subtasks()->orderByDesc('position')->lockForUpdate()->first(['id', 'position']);
             $position = ($last?->position ?? 0) + 1;
             if ($position > 65535) {
-                throw ValidationException::withMessages(['position' => ['No append position remains for this task.']]);
+                throw ValidationException::withMessages(['position' => ['Для цього завдання більше немає вільних позицій підзавдань.']]);
             }
 
             $subtask = $task->subtasks()->create([
@@ -135,7 +135,7 @@ class SubtaskService
             // Only identity/position is needed for validation; avoid hydrating full models here.
             $active = $task->subtasks()->orderBy('id')->lockForUpdate()->toBase()->get(['id', 'position'])->keyBy('id');
             if ($active->count() > 65535) {
-                throw ValidationException::withMessages(['subtask_ids' => ['Too many active subtasks to assign positions.']]);
+                throw ValidationException::withMessages(['subtask_ids' => ['Забагато активних підзавдань для призначення позицій.']]);
             }
             if (! array_is_list($subtaskIds) || count($subtaskIds) !== $active->count()) {
                 $this->invalidPermutation();
@@ -176,7 +176,7 @@ class SubtaskService
 
     private function invalidPermutation(): never
     {
-        throw ValidationException::withMessages(['subtask_ids' => ['The subtask ids must contain every active subtask of this task exactly once.']]);
+        throw ValidationException::withMessages(['subtask_ids' => ['Список має містити кожне активне підзавдання цього завдання рівно один раз.']]);
     }
 
     private function lockParent(User $user, Task $task): Task
@@ -201,7 +201,7 @@ class SubtaskService
         $parentDeadline = $task->getRawOriginal('deadline_at');
         if ($parentDeadline !== null && $candidate['deadline_at'] !== null
             && $candidate['deadline_at']->greaterThan(CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $parentDeadline, 'UTC'))) {
-            throw ValidationException::withMessages(['deadline_at' => ['The subtask deadline must not be later than the task deadline.']]);
+            throw ValidationException::withMessages(['deadline_at' => ['Дедлайн підзавдання не може бути пізніше дедлайну завдання.']]);
         }
     }
 }

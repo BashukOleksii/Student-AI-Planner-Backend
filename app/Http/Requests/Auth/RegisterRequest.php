@@ -12,7 +12,7 @@ class RegisterRequest extends FormRequest
     {
         if (! $this->hasSession()) {
             throw ValidationException::withMessages([
-                'session' => ['A SPA session is required. Send an Origin or Referer from a configured frontend.'],
+                'session' => ['Сеанс застосунку відсутній. Оновіть сторінку та увійдіть знову.'],
             ]);
         }
 
@@ -27,5 +27,10 @@ class RegisterRequest extends FormRequest
             'password' => ['required', 'string', 'confirmed', Password::defaults()],
             'timezone' => ['sometimes', 'required', 'string', 'max:64', 'timezone'],
         ];
+    }
+
+    public function attributes(): array
+    {
+        return ['name' => 'ім’я'];
     }
 }

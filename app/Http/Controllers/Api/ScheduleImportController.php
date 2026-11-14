@@ -38,6 +38,6 @@ class ScheduleImportController extends Controller
 
     private function unavailable(): never
     {
-        abort(410, 'Dated lesson imports are no longer available. Add individual lessons manually or use semester schedule imports.');
+        abort(410, 'Імпорт окремих занять за датами більше недоступний. Додайте заняття вручну або скористайтеся імпортом семестрового розкладу.');
     }
 }

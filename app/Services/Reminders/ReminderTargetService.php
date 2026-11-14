@@ -66,7 +66,7 @@ class ReminderTargetService
         }
         if (! $valid) {
             if ($create) {
-                throw ValidationException::withMessages(['target' => 'The reminder target is unavailable.']);
+                throw ValidationException::withMessages(['target' => 'Ціль нагадування недоступна.']);
             }
             throw new UnexpectedValueException('Invalid reminder relationships.');
         }

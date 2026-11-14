@@ -18,9 +18,9 @@ use LogicException;
 
 class ScheduleImportPreviewRevalidator
 {
-    private const INTEGRITY_MESSAGE = 'This import preview is malformed. Create a new import preview.';
+    private const INTEGRITY_MESSAGE = 'Цей огляд імпорту некоректний. Створіть новий огляд.';
 
-    private const UTC_ERROR = 'The stored occurrence UTC interval is invalid. Create a new import preview.';
+    private const UTC_ERROR = 'Збережений інтервал заняття в UTC некоректний. Створіть новий огляд імпорту.';
 
     public function __construct(
         private ScheduleOccurrenceResolver $resolver,
@@ -35,11 +35,11 @@ class ScheduleImportPreviewRevalidator
             $owner = User::whereKey($user->getKey())->lockForUpdate()->firstOrFail();
             $batch = $owner->scheduleImportBatches()->whereKey($batch->getKey())->lockForUpdate()->firstOrFail();
             if (! in_array($batch->status, [ScheduleImportBatchStatus::Uploaded, ScheduleImportBatchStatus::Validated], true)) {
-                throw ValidationException::withMessages(['schedule_import' => ['This import preview cannot be revalidated.']]);
+                throw ValidationException::withMessages(['schedule_import' => ['Цей огляд імпорту не можна перевірити повторно.']]);
             }
             $period = $owner->academicPeriods()->whereKey($batch->academic_period_id)->lockForUpdate()->first();
             if ($period === null) {
-                throw ValidationException::withMessages(['academic_period_id' => ['The selected academic period is invalid.']]);
+                throw ValidationException::withMessages(['academic_period_id' => ['Вибраний навчальний період недоступний.']]);
             }
             $rows = $batch->rows()->orderBy('row_number')->lockForUpdate()->get();
 

@@ -25,7 +25,7 @@ class PreviewStudyPlanRequest extends StudySessionRangeRequest
         return [...parent::after(), function (Validator $validator): void {
             $data = $validator->getData();
             if (($data['subtask_id'] ?? null) !== null && ($data['task_id'] ?? null) === null) {
-                $validator->errors()->add('task_id', 'A subtask requires its explicit parent task identifier.');
+                $validator->errors()->add('task_id', 'Для підзавдання вкажіть його батьківське завдання.');
             }
         }];
     }

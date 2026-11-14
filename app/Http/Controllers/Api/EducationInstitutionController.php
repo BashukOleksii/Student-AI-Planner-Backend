@@ -27,7 +27,7 @@ class EducationInstitutionController extends Controller
         try {
             $institution = $request->user()->educationInstitutions()->create($request->validated());
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['name' => ['An education institution with this name already exists.']]);
+            throw ValidationException::withMessages(['name' => ['Навчальний заклад із такою назвою вже існує.']]);
         }
 
         return (new EducationInstitutionResource($institution))->response()->setStatusCode(201);
@@ -45,7 +45,7 @@ class EducationInstitutionController extends Controller
         try {
             $educationInstitution->update($request->validated());
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['name' => ['An education institution with this name already exists.']]);
+            throw ValidationException::withMessages(['name' => ['Навчальний заклад із такою назвою вже існує.']]);
         }
 
         return new EducationInstitutionResource($educationInstitution);

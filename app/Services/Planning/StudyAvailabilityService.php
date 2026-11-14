@@ -83,7 +83,7 @@ class StudyAvailabilityService
     {
         if ($candidate['starts_at'] >= $candidate['ends_at']) {
             throw ValidationException::withMessages([
-                'ends_at' => ['The end time must be after the start time. Split overnight availability into two explicit windows.'],
+                'ends_at' => ['Час завершення має бути пізніше часу початку. Розділіть нічну доступність на два окремі проміжки.'],
             ]);
         }
 
@@ -97,7 +97,7 @@ class StudyAvailabilityService
 
         if ($overlaps) {
             throw ValidationException::withMessages([
-                'starts_at' => ['This window overlaps existing availability on the same weekday.'],
+                'starts_at' => ['Проміжок перетинається з наявною доступністю цього дня тижня.'],
             ]);
         }
     }

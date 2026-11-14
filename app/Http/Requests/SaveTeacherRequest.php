@@ -25,4 +25,9 @@ class SaveTeacherRequest extends FormRequest
             'education_institution_id' => ['sometimes', 'nullable', 'integer:strict', 'min:1'],
         ];
     }
+
+    public function attributes(): array
+    {
+        return ['name' => 'ім’я викладача'];
+    }
 }

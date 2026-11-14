@@ -38,8 +38,8 @@ class ReminderDeliveryRules
             throw new UnexpectedValueException('Invalid general reminder message.');
         }
         $display = $this->rules->meaningful($message) ? $message : match ($target) {
-            'task_id' => 'You have a task reminder.', 'subtask_id' => 'You have a subtask reminder.',
-            'study_session_id' => 'You have a study session reminder.',
+            'task_id' => 'Нагадування про завдання.', 'subtask_id' => 'Нагадування про підзавдання.',
+            'study_session_id' => 'Нагадування про навчальну сесію.',
         };
 
         return ['reminder_id' => $id, 'message' => $display, ...$ids, 'trigger_at' => $trigger];

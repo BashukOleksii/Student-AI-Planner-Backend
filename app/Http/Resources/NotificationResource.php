@@ -15,7 +15,7 @@ class NotificationResource extends JsonResource
         $reminder = $this->type === ReminderDeliveryRules::TYPE;
         $automatic = $this->type === AutomaticSessionReminderService::TYPE;
         $payload = $reminder ? app(ReminderDeliveryRules::class)->stored($this->data, $this->reminder_id) : [
-            'reminder_id' => null, 'message' => 'You have a new notification.',
+            'reminder_id' => null, 'message' => 'У вас нове сповіщення.',
             'task_id' => null, 'subtask_id' => null, 'study_session_id' => null, 'trigger_at' => null];
         if ($automatic) {
             $payload = app(AutomaticSessionReminderService::class)->stored($this->data);

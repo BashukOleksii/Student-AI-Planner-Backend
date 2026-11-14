@@ -50,7 +50,7 @@ class StudyReplanningPersistenceService
     {
         foreach (['accept_partial' => $acceptPartial, 'accept_unplaced_cancellation' => $acceptUnplacedCancellation, 'accept_split_replacements' => $acceptSplitReplacements] as $field => $value) {
             if (! is_bool($value)) {
-                throw ValidationException::withMessages([$field => ['This field must be a boolean.']]);
+                throw ValidationException::withMessages([$field => ['Значення має бути true або false.']]);
             }
         }
         $this->decode($token, $user);
@@ -69,7 +69,7 @@ class StudyReplanningPersistenceService
         }
         foreach (['accept_partial' => $acceptPartial, 'accept_unplaced_cancellation' => $acceptUnplacedCancellation, 'accept_split_replacements' => $acceptSplitReplacements] as $field => $value) {
             if (! is_bool($value)) {
-                throw ValidationException::withMessages([$field => ['This field must be a boolean.']]);
+                throw ValidationException::withMessages([$field => ['Значення має бути true або false.']]);
             }
         }
         // First read is current/locking: never establish a RR snapshot before owner contention.
@@ -128,10 +128,10 @@ class StudyReplanningPersistenceService
         $error = $this->confirmation->acceptanceError($current, $acceptPartial, $acceptUnplacedCancellation, $acceptSplitReplacements);
         if ($error !== null) {
             throw ValidationException::withMessages([$error => [match ($error) {
-                'accept_split_replacements' => 'Explicit review and acceptance is required for multiple successor sessions.',
-                'accept_partial' => 'Explicit acceptance is required for partial or unplaced replacements.',
-                'accept_unplaced_cancellation' => 'Explicit acceptance is required to cancel unplaced source sessions.',
-                default => 'This preview contains no actionable replanning changes.',
+                'accept_split_replacements' => 'Перегляньте та підтвердьте поділ на кілька нових сесій.',
+                'accept_partial' => 'Підтвердьте згоду на часткову заміну або сесії без заміни.',
+                'accept_unplaced_cancellation' => 'Підтвердьте згоду на скасування сесій, для яких не знайдено заміни.',
+                default => 'В огляді немає змін перепланування, які можна застосувати.',
             }]]);
         }
         $affected = $this->confirmation->affected($current);
@@ -183,7 +183,7 @@ class StudyReplanningPersistenceService
         try {
             return $this->confirmation->decode($token, $owner->getKey(), CarbonImmutable::now('UTC')->getTimestamp());
         } catch (InvalidArgumentException) {
-            throw ValidationException::withMessages(['preview_token' => ['The preview token is invalid or expired. Obtain a fresh preview.']]);
+            throw ValidationException::withMessages(['preview_token' => ['Огляд плану недійсний або прострочений. Створіть і перегляньте новий огляд.']]);
         }
     }
 

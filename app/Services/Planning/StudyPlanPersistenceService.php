@@ -40,7 +40,7 @@ class StudyPlanPersistenceService
     public function confirm(User $user, string $previewToken, mixed $acceptPartial = false): array
     {
         if (! is_bool($acceptPartial)) {
-            throw ValidationException::withMessages(['accept_partial' => ['The accept partial field must be a boolean.']]);
+            throw ValidationException::withMessages(['accept_partial' => ['Згода на частковий результат має бути true або false.']]);
         }
         $this->decode($previewToken, $user);
         if (DB::transactionLevel() !== 0) {
@@ -57,7 +57,7 @@ class StudyPlanPersistenceService
             throw new LogicException('Study plan execution requires an existing owner-first transaction.');
         }
         if (! is_bool($acceptPartial)) {
-            throw ValidationException::withMessages(['accept_partial' => ['The accept partial field must be a boolean.']]);
+            throw ValidationException::withMessages(['accept_partial' => ['Згода на частковий результат має бути true або false.']]);
         }
         $review = $this->decode($previewToken, $user);
         // First database read in this transaction is a current locking read.
@@ -79,7 +79,7 @@ class StudyPlanPersistenceService
         $error = $this->confirmation->acceptanceError($current, $acceptPartial);
         if ($error !== null) {
             throw ValidationException::withMessages([$error => [$error === 'accept_partial'
-                ? 'Explicit acceptance is required to save this partial plan.' : 'This preview contains no new sessions to save.']]);
+                ? 'Підтвердьте згоду, щоб зберегти частковий план.' : 'В огляді немає нових сесій для збереження.']]);
         }
         $this->validateBatch($owner, $current, $parameters);
         $created = new Collection;
@@ -104,7 +104,7 @@ class StudyPlanPersistenceService
         try {
             return $this->confirmation->decode($token, $owner->getKey(), CarbonImmutable::now('UTC')->getTimestamp());
         } catch (InvalidArgumentException) {
-            throw ValidationException::withMessages(['preview_token' => ['The preview token is invalid or expired. Obtain a fresh preview.']]);
+            throw ValidationException::withMessages(['preview_token' => ['Огляд плану недійсний або прострочений. Створіть і перегляньте новий огляд.']]);
         }
     }
 

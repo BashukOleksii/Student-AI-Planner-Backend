@@ -96,7 +96,7 @@ class ScheduleImportPreviewService
         }
         $period = $query->first();
         if ($period === null) {
-            throw ValidationException::withMessages(['academic_period_id' => ['The selected academic period is invalid.']]);
+            throw ValidationException::withMessages(['academic_period_id' => ['Вибраний навчальний період недоступний.']]);
         }
 
         return $period;

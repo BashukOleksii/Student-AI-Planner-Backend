@@ -22,7 +22,7 @@ class TaskEstimateService
 
         if ($hasSubtasks && $estimate !== null && $estimate > 65535) {
             throw ValidationException::withMessages([
-                'estimated_minutes' => ['The combined subtask estimate must not exceed 65535 minutes.'],
+                'estimated_minutes' => ['Загальна оцінка підзавдань не може перевищувати 65535 хвилин.'],
             ]);
         }
 

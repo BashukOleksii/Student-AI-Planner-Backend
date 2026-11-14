@@ -37,11 +37,11 @@ class ScheduleImportCommitService
                 return ['batch' => $batch->load(['rows' => fn ($query) => $query->orderBy('row_number')]), 'preview_changed' => false];
             }
             if ($batch->status !== ScheduleImportBatchStatus::Validated) {
-                throw ValidationException::withMessages(['schedule_import' => ['This import preview is not ready to commit.']]);
+                throw ValidationException::withMessages(['schedule_import' => ['Цей огляд імпорту ще не готовий до застосування.']]);
             }
             $period = $owner->academicPeriods()->whereKey($batch->academic_period_id)->lockForUpdate()->first();
             if ($period === null) {
-                throw ValidationException::withMessages(['academic_period_id' => ['The selected academic period is invalid.']]);
+                throw ValidationException::withMessages(['academic_period_id' => ['Вибраний навчальний період недоступний.']]);
             }
             $rows = $batch->rows()->orderBy('row_number')->lockForUpdate()->get();
             $batch->setRelation('rows', $rows);
@@ -158,6 +158,6 @@ class ScheduleImportCommitService
 
     private function invalidOperation(): never
     {
-        throw ValidationException::withMessages(['schedule_import' => ['This import preview could not be applied. Revalidate it before committing.']]);
+        throw ValidationException::withMessages(['schedule_import' => ['Не вдалося застосувати огляд імпорту. Перевірте його повторно перед підтвердженням.']]);
     }
 }

@@ -48,7 +48,7 @@ class AcademicPeriodService
                 || $period->scheduleImportBatches()->lockForUpdate()->first() !== null
                 || $period->lessons()->withTrashed()->lockForUpdate()->first() !== null) {
                 throw ValidationException::withMessages([
-                    'academic_period' => ['An academic period with schedule or import history cannot be deleted.'],
+                    'academic_period' => ['Навчальний період з історією розкладу або імпортів не можна видалити.'],
                 ]);
             }
 
@@ -64,19 +64,19 @@ class AcademicPeriodService
     private function validateCandidate(User $user, array $candidate, ?int $excludeId = null): void
     {
         if ($candidate['starts_on'] > $candidate['ends_on']) {
-            throw ValidationException::withMessages(['ends_on' => ['The end date must be on or after the start date.']]);
+            throw ValidationException::withMessages(['ends_on' => ['Дата завершення має бути не раніше дати початку.']]);
         }
 
         if ($candidate['education_institution_id'] !== null
             && $user->educationInstitutions()->whereKey($candidate['education_institution_id'])->lockForUpdate()->first() === null) {
-            throw ValidationException::withMessages(['education_institution_id' => ['The selected education institution is invalid.']]);
+            throw ValidationException::withMessages(['education_institution_id' => ['Вибраний навчальний заклад недоступний.']]);
         }
 
         $duplicate = $user->academicPeriods()->where('name', $candidate['name'])->where('starts_on', $candidate['starts_on'])
             ->when($excludeId !== null, fn ($query) => $query->whereKeyNot($excludeId))
             ->lockForUpdate()->first();
         if ($duplicate !== null) {
-            throw ValidationException::withMessages(['name' => ['An academic period with this name and start date already exists.']]);
+            throw ValidationException::withMessages(['name' => ['Навчальний період із такою назвою та датою початку вже існує.']]);
         }
     }
 }

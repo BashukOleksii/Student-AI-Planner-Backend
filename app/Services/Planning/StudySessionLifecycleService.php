@@ -81,7 +81,7 @@ class StudySessionLifecycleService
             $this->mutation->validateChain($chain, $source->id);
             if ($completeWork) {
                 if (! $this->canCompleteWork($task, $child)) {
-                    throw new ConflictHttpException('Linked work can no longer be completed. Review the session and complete it separately.');
+                    throw new ConflictHttpException('Пов’язану роботу більше не можна завершити цією дією. Оновіть сесію та завершіть роботу окремо.');
                 }
                 if ($child === null) {
                     app(TaskService::class)->complete($owner, $task, $completionToken, $now);

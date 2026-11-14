@@ -33,7 +33,7 @@ class ReminderActionRequest extends FormRequest
         return [function (Validator $validator): void {
             $this->validateJsonBody($validator);
             foreach (array_diff(array_keys($validator->getData()), array_keys($this->rules())) as $field) {
-                $validator->errors()->add($field, 'This field is not accepted.');
+                $validator->errors()->add($field, 'Це поле не дозволене в цьому запиті.');
             }
         }];
     }
@@ -44,7 +44,7 @@ class ReminderActionRequest extends FormRequest
             $body = json_decode($this->getContent());
             // Accept the conventional empty action payload [] as well as {}.
             if (json_last_error() !== JSON_ERROR_NONE || (! $body instanceof \stdClass && $body !== [])) {
-                $validator->errors()->add('reminder', 'A JSON object is required.');
+                $validator->errors()->add('reminder', 'Потрібен JSON-об’єкт.');
             }
         }
     }

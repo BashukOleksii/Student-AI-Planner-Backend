@@ -38,7 +38,7 @@ class SemesterScheduleImportController extends Controller
         $result = $service->commit($request->user(), $semesterScheduleImport, $request->validated('preview_token'));
         $resource = new SemesterScheduleImportResource($result['import']);
         if ($result['changed']) {
-            $resource->additional(['message' => 'The import preview changed. Review it and confirm again.']);
+            $resource->additional(['message' => 'Попередній огляд імпорту змінився. Перегляньте його та підтвердьте ще раз.']);
         }
 
         return $resource->response()->setStatusCode($result['changed'] ? 409 : 200);

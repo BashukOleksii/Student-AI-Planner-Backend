@@ -40,7 +40,7 @@ class SemesterScheduleManagementController extends Controller
     {
         $this->service->delete($request->user(), $semesterSchedule, $request->validated());
 
-        return response()->json(['message' => 'The empty semester schedule was deleted.']);
+        return response()->json(['message' => 'Порожній семестровий розклад видалено.']);
     }
 
     public function rules(SemesterScheduleManagementRequest $request, SemesterSchedule $semesterSchedule): AnonymousResourceCollection

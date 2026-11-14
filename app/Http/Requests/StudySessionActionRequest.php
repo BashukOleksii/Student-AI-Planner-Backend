@@ -31,7 +31,7 @@ class StudySessionActionRequest extends FormRequest
     {
         return [function (Validator $validator): void {
             foreach (array_diff(array_keys($validator->getData()), array_keys($this->rules())) as $field) {
-                $validator->errors()->add($field, 'This field is not accepted.');
+                $validator->errors()->add($field, 'Це поле не дозволене в цьому запиті.');
             }
         }];
     }

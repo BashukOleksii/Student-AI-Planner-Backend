@@ -31,7 +31,7 @@ class RecoverySuggestionRequest extends FormRequest
         if ($this->isMethod('GET') && $this->route('recoverySuggestion') === null) {
             $decimal = function (string $attribute, mixed $value, Closure $fail): void {
                 if (! is_string($value) || ! preg_match('/\A[1-9][0-9]*\z/', $value)) {
-                    $fail('Use a positive decimal integer.');
+                    $fail('Укажіть додатне десяткове ціле число.');
                 }
             };
 
@@ -50,7 +50,7 @@ class RecoverySuggestionRequest extends FormRequest
     {
         return [function (Validator $validator): void {
             foreach (array_diff(array_keys($validator->getData()), array_keys($this->rules())) as $field) {
-                $validator->errors()->add($field, 'This field is not accepted.');
+                $validator->errors()->add($field, 'Це поле не дозволене в цьому запиті.');
             }
         }];
     }

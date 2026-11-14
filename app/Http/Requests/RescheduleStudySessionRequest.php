@@ -15,7 +15,7 @@ class RescheduleStudySessionRequest extends StudySessionActionRequest
             try {
                 app(StudySessionLifecycleRules::class)->timestamp($value);
             } catch (InvalidArgumentException) {
-                $fail('The '.$attribute.' field must be a real whole-second UTC timestamp in YYYY-MM-DDTHH:MM:SSZ format, within years 1000–9999.');
+                $fail('Поле «'.__('validation.attributes.'.$attribute).'» має містити справжній час UTC із точністю до секунди у форматі YYYY-MM-DDTHH:MM:SSZ, у межах років 1000–9999.');
             }
         }];
 
@@ -31,7 +31,7 @@ class RescheduleStudySessionRequest extends StudySessionActionRequest
             $rules = app(StudySessionLifecycleRules::class);
             $data = $validator->getData();
             if ($rules->timestamp($data['ends_at']) <= $rules->timestamp($data['starts_at'])) {
-                $validator->errors()->add('ends_at', 'The ends at field must be after starts at.');
+                $validator->errors()->add('ends_at', 'Час завершення має бути пізніше часу початку.');
             }
         }];
     }

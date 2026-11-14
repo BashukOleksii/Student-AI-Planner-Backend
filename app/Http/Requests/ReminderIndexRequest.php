@@ -28,12 +28,12 @@ class ReminderIndexRequest extends FormRequest
             try {
                 app(ReminderRules::class)->timestamp($value);
             } catch (InvalidArgumentException) {
-                $fail('Use a real whole-second UTC timestamp within years 1000–9999.');
+                $fail('Укажіть справжній час UTC із точністю до секунди, у межах років 1000–9999.');
             }
         }];
         $integer = function (string $attribute, mixed $value, Closure $fail): void {
             if (! is_string($value) || ! preg_match('/\A[1-9][0-9]*\z/', $value)) {
-                $fail('Use a positive decimal integer.');
+                $fail('Укажіть додатне десяткове ціле число.');
             }
         };
 
@@ -48,16 +48,16 @@ class ReminderIndexRequest extends FormRequest
         return [function (Validator $validator): void {
             $data = $validator->getData();
             foreach (array_diff(array_keys($data), array_keys($this->rules())) as $field) {
-                $validator->errors()->add($field, 'This filter is not accepted.');
+                $validator->errors()->add($field, 'Цей фільтр не підтримується.');
             }
             if (array_key_exists('trigger_from', $data) !== array_key_exists('trigger_to', $data)) {
-                $validator->errors()->add('trigger_to', 'Supply both trigger range bounds.');
+                $validator->errors()->add('trigger_to', 'Укажіть обидві межі періоду спрацювання.');
             }
             if ($validator->errors()->isEmpty() && isset($data['trigger_from'], $data['trigger_to'])) {
                 $rules = app(ReminderRules::class);
                 $span = $rules->timestamp($data['trigger_to']) - $rules->timestamp($data['trigger_from']);
                 if ($span < 0 || $span > 366 * 86400) {
-                    $validator->errors()->add('trigger_to', 'The inclusive range must be ordered and span at most 366 days.');
+                    $validator->errors()->add('trigger_to', 'Межі періоду мають бути впорядковані й охоплювати не більш як 366 днів включно.');
                 }
             }
         }];

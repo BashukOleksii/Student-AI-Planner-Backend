@@ -122,10 +122,10 @@ return Application::configure(basePath: dirname(__DIR__))
                     return null;
                 }
                 if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
-                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Не знайдено.'], 404) : null;
                 }
 
-                return response()->json(['message' => 'Recovery suggestions could not be processed.', 'code' => 'recovery_failed'], 500);
+                return response()->json(['message' => 'Не вдалося опрацювати рекомендації з відновлення.', 'code' => 'recovery_failed'], 500);
             }
 
             if ($request->is('api/academic-calendar/*')) {
@@ -133,13 +133,13 @@ return Application::configure(basePath: dirname(__DIR__))
                     return null;
                 }
                 if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
-                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Не знайдено.'], 404) : null;
                 }
                 if ($exception instanceof InvalidArgumentException) {
-                    return response()->json(['message' => 'The saved academic calendar configuration is inconsistent.'], 409);
+                    return response()->json(['message' => 'Збережені налаштування навчального календаря неузгоджені.'], 409);
                 }
 
-                return response()->json(['message' => 'The academic calendar could not be processed.'], 500);
+                return response()->json(['message' => 'Не вдалося опрацювати навчальний календар.'], 500);
             }
 
             if ($request->is('api/semester-schedule-imports', 'api/semester-schedule-imports/*')) {
@@ -147,33 +147,33 @@ return Application::configure(basePath: dirname(__DIR__))
                     return null;
                 }
                 if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
-                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Не знайдено.'], 404) : null;
                 }
 
-                return response()->json(['message' => 'The semester schedule import could not be processed.'], 500);
+                return response()->json(['message' => 'Не вдалося опрацювати імпорт семестрового розкладу.'], 500);
             }
             if ($request->is('api/semester-schedules', 'api/semester-schedules/*')) {
                 if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
                     return null;
                 }
                 if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
-                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Не знайдено.'], 404) : null;
                 }
                 if ($exception instanceof InvalidArgumentException) {
-                    return response()->json(['message' => 'The saved semester schedule configuration is inconsistent.'], 409);
+                    return response()->json(['message' => 'Збережені налаштування семестрового розкладу неузгоджені.'], 409);
                 }
 
-                return response()->json(['message' => 'The semester schedule could not be processed.'], 500);
+                return response()->json(['message' => 'Не вдалося опрацювати семестровий розклад.'], 500);
             }
             if ($request->is('api/planning/workload-advice')) {
                 if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
                     return null;
                 }
                 if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
-                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Не знайдено.'], 404) : null;
                 }
 
-                return response()->json(['message' => 'The workload advice could not be processed.'], 500);
+                return response()->json(['message' => 'Не вдалося опрацювати рекомендації щодо навантаження.'], 500);
             }
             if ($request->is('api/profile/password', 'api/auth/forgot-password', 'api/auth/reset-password')) {
                 if ($exception instanceof ValidationException || $exception instanceof AuthenticationException
@@ -181,7 +181,7 @@ return Application::configure(basePath: dirname(__DIR__))
                     return null;
                 }
 
-                return response()->json(['message' => 'Password management is temporarily unavailable.'], 503);
+                return response()->json(['message' => 'Керування паролем тимчасово недоступне.'], 503);
             }
             if ($request->is('api/ai/*')) {
                 if ($exception instanceof AiAgentException) {
@@ -231,23 +231,23 @@ return Application::configure(basePath: dirname(__DIR__))
                     return null;
                 }
                 if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
-                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Не знайдено.'], 404) : null;
                 }
 
-                return response()->json(['message' => 'The progress statistics could not be processed.'], 500);
+                return response()->json(['message' => 'Не вдалося опрацювати статистику навчання.'], 500);
             }
             if ($request->is('api/notifications', 'api/notifications/*')) {
                 if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
                     return null;
                 }
                 if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
-                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Не знайдено.'], 404) : null;
                 }
 
-                return response()->json(['message' => 'The notification could not be processed.'], 500);
+                return response()->json(['message' => 'Не вдалося опрацювати сповіщення.'], 500);
             }
             if ($exception instanceof ReminderIntegrityException && $request->is('api/tasks/*')) {
-                return response()->json(['message' => 'The reminder dependencies could not be processed.'], 500);
+                return response()->json(['message' => 'Не вдалося опрацювати залежності нагадування.'], 500);
             }
             if ($exception instanceof ConflictHttpException && $request->is('api/tasks/*')) {
                 return response()->json(['message' => $exception->getMessage()], 409);
@@ -260,10 +260,10 @@ return Application::configure(basePath: dirname(__DIR__))
                     return null;
                 }
                 if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
-                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                    return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Не знайдено.'], 404) : null;
                 }
 
-                return response()->json(['message' => 'The reminder could not be processed.'], 500);
+                return response()->json(['message' => 'Не вдалося опрацювати нагадування.'], 500);
             }
             if (! $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/planning/recovery/*', 'api/planning/recovery-suggestions', 'api/planning/recovery-suggestions/*', 'api/study-sessions', 'api/study-sessions/*')) {
                 return null;
@@ -272,17 +272,61 @@ return Application::configure(basePath: dirname(__DIR__))
                 return response()->json(['message' => $exception->getMessage()], 409);
             }
             if ($request->is('api/planning/replanning/*') && $exception instanceof UnexpectedValueException) {
-                return response()->json(['message' => 'The replanning preview could not be processed.', 'classification' => 'invalid_source'], 500);
+                return response()->json(['message' => 'Не вдалося опрацювати огляд перепланування.', 'classification' => 'invalid_source'], 500);
             }
             if ($exception instanceof ValidationException || $exception instanceof AuthenticationException) {
                 return null;
             }
             if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500) {
-                return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Not found.'], 404) : null;
+                return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Не знайдено.'], 404) : null;
             }
 
             // Source corruption, SQL failures and internal bugs never expose details, even with APP_DEBUG.
-            return response()->json(['message' => 'The study plan could not be processed.'], 500);
+            return response()->json(['message' => 'Не вдалося опрацювати навчальний план.'], 500);
+        });
+        // Remaining API routes get localized framework errors and a safe unexpected-error body,
+        // including with APP_DEBUG=true. Earlier domain renderers keep their codes and shapes.
+        $exceptions->render(function (Throwable $exception, Request $request) {
+            if (! $request->is('api/*', 'sanctum/*') && ! $request->expectsJson()) {
+                return null;
+            }
+            if ($exception instanceof HttpResponseException) {
+                return $exception->getResponse();
+            }
+            if ($exception instanceof ValidationException) {
+                return $exception->response ?? response()->json(['message' => $exception->getMessage(), 'errors' => $exception->errors()], $exception->status);
+            }
+            if ($exception instanceof AuthenticationException) {
+                return response()->json(['message' => 'Увійдіть до свого акаунта.'], 401);
+            }
+            $status = $exception instanceof HttpExceptionInterface ? $exception->getStatusCode() : 500;
+            $message = match ($status) {
+                400 => 'Некоректний запит. Перевірте надіслані дані.',
+                403 => 'Доступ до цієї дії заборонено.',
+                404 => 'Не знайдено.',
+                405 => 'Цей спосіб запиту не підтримується.',
+                409 => 'Дані змінилися або дія суперечить поточному стану. Оновіть сторінку.',
+                410 => 'Ця дія більше недоступна.',
+                413 => 'Розмір запиту або файлу перевищує дозволений.',
+                419 => 'Сеанс захисту запиту завершився. Оновіть сторінку та повторіть дію.',
+                422 => 'Перевірте дані запиту.',
+                429 => 'Забагато запитів. Зачекайте й спробуйте ще раз.',
+                503 => 'Сервіс тимчасово недоступний. Спробуйте пізніше.',
+                default => 'Не вдалося виконати запит. Спробуйте пізніше.',
+            };
+            // These are reviewed, fixed domain diagnostics; arbitrary HTTP exception text is never echoed.
+            if (in_array($exception->getMessage(), [
+                'Для цієї дати вже є виняток. Відредагуйте або видаліть його окремо.',
+                'Семестровий розклад змінився.',
+                'Семестровий розклад змінився. Оновіть його перед повторенням дії.',
+                'Пов’язану роботу більше не можна завершити цією дією. Оновіть сесію та завершіть роботу окремо.',
+                'Імпорт окремих занять за датами більше недоступний. Додайте заняття вручну або скористайтеся імпортом семестрового розкладу.',
+            ], true) && $status < 500) {
+                $message = $exception->getMessage();
+            }
+
+            return response()->json(['message' => $message], $status,
+                $exception instanceof HttpExceptionInterface ? $exception->getHeaders() : []);
         });
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),

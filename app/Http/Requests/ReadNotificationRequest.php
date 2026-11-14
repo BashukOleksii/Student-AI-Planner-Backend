@@ -30,12 +30,12 @@ class ReadNotificationRequest extends FormRequest
     {
         return [function (Validator $validator): void {
             foreach (array_keys($validator->getData()) as $field) {
-                $validator->errors()->add($field, 'This field is not accepted.');
+                $validator->errors()->add($field, 'Це поле не дозволене в цьому запиті.');
             }
             if ($this->isJson() && $this->getContent() !== '') {
                 $body = json_decode($this->getContent());
                 if (json_last_error() !== JSON_ERROR_NONE || (! $body instanceof \stdClass && $body !== [])) {
-                    $validator->errors()->add('notification', 'A JSON object is required.');
+                    $validator->errors()->add('notification', 'Потрібен JSON-об’єкт.');
                 }
             }
         }];
