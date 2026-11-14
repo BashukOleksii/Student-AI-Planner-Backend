@@ -80,7 +80,7 @@ operator checks (not executed by this task):
 
 ```sh
 systemctl status student-ai-planner-scheduler.timer student-ai-planner-scheduler.service
-systemctl cat student-ai-planner-queue.service
+systemctl cat student-ai-planner-queue.service student-ai-planner-reminder-email.service
 ```
 
 Mail needs a worker consuming the new named queue. Its equivalent foreground
@@ -91,13 +91,61 @@ cd /srv/student-ai-planner/backend
 php8.4 artisan queue:work reminder-email --queue=reminder-email --sleep=3 --tries=3 --timeout=60
 ```
 
-Keep the existing default worker for other jobs. If its database connection is
-the same application DB/jobs table, an operator can instead review adding
-`--queue=default,reminder-email` to that worker; a separate worker avoids starvation
-behind default jobs. Inspect the actual unit first. Any persistent service change
-requires a separate operator change; no unit is installed/edited here. Preserve
-`timeout=60 < retry_after=90`, SIGTERM draining and the existing stop timeout.
-Long-running workers must restart on deployment through the existing procedure.
+The installed `student-ai-planner-reminder-email.service` handles this queue;
+keep `student-ai-planner-queue.service` for default jobs. The reviewed control
+helper manages both under the existing commands: `stop-queue` attempts both stops
+independently and returns nonzero if either fails; `start-queue` starts both;
+`health` requires both active, along with FPM and the scheduler timer. No sudo
+command names or allowed arguments change. No unit or SMTP configuration is
+installed/edited here. Preserve `timeout=60 < retry_after=90`, SIGTERM draining
+and the existing stop timeout for both workers.
+
+During deployment, both workers stop before code/dependency changes and migrations,
+then start only after all three HTTP smoke checks pass. Post-mutation failure
+containment calls `stop-queue`, so failure stopping either worker still attempts
+the other stop; the deploy also attempts scheduler/FPM shutdown, keeps maintenance
+and `in-progress`, and reports containment failure for operator recovery.
+
+### First activation with the new helper (manual operator procedure)
+
+The email unit is already installed but not yet enabled. The new preflight health
+check requires it to be **active before the first deploy** using this helper;
+a deploy cannot bootstrap an inactive worker. Perform this sequence from a trusted
+administrator session, not through CI (none of these steps ran in this task):
+
+1. Disable automatic deployment, acquire the existing deployment lock and resolve
+   any `in-progress` marker through the recovery procedure. Verify the current
+   deployed code, applied schema and existing worker configuration support the
+   email worker before starting it. If an upgrade is required first, complete a
+   reviewed manual release under maintenance with both workers stopped.
+2. Inspect the already installed email unit's checkout, service user, queue command,
+   private environment and graceful stop settings. Do not change SMTP or test mail
+   as part of this setup.
+3. Install the reviewed helper **before starting the email worker**. It must be
+   root-owned outside the checkout, so checkout updates alone do not install it:
+
+   ```sh
+   sudo install -o root -g root -m 755 scripts/deploy/student-planner-backend-control /usr/local/sbin/student-planner-backend-control
+   ```
+
+   Verify its checksum against the reviewed commit. Keep the existing restricted
+   sudoers rules below; do not grant generic `systemctl` access to the deploy key.
+4. As administrator, enable the existing email unit for boot, then use the helper
+   to start both workers and verify the complete service set:
+
+   ```sh
+   sudo systemctl enable student-ai-planner-reminder-email.service
+   sudo -n /usr/local/sbin/student-planner-backend-control start-queue
+   sudo -n /usr/local/sbin/student-planner-backend-control health
+   sudo -n /usr/local/sbin/student-planner-backend-control audit
+   ```
+
+   Enabling alone does not start a service. `start-queue` starts services but does
+   not enable them. If a start/check fails, keep deployment disabled, attempt
+   `stop-queue` to stop both workers and investigate; do not bypass health checks.
+5. Verify application HTTP health and scheduler state, release the lock, then
+   explicitly re-enable automatic deployment. Subsequent deployments require both
+   workers active on entry and manage both through the existing helper commands.
 
 The email job explicitly uses the configured `smtp` mailer, never `log`/log-failover.
 An authorized operator must separately provision/review working SMTP settings
@@ -168,9 +216,9 @@ overrides are refused before code mutation and need a separately reviewed plan.
 Inspect (do not log environment secrets):
 
 ```sh
-systemctl cat php8.4-fpm.service student-ai-planner-queue.service
+systemctl cat php8.4-fpm.service student-ai-planner-queue.service student-ai-planner-reminder-email.service
 systemctl cat student-ai-planner-scheduler.timer student-ai-planner-scheduler.service
-systemctl show php8.4-fpm.service student-ai-planner-queue.service -p KillSignal -p TimeoutStopUSec -p UMask
+systemctl show php8.4-fpm.service student-ai-planner-queue.service student-ai-planner-reminder-email.service -p KillSignal -p TimeoutStopUSec -p UMask
 ```
 
 Confirm the timer activates `student-ai-planner-scheduler.service`, whose
@@ -382,7 +430,7 @@ Recovery is a manual operator operation, never an automatic destructive reset:
 ## Exact deployment verification
 
 Successful logs must show the tested/deployed/checkout SHA match, three HTTP status
-checks and active FPM/queue/timer. The Actions step summary repeats success and
+checks and active FPM/default worker/email worker/timer. The Actions step summary repeats success and
 smoke results; failure/cancellation is explicitly unconfirmed. GitHub Environment
 records the deployment outcome. A historical success is not a live health monitor.
 
@@ -417,7 +465,10 @@ vendor/bin/phpunit --testsuite Unit
 Fixtures use temporary repositories and mocked SSH/PHP/Composer/services/curl.
 They cover added migrations across multiple commits, refusal of existing migration
 modification/deletion/rename, migration ordering and failure containment, exact SHA,
-concurrency and interrupted-deploy guards. PHP/Artisan (including `migrate`) is
+concurrency and interrupted-deploy guards. Real helper copies with mocked systemctl
+also verify both workers stop before migrations, start after HTTP smoke checks,
+block preflight when either is inactive, and both receive stop attempts during
+containment even if one stop fails. PHP/Artisan (including `migrate`) is
 mocked: they never connect to Lightsail or use any working database or production
 credentials.
 

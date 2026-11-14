@@ -6,8 +6,17 @@ export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 case "$1" in
     stop-fpm) /usr/bin/systemctl stop php8.4-fpm.service ;;
     start-fpm) /usr/bin/systemctl start php8.4-fpm.service ;;
-    stop-queue) /usr/bin/systemctl stop student-ai-planner-queue.service ;;
-    start-queue) /usr/bin/systemctl start student-ai-planner-queue.service ;;
+    stop-queue)
+        # Attempt both stops even if one fails, including during deploy containment.
+        result=0
+        /usr/bin/systemctl stop student-ai-planner-queue.service || result=1
+        /usr/bin/systemctl stop student-ai-planner-reminder-email.service || result=1
+        exit "$result"
+        ;;
+    start-queue)
+        /usr/bin/systemctl start student-ai-planner-queue.service
+        /usr/bin/systemctl start student-ai-planner-reminder-email.service
+        ;;
     stop-scheduler)
         /usr/bin/systemctl stop student-ai-planner-scheduler.timer
         /usr/bin/systemctl stop student-ai-planner-scheduler.service
@@ -16,6 +25,7 @@ case "$1" in
     health)
         /usr/bin/systemctl is-active --quiet php8.4-fpm.service
         /usr/bin/systemctl is-active --quiet student-ai-planner-queue.service
+        /usr/bin/systemctl is-active --quiet student-ai-planner-reminder-email.service
         /usr/bin/systemctl is-active --quiet student-ai-planner-scheduler.timer
         ;;
     audit)

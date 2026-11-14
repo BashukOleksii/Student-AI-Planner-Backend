@@ -132,6 +132,80 @@ esac''')
         self.assertNotIn('CONFIG_MUST_STAY_PRIVATE', self.output)
         return result
 
+    def use_installed_control_fixture(self):
+        # Exercise the actual helper through deploy's sudo adapter; no host services.
+        self.mock('systemctl', '''echo "systemctl $*" >> "$FIXTURE/commands"
+if [[ $* == "${SYSTEMCTL_FAIL_CALL:-}" ]]; then
+  if [[ ${SYSTEMCTL_FAIL_AFTER_MUTATION:-0} == 0 || -f app/New.php ]]; then exit 1; fi
+fi''')
+        self.mock('runuser', 'exit 0')
+        source = (ROOT / 'scripts/deploy/student-planner-backend-control').read_text()
+        source = source.replace('/usr/bin/systemctl', str(self.bin / 'systemctl'))
+        source = source.replace('/usr/sbin/runuser', str(self.bin / 'runuser'))
+        (self.base / 'control').write_text(source)
+        self.mock('sudo', '''echo "service ${*: -1}" >> "$FIXTURE/commands"
+exec /bin/bash "$FIXTURE/control" "${*: -1}"''')
+
+    def test_both_workers_stop_before_migration_and_start_after_http_with_real_helper(self):
+        self.use_installed_control_fixture()
+        self.assertEqual(0, self.deploy().returncode, self.output)
+        commands = self.log.read_text()
+        for unit in ('student-ai-planner-queue.service', 'student-ai-planner-reminder-email.service'):
+            self.assertLess(commands.index(f'systemctl stop {unit}'),
+                            commands.index('php artisan migrate --force --no-interaction'))
+            self.assertLess(commands.index('/sanctum/csrf-cookie'),
+                            commands.index(f'systemctl start {unit}'))
+            self.assertEqual(2, commands.count(f'systemctl is-active --quiet {unit}'))
+
+    def test_inactive_worker_refuses_preflight_with_real_helper(self):
+        for unit in ('student-ai-planner-queue.service', 'student-ai-planner-reminder-email.service'):
+            with self.subTest(unit=unit):
+                self.use_installed_control_fixture()
+                self.env['SYSTEMCTL_FAIL_CALL'] = f'is-active --quiet {unit}'
+                self.assertNotEqual(0, self.deploy().returncode)
+                self.assertIn('Backend services are not initially active', self.output)
+                self.assertEqual(self.old, self.git('rev-parse', 'HEAD'))
+                self.assertFalse((self.state / 'in-progress').exists())
+                self.assertNotIn('systemctl stop ', self.log.read_text())
+                self.assertNotIn('php artisan migrate', self.log.read_text())
+                self.setUpFreshFixture()
+
+    def test_migration_failure_attempts_both_worker_stops_even_if_one_fails(self):
+        for unit in ('student-ai-planner-queue.service', 'student-ai-planner-reminder-email.service'):
+            with self.subTest(unit=unit):
+                self.use_installed_control_fixture()
+                self.env['SYSTEMCTL_FAIL_CALL'] = f'stop {unit}'
+                self.env['SYSTEMCTL_FAIL_AFTER_MUTATION'] = '1'
+                self.assertNotEqual(0, self.deploy(fail='migrate').returncode)
+                self.assertIn('phase=migrations', self.output)
+                self.assertIn('queue-stop=failed', self.output)
+                commands = self.log.read_text()
+                for stopped in ('student-ai-planner-queue.service', 'student-ai-planner-reminder-email.service'):
+                    self.assertEqual(2, commands.count(f'systemctl stop {stopped}'))
+                self.assertIn('systemctl stop php8.4-fpm.service', commands)
+                self.assertIn('systemctl stop student-ai-planner-scheduler.timer', commands)
+                self.assertNotIn('systemctl start ', commands)
+                self.assertNotIn('php artisan up', commands)
+                self.assertTrue((self.state / 'in-progress').exists())
+                self.assertTrue((self.repo / 'storage/framework/down').exists())
+                self.assertFalse((self.state / 'last-successful-sha').exists())
+                self.setUpFreshFixture()
+
+    def test_worker_start_failure_stops_both_workers_with_real_helper(self):
+        for unit in ('student-ai-planner-queue.service', 'student-ai-planner-reminder-email.service'):
+            with self.subTest(unit=unit):
+                self.use_installed_control_fixture()
+                self.env['SYSTEMCTL_FAIL_CALL'] = f'start {unit}'
+                self.assertNotEqual(0, self.deploy().returncode)
+                self.assertIn('Queue start failed', self.output)
+                commands = self.log.read_text()
+                for stopped in ('student-ai-planner-queue.service', 'student-ai-planner-reminder-email.service'):
+                    self.assertEqual(2, commands.count(f'systemctl stop {stopped}'))
+                self.assertTrue((self.state / 'in-progress').exists())
+                self.assertTrue((self.repo / 'storage/framework/down').exists())
+                self.assertFalse((self.state / 'last-successful-sha').exists())
+                self.setUpFreshFixture()
+
     def test_exact_tested_sha_with_inherited_restrictive_umask(self):
         self.assertEqual(0, self.deploy().returncode, self.output)
         self.assertEqual(self.sha, self.git('rev-parse', 'HEAD'))
