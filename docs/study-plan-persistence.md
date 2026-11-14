@@ -51,6 +51,14 @@ empty strings are rejected. A non-null Subtask requires its explicit Task ID.
 Missing identifiers normalize to null. Explicit foreign, missing, deleted or
 incorrectly nested preview targets produce generic 404 responses.
 
+Manual POST preview captures a server UTC cutoff of preview creation time + five
+minutes, rounded up to a whole second, and passes it as the existing internal
+`notBeforeUtc`. This is a buffer before the earliest proposed start, not a new
+preview lifetime: the token still expires 900 seconds after issuance. No public
+field or availability setting is added. If the cutoff leaves insufficient time,
+the existing partial/empty preview contract applies without extending availability,
+the requested horizon or deadlines.
+
 Confirmation body:
 
 ```json
@@ -142,7 +150,7 @@ of server timezone. List returns `data: [...]` and `meta` containing exactly
 
 ```php
 StudyPlanPersistenceService::preview(User $user, string $startDate, string $endDate,
-    mixed $taskId = null, mixed $subtaskId = null): array;
+    mixed $taskId = null, mixed $subtaskId = null, mixed $notBeforeUtc = null): array;
 // plan, preview_token, expires_at
 
 StudyPlanPersistenceService::confirm(User $user, string $previewToken,
@@ -172,8 +180,9 @@ authenticated owner's relationship before applying `StudySessionPolicy::view()`.
 
 Use the application's Laravel authenticated Encrypter and existing `APP_KEY` /
 cipher configuration. The encrypted plaintext is JSON, not PHP serialized objects.
-It contains purpose `study-plan-confirmation`, version 1, owner ID, exactly four
-normalized request parameters, the complete Stage B result, and integer UTC
+It contains purpose `study-plan-confirmation`, version 1, owner ID, four normalized
+request parameters plus the optional server-only `not_before_utc` cutoff, the
+complete Stage B result, and integer UTC
 `issued_at` / `expires_at`. The expiry is issuance + **900 elapsed seconds**.
 The owner and planning data are never sent in plaintext inside the token.
 
@@ -191,6 +200,12 @@ root `as_of_utc`: dates, timezone, session work attribution/intervals/durations 
 list order, work allocations/reasons, exclusions, warnings and totals. Recursive
 canonicalization sorts associative keys only; scalar types and list order remain
 material. JSON object key order/presentation formatting cannot cause a mismatch.
+
+Manual confirmation reuses the exact `not_before_utc` stored in the protected
+token; it never recalculates current time + five minutes. Regeneration must match
+the reviewed sessions exactly or the entire preview is rejected. Starts that have
+already arrived remain invalid, including at the final pre-commit check. AI
+planning and adaptive replanning retain their existing cutoff behavior.
 
 Clock advancement alone is not a change when those reviewed fields remain identical
 and valid. A changed estimate, deadline, availability, preference, Lesson, reservation,
@@ -265,9 +280,10 @@ The future-start guarantee applies at the final pre-commit validation instant;
 network delivery or the wall clock can naturally advance after that instant.
 No transaction can make a future-start promise permanent. Stage A's captured clock
 still governs regeneration, and actual confirmation-time checks add protection.
-Previews whose earliest session starts immediately can become stale within a
-second. No unapproved confirmation-delay buffer is introduced into Stage B; a
-future date or future availability window leaves more time for human review.
+The manual preview's five-minute cutoff leaves review time before the earliest
+proposed start. It neither renews token expiry nor permits saving a session whose
+start has arrived. Stage B retains its existing allocation rules and optional
+server cutoff; only the manual HTTP preview supplies this buffer.
 
 ## Persistence, replay and concurrency limits
 

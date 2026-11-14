@@ -9,6 +9,7 @@ use App\Http\Requests\PreviewStudyPlanRequest;
 use App\Http\Resources\StudyPlanResource;
 use App\Services\Planning\PlanningWorkOptionsService;
 use App\Services\Planning\StudyPlanPersistenceService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 
 class StudyPlanController extends Controller
@@ -21,9 +22,10 @@ class StudyPlanController extends Controller
     public function preview(PreviewStudyPlanRequest $request, StudyPlanPersistenceService $service): StudyPlanResource
     {
         $values = $request->validated();
+        $notBeforeUtc = CarbonImmutable::now('UTC')->addMinutes(5)->ceilSecond()->getTimestamp();
 
         return new StudyPlanResource($service->preview($request->user(), $values['start_date'], $values['end_date'],
-            $values['task_id'] ?? null, $values['subtask_id'] ?? null));
+            $values['task_id'] ?? null, $values['subtask_id'] ?? null, $notBeforeUtc));
     }
 
     public function confirm(ConfirmStudyPlanRequest $request, StudyPlanPersistenceService $service): JsonResponse
