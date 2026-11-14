@@ -136,8 +136,10 @@ excess seconds. No titles, descriptions, subjects or foreign records are returne
   Credit exceeding estimate is retained, with remaining effort clamped at zero.
 - **A3 — Reservations:** only owned, correctly attributed `planned` sessions with
   `start >= captured now` and `end <= effective deadline` (when present) reduce
-  unallocated work. A start already past, including within the captured second or
-  with an end still future, is stale and contributes zero reservation. Completed
+  unallocated work. Ongoing sessions (`start <= now < end`) also retain their full
+  reservation for unfinished work, even with deadline warnings, so removing the
+  premature outcome prompt cannot make their work available for duplicate planning.
+  Ended planned sessions contribute zero reservation and require an explicit outcome. Completed
   parent/child work is not a valid reservation target. Equality with a configured
   deadline passes. There is no future lookahead cap. Missing-estimate pending units
   retain known valid reserved seconds but still cannot be selected for new planning.
@@ -184,8 +186,8 @@ is positive. Decomposed-parent reasons are `subtasks_authoritative`, followed by
 | --- | --- |
 | `ambiguous_parent_session_attribution` | Parent source cannot be assigned to authoritative children. |
 | `session_targets_deleted_subtask` | Retained deleted-child source is not current work. |
-| `stale_planned_session` | Session has already started; no reservation credit. |
-| `reservation_deadline_exceeded` | Planned end exceeds effective deadline; no reservation credit. |
+| `stale_planned_session` | Session has already started; ongoing unfinished work retains its reservation until the end. |
+| `reservation_deadline_exceeded` | Planned end exceeds effective deadline; future reservations lose credit, ongoing unfinished work retains it. |
 | `reservation_targets_completed_work` | Planned source references completed Task/child; no reservation credit. |
 | `completed_effort_exceeds_estimate` | Raw completed credit exceeds estimate. |
 | `future_reservation_exceeds_remaining_work` | Valid reservations exceed unfinished effort. |

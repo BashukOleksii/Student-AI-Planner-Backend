@@ -18,6 +18,7 @@ class UpdateProfileRequest extends FormRequest
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'email' => ['sometimes', 'required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->user())],
             'timezone' => ['sometimes', 'required', 'string', 'max:64', 'timezone'],
+            'reminder_email_enabled' => ['sometimes', 'required', 'boolean:strict'],
         ];
     }
 }

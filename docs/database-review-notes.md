@@ -9,6 +9,13 @@ below describe their original schema; current history is a directed tree.
 
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
+Current reminder email extension: additive migration
+`2026_11_14_000001_add_reminder_email_preferences_to_users` adds a non-null false
+opt-in and a zero-initialized unsigned email revision to users, preserving existing
+data and verification. No new outbox table/index/FK is needed: the existing jobs
+table uses the same transactional connection as inbox delivery. Email revisions
+invalidate old jobs even across A → B → A profile changes. See [the contract](reminder-email.md).
+
 Testing-stage compatibility fix: the new forward migration `2026_11_12_000003_expand_ai_action_type_length.php` widens action identity storage to VARCHAR(64), preserving names and constraints. MySQL reproduction showed 33/34-character registered semester names could not fit the prior column. No applied migration is rewritten. See [verification evidence](testing/backend-test-rebuild-report.md).
 
 > Current implementation update (after reference `4eb708e`): A new forward migration creates `recovery_suggestions` and `recovery_scan_states` for conversation-independent reviews. Unique pending-owner, dedupe and refresh-lineage keys plus CHECKs protect lifecycle invariants; existing applied migrations and AI action types are unchanged. Logical refresh lineage is owner checked by the service rather than a self-cascade foreign key. Protected tokens use Laravel encrypted casts; presentation excludes private fingerprints/tokens. Migration execution and MySQL concurrency remain deferred. See [ADR-012](decisions/ADR-012-automatic-learning-recovery.md).

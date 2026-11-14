@@ -12,12 +12,17 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'timezone'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable(['name', 'email', 'password', 'timezone', 'reminder_email_enabled'])]
+#[Hidden(['password', 'remember_token', 'reminder_email_version'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    protected $attributes = [
+        'reminder_email_enabled' => false,
+        'reminder_email_version' => 0,
+    ];
 
     public function recoverySuggestions(): HasMany
     {
@@ -103,6 +108,8 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'reminder_email_enabled' => 'boolean',
+            'reminder_email_version' => 'integer',
             'password' => 'hashed',
         ];
     }

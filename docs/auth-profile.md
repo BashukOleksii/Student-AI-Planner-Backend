@@ -42,7 +42,11 @@ authentication, returning standard 422 errors under `session`. This occurs when
 Sanctum does not recognize the Origin/Referer as a configured stateful frontend.
 The check avoids a server exception and partial registration. A configured Referer alone is valid.
 
-PATCH accepts any subset of `name`, `email`, and `timezone`; supplied values must
+PATCH accepts any subset of `name`, `email`, `timezone`, and the optional strict
+boolean `reminder_email_enabled` (default false). Only a verified current email
+can enable reminders; changing email also disables this option atomically.
+See the [Frontend contract and delivery guarantees](reminder-email.md).
+Other supplied values must
 be nonempty. Email is unique, ignoring only the trusted authenticated user's
 record. Timezone uses Laravel's IANA identifier validation, such as `Europe/Kyiv`
 or `UTC`; raw offsets such as `+03:00` are rejected. Unknown fields are ignored.
@@ -53,7 +57,7 @@ authentication context. There is no arbitrary-user profile route.
 Registration, login, and profile return the same standard Resource envelope:
 
 ```json
-{"data":{"id":1,"name":"Student","email":"student@example.test","email_verified":false,"timezone":"UTC"}}
+{"data":{"id":1,"name":"Student","email":"student@example.test","email_verified":false,"reminder_email_enabled":false,"timezone":"UTC"}}
 ```
 
 Password/hash, remember token, authentication metadata, and model relationships

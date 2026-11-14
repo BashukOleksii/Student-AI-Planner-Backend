@@ -27,16 +27,16 @@ class LearningRecoveryAnalysisService
     public function analyze(User $user, string $start, string $end): array
     {
         return DB::transaction(function () use ($user, $start, $end): array {
-            $source = $this->sources->capture($user, $start, $end);
+            $now = CarbonImmutable::now('UTC');
+            $source = $this->sources->capture($user, $start, $end, $now);
             $owner = $source['owner'];
-            $notBefore = CarbonImmutable::now('UTC')->getTimestamp() + self::REVIEW_LEAD_SECONDS;
-            $recovery = $this->recovery->preview($owner, $start, $end, notBeforeUtc: $notBefore);
+            $notBefore = $now->getTimestamp() + self::REVIEW_LEAD_SECONDS;
+            $recovery = $this->recovery->preview($owner, $start, $end, notBeforeUtc: $notBefore, asOfUtc: $now);
             $adaptive = $this->replanning->preview($owner, $start, $end, notBeforeUtc: $notBefore);
             $advice = $this->advice->analyze($owner, $start, $end, $notBefore);
-            $effort = $this->selection->select($owner);
-            $now = CarbonImmutable::now('UTC');
+            $effort = $this->selection->select($owner, asOfUtc: $now);
             $unknown = $source['sessions']->filter(fn ($row) => $row->status->value === 'planned'
-                && $row->getRawOriginal('starts_at') <= $now->format('Y-m-d H:i:s'));
+                && $row->getRawOriginal('ends_at') <= $now->format('Y-m-d H:i:s.u'));
             $invalid = array_filter($adaptive['session_results'], fn ($row) => $row['classification'] === 'cannot_replan');
             $excludedNeedsAttention = array_filter($advice['excluded_items'], fn ($row) => ($row['recommendation_codes'] ?? []) !== []);
             $kind = match (true) {
@@ -110,7 +110,7 @@ class LearningRecoveryAnalysisService
                 throw new RecoverySuggestionException('analysis_limit_exceeded');
             }
 
-            if (! hash_equals($source['source_hash'], $this->sources->capture($owner, $start, $end)['source_hash'])) {
+            if (! hash_equals($source['source_hash'], $this->sources->capture($owner, $start, $end, $now)['source_hash'])) {
                 throw new RecoverySuggestionException('suggestion_stale');
             }
             if ($expiry !== null && CarbonImmutable::parse($expiry) <= CarbonImmutable::now('UTC')) {

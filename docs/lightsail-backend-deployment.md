@@ -58,6 +58,51 @@ started fresh through systemd; no database-backed `queue:restart` signal is need
 The scheduler timer restarts after HTTP checks. `schedule:run` is never invoked by
 the deployment, so it does not manually dispatch production reminders.
 
+## Voluntary reminder email operator runbook
+
+The optional [reminder email channel](reminder-email.md) adds one forward User
+migration and a database queue named `reminder-email` in the existing application
+MySQL `jobs` table. It is off for every existing/new account. This task does not
+change production config, systemd units, SMTP credentials, AWS or deployed data.
+Apply the existing manual migration gate below before deploying this code;
+the ordinary code-only deploy must refuse this migration difference.
+
+The existing `student-ai-planner-scheduler.timer` / scheduler service continues
+running `php8.4 artisan schedule:run` from `/srv/student-ai-planner/backend`.
+No additional scheduled command or altered reminder trigger is needed. Read-only
+operator checks (not executed by this task):
+
+```sh
+systemctl status student-ai-planner-scheduler.timer student-ai-planner-scheduler.service
+systemctl cat student-ai-planner-queue.service
+```
+
+Mail needs a worker consuming the new named queue. Its equivalent foreground
+command, as the existing application service user with its normal private env, is:
+
+```sh
+cd /srv/student-ai-planner/backend
+php8.4 artisan queue:work reminder-email --queue=reminder-email --sleep=3 --tries=3 --timeout=60
+```
+
+Keep the existing default worker for other jobs. If its database connection is
+the same application DB/jobs table, an operator can instead review adding
+`--queue=default,reminder-email` to that worker; a separate worker avoids starvation
+behind default jobs. Inspect the actual unit first. Any persistent service change
+requires a separate operator change; no unit is installed/edited here. Preserve
+`timeout=60 < retry_after=90`, SIGTERM draining and the existing stop timeout.
+Long-running workers must restart on deployment through the existing procedure.
+
+The email job explicitly uses the configured `smtp` mailer, never `log`/log-failover.
+An authorized operator must separately provision/review working SMTP settings
+and sender permissions before offering email delivery; do not test real mail or
+print credentials in deployment output. SMTP timeout remains 15 seconds. The
+Scheduler's `sent` counter measures inbox delivery, not mail success. Inspect
+pending/failed jobs without printing payloads or exception transport details;
+review uncertain SMTP outcomes before retrying, since an accepted message can
+be duplicated. Production migration, Scheduler/worker health and SMTP delivery
+were not verified in this task.
+
 ## GitHub setup (manual, after review)
 
 Create Environment **production**, restrict deployment branches to `main`, and

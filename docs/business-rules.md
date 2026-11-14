@@ -460,7 +460,11 @@ deliver after its start without inferring missed/completed state. Each corrupt
 candidate rolls back and is counted independently; the bounded batch continues.
 GET is read-only; owned marking-as-read is idempotent and preserves immutable
 payload and sent history. Existing retirement never clones reminders/notifications.
-Email/push and external retry channels remain future work. Administrative hard
+Optional [email delivery](reminder-email.md) now persists one encrypted database
+job atomically with inbox delivery for an opted-in verified recipient. Each mail
+attempt rechecks the current address/revision, verification and opt-in; SMTP
+failure never alters inbox or sent history. External exactly-once delivery is not
+guaranteed. Push remains future work. Administrative hard
 purge must reconcile scheduled dependents before SET NULL and separately account
 for polymorphic inbox ownership; no speculative endpoint/hook is introduced.
 See [the F1/F2/F3a contract and actual verification](reminders.md).

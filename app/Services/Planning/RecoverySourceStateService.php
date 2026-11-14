@@ -16,8 +16,9 @@ class RecoverySourceStateService
 {
     public function __construct(private PlanningContextService $context) {}
 
-    public function capture(User $user, string $start, string $end): array
+    public function capture(User $user, string $start, string $end, ?CarbonImmutable $asOfUtc = null): array
     {
+        $now = ($asOfUtc ?? CarbonImmutable::now('UTC'))->utc();
         $this->context->validateDates($start, $end);
         $owner = User::findOrFail($user->id);
         // Never truncate planning inputs: fail explicitly before invoking services that need complete history.
@@ -54,7 +55,6 @@ class RecoverySourceStateService
         foreach (['break_anchors', 'workload_sessions'] as $key) {
             usort($context[$key], fn ($a, $b) => [$a['start'], $a['end']] <=> [$b['start'], $b['end']]);
         }
-        $now = CarbonImmutable::now('UTC');
         // Source state changes on a session start/end boundary, not on every ticking second.
         $states = $sessions->filter(fn ($session) => $session->status->value === 'planned')->values()->map(fn ($session) => ['id' => $session->id,
             'started' => $session->getRawOriginal('starts_at') <= $now->format('Y-m-d H:i:s'),
@@ -77,7 +77,8 @@ class RecoverySourceStateService
             'deadline_elapsed' => $row->getRawOriginal('deadline_at') === null ? null
                 : $row->getRawOriginal('deadline_at') <= $now->format('Y-m-d H:i:s')])->all();
         $attributes = fn ($rows) => $rows->map->getRawOriginal()->all();
-        $hash = $this->hash(['recovery_policy_version' => 2, 'review_lead_seconds' => LearningRecoveryAnalysisService::REVIEW_LEAD_SECONDS, 'owner_id' => $owner->id, 'timezone' => $owner->timezone, 'start_date' => $start, 'end_date' => $end,
+        // Invalidate pending reviews created under the former session-start outcome rule.
+        $hash = $this->hash(['recovery_policy_version' => 3, 'review_lead_seconds' => LearningRecoveryAnalysisService::REVIEW_LEAD_SECONDS, 'owner_id' => $owner->id, 'timezone' => $owner->timezone, 'start_date' => $start, 'end_date' => $end,
             'tasks' => $attributes($tasks), 'subtasks' => $attributes($children), 'sessions' => $attributes($sessions),
             'scheduled_reminders' => $attributes($reminders), 'time_states' => $states,
             'task_deadline_states' => $deadlines($tasks), 'subtask_deadline_states' => $deadlines($children), 'context' => $context]);

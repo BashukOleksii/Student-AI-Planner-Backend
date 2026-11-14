@@ -44,6 +44,17 @@ return [
             'after_commit' => false,
         ],
 
+        // Always the domain's default DB connection, regardless of DB_QUEUE_CONNECTION.
+        // Inbox, sent status and mail intent commit together in the existing jobs table.
+        'reminder-email' => [
+            'driver' => 'database',
+            'connection' => null,
+            'table' => 'jobs',
+            'queue' => 'reminder-email',
+            'retry_after' => 90,
+            'after_commit' => false,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

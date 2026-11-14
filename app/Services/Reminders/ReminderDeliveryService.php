@@ -20,6 +20,7 @@ class ReminderDeliveryService
         private ReminderRules $rules,
         private ReminderDeliveryRules $delivery,
         private ReminderTargetService $targets,
+        private ReminderEmailService $email,
     ) {}
 
     public function dispatchDue(int $limit = 100): array
@@ -106,6 +107,7 @@ class ReminderDeliveryService
         if (! $notification->exists || ! $reminder->update(['status' => ReminderStatus::Sent, 'sent_at' => $timestamp])) {
             throw new ReminderIntegrityException;
         }
+        $this->email->enqueue($owner, $notification);
 
         return ['status' => 'sent'];
     }

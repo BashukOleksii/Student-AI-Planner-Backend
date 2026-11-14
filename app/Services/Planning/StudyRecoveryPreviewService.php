@@ -18,14 +18,14 @@ class StudyRecoveryPreviewService
         private TimeIntervalService $intervals,
     ) {}
 
-    public function preview(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null, mixed $notBeforeUtc = null): array
+    public function preview(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null, mixed $notBeforeUtc = null, ?CarbonImmutable $asOfUtc = null): array
     {
         // One nonlocking MySQL snapshot covers the authoritative proposal and its diagnostics.
-        return DB::transaction(function () use ($user, $startDate, $endDate, $taskId, $subtaskId, $notBeforeUtc): array {
+        return DB::transaction(function () use ($user, $startDate, $endDate, $taskId, $subtaskId, $notBeforeUtc, $asOfUtc): array {
             $preview = $notBeforeUtc === null ? $this->plans->preview($user, $startDate, $endDate, $taskId, $subtaskId)
                 : $this->plans->preview($user, $startDate, $endDate, $taskId, $subtaskId, $notBeforeUtc);
             $plan = $preview['plan'];
-            $now = CarbonImmutable::parse($plan['as_of_utc']);
+            $now = $asOfUtc?->utc() ?? CarbonImmutable::parse($plan['as_of_utc'])->utc();
             $units = [];
             foreach ([...$plan['work_results'], ...$plan['excluded_items']] as $item) {
                 $units[$item['task_id'].':'.($item['subtask_id'] ?? 'task')] = $item['reason_codes'];
@@ -36,7 +36,7 @@ class StudyRecoveryPreviewService
                 ->when($subtaskId !== null, fn ($query) => $query->where('subtask_id', $subtaskId))
                 ->where(fn ($query) => $query->where('status', StudySessionStatus::Missed)
                     ->orWhere(fn ($planned) => $planned->where('status', StudySessionStatus::Planned)
-                        ->where('starts_at', '<', $now->format('Y-m-d H:i:s.u'))))
+                        ->where('ends_at', '<=', $now->format('Y-m-d H:i:s.u'))))
                 ->orderBy('starts_at')->orderBy('id')
                 ->get(['id', 'task_id', 'subtask_id', 'status', 'starts_at', 'ends_at']);
             $this->context->validateSessionReferences($user, $sessions);

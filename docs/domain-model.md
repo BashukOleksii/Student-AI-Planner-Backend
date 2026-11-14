@@ -223,6 +223,11 @@ A user-owned instruction to notify the user at a specific instant. It has at mos
 **Reminder Delivery**  
 Delivery status belongs to the reminder lifecycle in V1. Separate delivery-attempt history is deferred until a concrete audit requirement justifies it.
 
+The optional [email channel](reminder-email.md) reuses the database queue for a
+durable secondary delivery intent. Its retries do not alter the inbox-based
+Reminder status. User opt-in and an internal email revision bind queued mail to
+the verified address that was current when inbox delivery committed.
+
 ### Progress & Reporting
 
 **Progress Metrics**  

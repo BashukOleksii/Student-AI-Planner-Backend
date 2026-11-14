@@ -14,12 +14,14 @@ Kinds:
 
 | Kind | Meaning | Can confirm? |
 |---|---|---|
-| `decision_required` | A planned session has started without an explicit outcome; includes elapsed sessions. | No. Use existing session lifecycle endpoints, then obtain a fresh review. |
+| `decision_required` | A planned session has ended without an explicit outcome (`ends_at <=` the captured UTC analysis clock). | No. Use existing session lifecycle endpoints, then obtain a fresh review. |
 | `replan` | Existing future sessions require deterministic adaptive replanning. | Yes, with required consents. |
 | `create_plan` | Known remaining work can receive additional planned allocation. | Yes, with partial-allocation consent when required. |
 | `warning` | Missing estimates, insufficient capacity, manual-review sessions or persisted overload require attention without a safe automatic write. | No. Resolve inputs or use existing scoped workflows. |
 
-Unknown outcomes take precedence over writes. This conservatively pauses automatic allocation for the owner while any captured planned session has started. It does not mark the session missed, fabricate actual minutes, complete a Task/Subtask, or cancel an existing session. A session that is in progress may not yet allow the `miss` transition. `review.recovery` reports allowed lifecycle actions for selected work; existing lifecycle endpoints remain authoritative.
+Unknown ended-session outcomes take precedence over writes. The result-request list, `session_outcome_unknown`, `decision_required` and past-planned count use `planned` plus `ends_at <=` one captured UTC clock per review; neither session start nor task deadline requests an outcome. An ongoing session still blocks its occupied interval and reserves its work against duplicate planning; it cannot be automatically relocated, cancelled or marked missed. Existing manual lifecycle rules remain authoritative. `review.recovery` reports allowed lifecycle actions for selected work.
+
+Recovery source policy version 3 invalidates pending reviews built under the former session-start rule, including already saved cards for ongoing sessions. GET list/detail and attention counts use the existing effective-staleness check; GET does not rewrite history. The next detection persists invalidation and recalculates the need; explicit refresh uses the existing new-review/no-recovery-needed flow. Historical review payloads and applied receipts remain unchanged. This conservatively invalidates other pending reviews from the previous policy too; no data migration is needed.
 
 `pending` becomes `applied`, `rejected`, `expired` or `invalidated`. Applied rows contain an immutable receipt. Terminal rows cannot execute again; duplicate confirmation of an applied row returns that same receipt with `replayed: true`. GETs annotate current expiry/staleness without writing metadata. The scheduler or explicit decisions persist lifecycle resolution. Never assume that opening a review, creating a diagnostic, refreshing a review, or saying “yes” in chat applies it.
 
@@ -103,6 +105,32 @@ Vue must:
 6. Handle advisory/limited/stale/expired states, absence of a new review for an unchanged rejected need, and explicit refresh. Use existing manual task-scoped workflows for accounts outside automatic limits.
 
 No frontend source or production infrastructure is changed. Existing academic lesson editing identities, import suppression, frozen semester exceptions, self-study/calendar separation and legacy routes remain unchanged.
+
+## Session-outcome correction: manual acceptance, 2026-11-14
+
+Manually exercised real application Services and persistence on a separately
+initialized MySQL 8.4.10 (`planner_recovery_outcome_acceptance`, private temporary
+socket/datadir), with PHP 8.5.11 and a process-local frozen Carbon clock. The
+12:31–14:11 example uses `Europe/Kyiv`, stored as 10:31–12:11 UTC on this date.
+No browser, automated test runner, Scheduler, queue worker or external service
+was used in this acceptance; no working database was migrated.
+
+| Manual scenario | Observed result |
+| --- | --- |
+| 13:00 local | Unknown list empty, outcome reason absent, both automatic/manual past-planned counts 0, lifecycle decision false. An unrelated `warning` can remain. |
+| Ongoing occupancy/effort | Original interval remains blocking; no free overlap with 13:00–14:11; full 6,000 seconds reserved, zero unallocated seconds and no duplicate proposed sessions. |
+| Deadline before the session end, including already expired | No outcome request; ongoing unfinished work stays reserved. |
+| 14:10:59.999999 | No outcome request; stored status still `planned`. |
+| Exactly 14:11:00 and next detection at 14:11:01 | `decision_required`, unknown list/count 1, `session_outcome_unknown`; stored status remains `planned`, actual minutes null. |
+| Explicit completion at 14:12, reported 100 minutes | Status `completed`; unknown list and both past-planned counts 0, outcome reason absent, attention decision count 0. Other warning kinds are independent. |
+| Legacy ongoing-session card | Created using the original HEAD versions of the four Services loaded from a temporary directory, without replacing working files. Current list/detail annotate it `invalidated` while GET leaves persisted history untouched; attention decision count 0. Confirmation rejects `suggestion_stale`; detection persists invalidation; refresh creates a new review without an outcome request. Original review payload hash unchanged. |
+| Historical applied decision | Show remains `applied`; duplicate confirmation returns `replayed=true` and the same receipt hash. |
+| Existing ongoing lifecycle guards | Miss/cancel refused by existing Services; reschedule permission refused by existing rules; session remained planned. |
+
+`php -l` passed for all four changed PHP Services; `git diff --check` passed.
+Automated tests were not added, edited or run. Browser rendering and concurrent
+requests were not verified. Unrelated pre-existing reminder-email changes were
+preserved byte-for-byte. This correction adds no migration or API fields.
 
 ## Deferred verification
 

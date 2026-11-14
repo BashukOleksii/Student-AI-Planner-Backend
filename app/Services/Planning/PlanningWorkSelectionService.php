@@ -149,7 +149,10 @@ class PlanningWorkSelectionService
 
                 continue;
             }
-            if (! $invalid) {
+            // Ongoing work stays reserved even though past-start/deadline warnings remain diagnostic.
+            $ongoing = $start <= $now && $end > $now && $task->status->isUnfinished()
+                && ($child === null || $child->status !== TaskStatus::Completed);
+            if (! $invalid || $ongoing) {
                 $reserved[$key][] = ['scheduled_seconds' => $duration];
             }
         }

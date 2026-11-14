@@ -4,6 +4,11 @@
 
 # Backend Architecture
 
+Current reminder email extension: opt-in verified recipients use an encrypted
+database job inserted on the same connection and in the same transaction as the
+inbox notification. SMTP runs only in a separate worker; `sent` still means inbox
+delivery. See [contract and operational limits](reminder-email.md).
+
 > Current implementation update (after reference `4eb708e`): Automatic learning recovery now uses a bounded scheduled detector and durable owner-scoped reviews. Only explicit authenticated confirmation delegates to existing deterministic planning/replanning writers. See [ADR-012](decisions/ADR-012-automatic-learning-recovery.md) and [API contract](automatic-learning-recovery.md). No automatic session relocation or inferred missed status is introduced.
 
 Unified academic-calendar REST reads now share the authoritative effective calendar with AI and planning. Confirmed semester AI actions reuse management projection validation and the existing pending-action/receipt workflow. Earlier stage summaries below describe their historical scope; see [the current contract](unified-academic-calendar.md) and [ADR-011](decisions/ADR-011-unified-calendar-and-ai-semester-actions.md).

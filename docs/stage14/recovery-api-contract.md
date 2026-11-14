@@ -119,7 +119,7 @@ The token value is an opaque placeholder; use the real returned value verbatim.
 | `history_scope` | literal string `selected_work_all_dates`. |
 | `summary.eligible_work_count` | integer ≥ 0; number of authoritative eligible planning units, including units that cannot fit. |
 | `summary.missed_session_count` | integer ≥ 0; count of returned explicitly missed records, not a count of remaining units. |
-| `summary.past_planned_session_count` | integer ≥ 0; count of returned planned records whose start is before the captured full-precision clock. |
+| `summary.past_planned_session_count` | integer ≥ 0; count of returned planned records whose end is at or before the captured full-precision UTC clock. |
 | `summary.requires_lifecycle_decision` | boolean; at least one such past planned record exists. |
 | `summary.actionable` | boolean; at least one new session is proposed. It does not mean a partial plan is fully allocated. |
 | `missed_sessions`, `past_planned_sessions` | arrays of diagnostic records, ordered by original `starts_at`, then numeric ID ascending. |
@@ -142,17 +142,19 @@ Subtasks are authoritative.
 
 History is for the selected active Tasks across **all dates**, independently of
 the new allocation horizon. Thus a missed session last week remains visible when
-requesting next week's recovery. Only `missed` or past-start `planned` records are
+requesting next week's recovery. Only `missed` or ended `planned` records are
 returned; completed/cancelled/rescheduled records are not recovery sources. Parent
 history under a Task now using Subtasks is diagnostic, not redistributed effort.
 Owned deleted-Subtask history under a selected active Task can be reported with
 `deleted_subtask`; deleted Tasks are not current selected work. Explicit Subtask
 scope filters sibling/parent session history.
 
-`past_planned_sessions` is separate from explicitly missed history. Started but
-not yet ended sessions are included. An ended planned session reports
-`allowed_lifecycle_actions: ["complete", "miss"]`; a currently in-progress
-planned session reports `["complete"]`. These are time/status hints, not an
+`past_planned_sessions` is separate from explicitly missed history. It requires
+`status=planned` and `ends_at <=` the captured UTC clock. Started but not yet
+ended sessions are excluded from this list and its count; their time stays
+occupied and their work remains reserved against duplicate planning. Neither
+`starts_at` nor a task deadline requests an outcome. An ended planned session
+reports `allowed_lifecycle_actions: ["complete", "miss"]`. These are time/status hints, not an
 authorization token or guarantee of later success. Existing lifecycle endpoints
 still validate ownership, history, reminders and the current clock.
 
@@ -176,10 +178,11 @@ rejects changed material outcomes instead of silently saving a different plan.
 | Multiple missed sessions for one unit | Multiple historical diagnostics, but one allocation budget for that unit. |
 | Other completed sessions satisfy the estimate | No new allocation; `completed_effort_satisfies_estimate`. |
 | Valid future reservations cover the remainder | No new allocation; `fully_reserved`, including reservations outside the requested horizon. |
+| Ongoing planned session | No outcome request yet; its full duration still reserves unfinished work, including when deadline warnings exist. |
 | Missing estimate | `missing_estimate`; no invented remaining duration. Persisted estimates are positive or null; zero remaining work is an effort result. |
 | Completed parent/child | Existing `completed_task`, `parent_task_completed` or `completed_subtask` exclusions. |
 | Decomposed parent | `subtasks_authoritative`; no duplicate parent allocation. |
-| Past planned session | Diagnostic and `stale_planned_session`; no completed credit or new-effort reservation is inferred. Existing occupied intervals/workload remain in C9 context. |
+| Ended planned session | Outcome diagnostic and `stale_planned_session`; no completed credit or new-effort reservation is inferred. Existing occupied intervals/workload remain in C9 context. |
 | Deadline already expired | `deadline_expired`; no automatic deadline extension or overdue placement. |
 | Deadline leaves too little usable time | Partial/empty result with existing allocator reasons such as `deadline_capacity_exhausted`. |
 | Availability/break/daily/weekly limits prevent fitting | Exact unscheduled seconds and existing constraint/exhaustion codes; no invented capacity. |

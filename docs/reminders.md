@@ -1,5 +1,9 @@
 # Stages F1/F2/F3a — Reminders and In-App Notifications
 
+Current extension: [voluntary email reminders](reminder-email.md) add a second
+channel using a same-transaction database job. Inbox delivery and `sent` semantics
+remain authoritative; the historical stage descriptions below predate that channel.
+
 H3b adds confirmed AI Reminder create/update/cancel proposals and list_reminders.
 Absolute/relative rules, target eligibility, future clocks, sent/cancelled history,
 synchronization and delivery remain authoritative. Public ReminderService writes
