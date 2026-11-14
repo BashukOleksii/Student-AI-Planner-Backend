@@ -17,6 +17,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\WeeklyLessonRule;
 use App\Observers\PlanningSourceObserver;
+use App\Observers\StudySessionReminderObserver;
 use App\Policies\DatabaseNotificationPolicy;
 use App\Services\AI\AgentLimits;
 use App\Services\AI\GeminiGenerateContentProvider;
@@ -56,6 +57,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        StudySession::observe(StudySessionReminderObserver::class);
         foreach ([StudyAvailabilityWindow::class, PlanningPreference::class,
             SemesterSchedule::class, WeeklyLessonRule::class,
             ScheduleDateException::class, ScheduleDateExceptionLesson::class,

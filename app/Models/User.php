@@ -12,7 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'timezone', 'reminder_email_enabled'])]
+#[Fillable(['name', 'email', 'password', 'timezone', 'reminder_email_enabled',
+    'session_reminder_in_app_enabled', 'session_reminder_email_enabled', 'session_reminder_lead_minutes'])]
 #[Hidden(['password', 'remember_token', 'reminder_email_version'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -22,6 +23,9 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $attributes = [
         'reminder_email_enabled' => false,
         'reminder_email_version' => 0,
+        'session_reminder_in_app_enabled' => false,
+        'session_reminder_email_enabled' => false,
+        'session_reminder_lead_minutes' => 10,
     ];
 
     public function recoverySuggestions(): HasMany
@@ -110,6 +114,9 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'reminder_email_enabled' => 'boolean',
             'reminder_email_version' => 'integer',
+            'session_reminder_in_app_enabled' => 'boolean',
+            'session_reminder_email_enabled' => 'boolean',
+            'session_reminder_lead_minutes' => 'integer',
             'password' => 'hashed',
         ];
     }

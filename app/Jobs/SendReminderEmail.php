@@ -17,6 +17,9 @@ class SendReminderEmail implements ShouldBeEncrypted, ShouldQueue
 
     public int $timeout = 60;
 
+    // Explicit default also keeps serialized jobs from before this extension readable.
+    public ?int $automaticReminderId = null;
+
     public function __construct(public int $ownerId, public string $notificationId, public string $recipientFingerprint) {}
 
     public function backoff(): array
@@ -27,7 +30,11 @@ class SendReminderEmail implements ShouldBeEncrypted, ShouldQueue
     public function handle(ReminderEmailService $service): void
     {
         try {
-            $service->send($this->ownerId, $this->notificationId, $this->recipientFingerprint);
+            if ($this->automaticReminderId !== null) {
+                $service->sendAutomatic($this->ownerId, $this->automaticReminderId, $this->recipientFingerprint);
+            } else {
+                $service->send($this->ownerId, $this->notificationId, $this->recipientFingerprint);
+            }
 
             return;
         } catch (Throwable) {

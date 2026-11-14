@@ -8,7 +8,7 @@ use Illuminate\Mail\Mailables\Envelope;
 
 class StudyReminderMail extends Mailable
 {
-    public function __construct(#[\SensitiveParameter] private string $reminderMessage) {}
+    public function __construct(#[\SensitiveParameter] private string $reminderMessage, private bool $inboxAvailable = true) {}
 
     public function envelope(): Envelope
     {
@@ -18,6 +18,6 @@ class StudyReminderMail extends Mailable
     public function content(): Content
     {
         return new Content(view: 'mail.study-reminder', text: 'mail.study-reminder-text',
-            with: ['reminderMessage' => $this->reminderMessage]);
+            with: ['reminderMessage' => $this->reminderMessage, 'inboxAvailable' => $this->inboxAvailable]);
     }
 }

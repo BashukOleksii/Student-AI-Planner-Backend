@@ -9,6 +9,11 @@ below describe their original schema; current history is a directed tree.
 
 # Earlier Database Draft — Review Notes and Stage 02 Resolutions
 
+Current automatic-session extension: `2026_11_14_000002_create_automatic_session_reminders`
+adds false/false/10 profile settings and a separate intent table with session/channel
+uniqueness, ownership FKs and due index. Existing sessions/manual reminders/inbox
+are preserved without backfill. See [schema and delivery rationale](automatic-session-reminders.md).
+
 Current reminder email extension: additive migration
 `2026_11_14_000001_add_reminder_email_preferences_to_users` adds a non-null false
 opt-in and a zero-initialized unsigned email revision to users, preserving existing

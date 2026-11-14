@@ -15,6 +15,9 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'email_verified' => $this->hasVerifiedEmail(),
             'reminder_email_enabled' => $this->reminder_email_enabled,
+            'session_reminder_in_app_enabled' => $this->session_reminder_in_app_enabled,
+            'session_reminder_email_enabled' => $this->session_reminder_email_enabled,
+            'session_reminder_lead_minutes' => $this->session_reminder_lead_minutes,
             'timezone' => $this->timezone,
         ];
     }

@@ -206,6 +206,11 @@ A smaller ordered step belonging to exactly one task and inheriting its ownershi
 **Study Session**  
 A concrete reserved time block with a required task and optional subtask belonging to that same task. It retains scheduled timing, optional completion timing, and actual minutes separately. Rescheduling creates a new session linked to its predecessor; history uses lifecycle states rather than soft deletes.
 
+**Automatic Session Reminder**
+Optional [automatic session reminders](automatic-session-reminders.md) keep one
+delivery intent per session/channel, separately from manual Reminders. Their
+lead/trigger is captured at session creation; settings never backfill old sessions.
+
 **Free Time Slot**  
 A calculated result, not persisted in V1. It is produced by subtracting blocking events and constraints from the user's allowed study windows.
 

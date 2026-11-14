@@ -398,6 +398,12 @@ Rescheduling creates a new session referencing its predecessor through `reschedu
 
 ## 10. Reminder rules
 
+Optional [automatic pre-session reminders](automatic-session-reminders.md) are
+separate from the manual Reminder rules below: create only future triggers for
+new eligible sessions; deliver only before start; independently opt in each channel;
+require verified current email plus general email consent; never backfill or revive
+cancelled intents. Terminal/replaced sessions cannot receive automatic delivery.
+
 **BR-REM-001 — Reminder ownership**  
 Every reminder belongs to one user.
 

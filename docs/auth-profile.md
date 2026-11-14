@@ -46,6 +46,10 @@ PATCH accepts any subset of `name`, `email`, `timezone`, and the optional strict
 boolean `reminder_email_enabled` (default false). Only a verified current email
 can enable reminders; changing email also disables this option atomically.
 See the [Frontend contract and delivery guarantees](reminder-email.md).
+Automatic sessions additionally accept strict booleans `session_reminder_in_app_enabled`
+and `session_reminder_email_enabled` (both default false), and strict integer
+`session_reminder_lead_minutes` (1–65535, default 10). These fields also appear
+in UserResource. See [automatic session settings and lifecycle](automatic-session-reminders.md).
 Other supplied values must
 be nonempty. Email is unique, ignoring only the trusted authenticated user's
 record. Timezone uses Laravel's IANA identifier validation, such as `Europe/Kyiv`
@@ -57,7 +61,7 @@ authentication context. There is no arbitrary-user profile route.
 Registration, login, and profile return the same standard Resource envelope:
 
 ```json
-{"data":{"id":1,"name":"Student","email":"student@example.test","email_verified":false,"reminder_email_enabled":false,"timezone":"UTC"}}
+{"data":{"id":1,"name":"Student","email":"student@example.test","email_verified":false,"reminder_email_enabled":false,"session_reminder_in_app_enabled":false,"session_reminder_email_enabled":false,"session_reminder_lead_minutes":10,"timezone":"UTC"}}
 ```
 
 Password/hash, remember token, authentication metadata, and model relationships

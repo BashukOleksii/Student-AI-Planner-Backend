@@ -4,6 +4,11 @@
 
 # Backend Architecture
 
+Automatic pre-session reminders use a synchronous StudySession creation observer
+and a shared Service across all current Eloquent writers, with separate per-channel
+delivery intents. Manual reminders and recovery rules retain their own lifecycle.
+See [automatic session reminders](automatic-session-reminders.md).
+
 Current reminder email extension: opt-in verified recipients use an encrypted
 database job inserted on the same connection and in the same transaction as the
 inbox notification. SMTP runs only in a separate worker; `sent` still means inbox
