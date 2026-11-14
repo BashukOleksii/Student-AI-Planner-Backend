@@ -17,7 +17,7 @@ class PlanningAttentionStatusService
         return DB::transaction(function () use ($owner): array {
             $state = DB::table('recovery_scan_states')->where('user_id', $owner->id)->first();
             $counts = ['decision_required' => 0, 'replan' => 0, 'warning' => 0, 'create_plan' => 0];
-            $pending = $owner->recoverySuggestions()->where('status', 'pending')->get([
+            $pending = $owner->recoverySuggestions()->where('active_owner_id', $owner->id)->where('status', 'pending')->get([
                 'id', 'user_id', 'status', 'kind', 'source_hash', 'start_date', 'end_date', 'expires_at',
             ]);
             $lastSuccess = $state?->last_successful_at;
@@ -43,9 +43,10 @@ class PlanningAttentionStatusService
                                 $unverified--;
                             }
                         }
-                        if ($unverified > 0) {
-                            $check = 'pending';
-                        }
+                        // A finished check with an expired/stale review needs an explicit
+                        // refresh, not an imaginary running analysis. annotate is also
+                        // the freshness definition used by the pending listing.
+                        $refreshRequired = $unverified > 0;
                     } else {
                         $start = CarbonImmutable::now($owner->timezone)->startOfDay();
                         $current = $this->sources->capture($owner, $start->toDateString(), $start->addDays(6)->toDateString());

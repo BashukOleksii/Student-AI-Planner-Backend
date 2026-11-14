@@ -247,3 +247,24 @@ Frontend: api/client.ts, api/planningAttention.ts, utils/planningMutation.ts,
 stores/planningAttention.ts, PlanningAttentionIndicator.vue, AppLayout.vue,
 PlanningView.vue, RecoverySuggestionsView.vue, styles/planning.css;
 planning-attention.test.ts, спільний f2Backend mock та page-content assertion.
+
+## Актуальні та історичні огляди (2026-11-14)
+
+`status=pending` перевіряє `annotate` до SQL-пагінації та total: протермінований
+або неактуальний огляд не займає сторінку. Кандидати беруться через
+`active_owner_id` + `status=pending`; unique active-owner і CHECK обмежують
+вибірку одним записом. `annotate` — те саме визначення актуальності, що й для
+attention-status та прямого GET. Для `all` лишається пагінація історії.
+
+GET не запускає analysis, не створює оглядів і не записує обчислений статус;
+receipt, protected token та збережений статус не переписуються читанням. Тому
+owner-first locks детектора й confirm залишаються без змін. Confirm усе ще
+перевіряє строк/джерело під owner lock і може термінально resolve старий запис.
+
+Завершена перевірка з протермінованим/застарілим активним записом має
+`review_refresh_required=true`, а не уявний pending job. Dirty/running/failed
+scan-state зберігає свою семантику. Для явного refresh із kind=null збережено
+409 `no_recovery_needed`; у тій самій owner-locked транзакції успіх аналізу
+записується штатним recordScan(no_need). Він очищає попередній queued token і
+узгоджує checked_version, як detect: старі доставки no-op, новий writer знову
+позначить стан dirty. Нових правил allocation/lifecycle/consent немає.

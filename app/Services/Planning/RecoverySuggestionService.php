@@ -124,13 +124,19 @@ class RecoverySuggestionService
         return DB::transaction(function () use ($owner, $filters) {
             $query = $owner->recoverySuggestions()->orderByDesc('created_at')->orderByDesc('id');
             $status = $filters['status'] ?? 'pending';
-            if ($status !== 'all') {
+            $currentPending = null;
+            if ($status === 'pending') {
+                // The unique active_owner_id + CHECK constraint bounds this set to one.
+                // Evaluate freshness before pagination/counting; history is never scanned.
+                $currentPending = $owner->recoverySuggestions()->where('active_owner_id', $owner->id)->where('status', 'pending')->get()
+                    ->map(fn ($row) => $this->annotate($owner, $row))
+                    ->filter(fn ($row) => $row->currentStatus === 'pending')->keyBy('id');
+                $query->whereIn('id', $currentPending->keys());
+            } elseif ($status !== 'all') {
                 $query->where('status', $status);
             }
             $page = $query->paginate($filters['per_page'] ?? 10, ['*'], 'page', $filters['page'] ?? 1);
-            foreach ($page->items() as $suggestion) {
-                $this->annotate($owner, $suggestion);
-            }
+            $page->setCollection($page->getCollection()->map(fn ($row) => $currentPending !== null ? $currentPending->get($row->id) : $this->annotate($owner, $row)));
 
             return $page;
         });
@@ -268,6 +274,9 @@ class RecoverySuggestionService
             $result = $this->analysis->analyze($owner, $start, $end);
             $this->invalidateActive($owner);
             if ($result['kind'] === null) {
+                // Explicit analysis completed under the owner lock, just like the detector.
+                $this->recordScan($owner, $result['source_hash'], 'no_need');
+
                 return ['error' => 'no_recovery_needed'];
             }
 
