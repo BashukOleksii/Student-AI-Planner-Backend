@@ -36,7 +36,11 @@ optional `timezone`. Password validation uses Laravel's default Password rule
 (minimum eight characters) and confirmation; the existing hashed model cast
 stores it. Omitted timezone uses the existing database default `UTC`.
 Login accepts `email` and `password`. Invalid credentials return the same standard
-422 validation error for unknown email and incorrect password. Registration/login
+422 validation error for unknown email and incorrect password. Only this refusal
+includes the stable top-level `code: "invalid_credentials"`; existing `message`
+and `errors.email` remain unchanged for compatibility. Other validation errors
+do not carry this code. Clients must use the code rather than status or translated
+text to identify invalid credentials. Registration/login
 reject requests without an attached SPA session before account creation or
 authentication, returning standard 422 errors under `session`. This occurs when
 Sanctum does not recognize the Origin/Referer as a configured stateful frontend.

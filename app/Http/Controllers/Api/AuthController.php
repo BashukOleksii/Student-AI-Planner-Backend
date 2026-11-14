@@ -30,9 +30,16 @@ class AuthController extends Controller
     public function login(LoginRequest $request): UserResource
     {
         if (! Auth::guard('web')->attempt($request->validated())) {
-            throw ValidationException::withMessages([
+            $exception = ValidationException::withMessages([
                 'email' => [__('auth.failed')],
             ]);
+            $exception->response = response()->json([
+                'message' => $exception->getMessage(),
+                'errors' => $exception->errors(),
+                'code' => 'invalid_credentials',
+            ], $exception->status);
+
+            throw $exception;
         }
 
         $request->session()->regenerate();
