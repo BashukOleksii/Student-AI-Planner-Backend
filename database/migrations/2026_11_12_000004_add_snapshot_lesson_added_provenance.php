@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -16,7 +17,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        if (\Illuminate\Support\Facades\DB::table('schedule_date_exception_lessons')->whereNotNull('is_added')->exists()) {
+        if (DB::table('schedule_date_exception_lessons')->whereNotNull('is_added')->exists()) {
             throw new RuntimeException('Cannot discard saved snapshot lesson provenance.');
         }
         Schema::table('schedule_date_exception_lessons', function (Blueprint $table): void {
