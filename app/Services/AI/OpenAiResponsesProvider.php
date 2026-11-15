@@ -4,6 +4,7 @@ namespace App\Services\AI;
 
 use App\Exceptions\AiAgentException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use JsonException;
@@ -43,7 +44,7 @@ class OpenAiResponsesProvider implements LlmProvider
             'max_output_tokens' => $this->limits->get('max_output_tokens')];
         $this->limits->json($body);
         try {
-            /** @var \Illuminate\Http\Client\Response $response */
+            /** @var Response $response */
             $response = Http::withToken($key)->acceptJson()->asJson()->connectTimeout(min(10, $this->limits->get('request_timeout')))
                 ->timeout($this->limits->get('request_timeout'))->withOptions(['allow_redirects' => false])
                 ->post('https://api.openai.com/v1/responses', $body);

@@ -6,8 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\TestCase;
 
-/** @mixin \Tests\TestCase */
+/** @mixin TestCase */
 trait AssertsMysqlPersistence
 {
     private function assertTableDefinition(string $table, array $expected, bool $autoIncrement = true): void

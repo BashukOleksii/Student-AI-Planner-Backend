@@ -6,6 +6,7 @@ use App\Exceptions\AiAgentException;
 use Carbon\CarbonImmutable;
 use GuzzleHttp\Exception\TransferException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -53,7 +54,7 @@ class GeminiGenerateContentProvider implements LlmProvider
             throw new AiAgentException('execution_limit_reached');
         }
         try {
-            /** @var \Illuminate\Http\Client\Response $response */
+            /** @var Response $response */
             $response = Http::withHeaders(['x-goog-api-key' => $key])->acceptJson()->withBody($json, 'application/json')
                 ->connectTimeout(min(10, $this->limits->get('request_timeout')))->timeout($this->limits->get('request_timeout'))
                 ->withOptions(['allow_redirects' => false, 'decode_content' => false,

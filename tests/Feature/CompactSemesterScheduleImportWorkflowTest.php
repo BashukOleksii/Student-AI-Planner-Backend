@@ -18,10 +18,10 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\Group;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -464,7 +464,6 @@ class CompactSemesterScheduleImportWorkflowTest extends TestCase
         return [['catalog'], ['other semester'], ['exception'], ['lesson']];
     }
 
-
     public function test_new_external_dependency_invalidates_teacher_change_without_clearing_schedule(): void
     {
         [$user, $period, $schedule] = $this->imported();
@@ -492,5 +491,4 @@ class CompactSemesterScheduleImportWorkflowTest extends TestCase
         $this->assertNull($rule->fresh());
         $this->assertSame(16, $schedule->weeklyLessonRules()->count());
     }
-
 }

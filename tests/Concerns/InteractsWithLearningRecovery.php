@@ -10,8 +10,9 @@ use App\Models\User;
 use App\Services\Planning\RecoverySuggestionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Tests\TestCase;
 
-/** @mixin \Tests\TestCase */
+/** @mixin TestCase */
 trait InteractsWithLearningRecovery
 {
     private function initializeRecovery(): void

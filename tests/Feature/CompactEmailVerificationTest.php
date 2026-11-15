@@ -7,6 +7,8 @@ use App\Services\Auth\EmailVerificationService;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
+use Illuminate\Mail\Mailer;
+use Illuminate\Mail\Transport\ArrayTransport;
 use Illuminate\Notifications\ChannelManager;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
@@ -96,9 +98,9 @@ class CompactEmailVerificationTest extends TestCase
         Notification::swap(new ChannelManager($this->app));
         $owner = User::factory()->unverified()->create(['email' => 'student@example.test']);
         $this->actingAs($owner, 'web')->postJson(self::SEND)->assertOk();
-        /** @var \Illuminate\Mail\Mailer $mailer */
+        /** @var Mailer $mailer */
         $mailer = Mail::mailer();
-        /** @var \Illuminate\Mail\Transport\ArrayTransport $transport */
+        /** @var ArrayTransport $transport */
         $transport = $mailer->getSymfonyTransport();
         $messages = $transport->messages();
         $this->assertCount(1, $messages);

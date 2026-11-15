@@ -2,7 +2,9 @@
 
 namespace Tests\Concerns;
 
-/** @mixin \Tests\TestCase */
+use Tests\TestCase;
+
+/** @mixin TestCase */
 trait AssertsBatchedReads
 {
     private function assertSameReadShape(array $sparse, array $dense): void

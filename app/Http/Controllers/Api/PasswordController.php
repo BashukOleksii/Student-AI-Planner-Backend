@@ -7,6 +7,8 @@ use App\Http\Requests\Auth\ChangePasswordRequest;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Services\Auth\PasswordManagementService;
+use Illuminate\Auth\RequestGuard;
+use Illuminate\Auth\SessionGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 
@@ -15,7 +17,7 @@ class PasswordController extends Controller
     public function change(ChangePasswordRequest $request, PasswordManagementService $service): JsonResponse
     {
         $user = $service->change($request->user(), $request->validated(), $request->session()->getId());
-        /** @var \Illuminate\Auth\SessionGuard $guard */
+        /** @var SessionGuard $guard */
         $guard = Auth::guard('web');
         $guard->setUser($user);
         $request->session()->regenerate(true);
@@ -34,11 +36,11 @@ class PasswordController extends Controller
     public function reset(ResetPasswordRequest $request, PasswordManagementService $service): JsonResponse
     {
         $user = $service->reset($request->validated());
-        /** @var \Illuminate\Auth\SessionGuard $guard */
+        /** @var SessionGuard $guard */
         $guard = Auth::guard('web');
         if ($request->hasSession() && (string) $guard->id() === (string) $user->getKey()) {
             $guard->logoutCurrentDevice();
-            /** @var \Illuminate\Auth\RequestGuard $sanctumGuard */
+            /** @var RequestGuard $sanctumGuard */
             $sanctumGuard = Auth::guard('sanctum');
             $sanctumGuard->forgetUser();
             $request->session()->invalidate();

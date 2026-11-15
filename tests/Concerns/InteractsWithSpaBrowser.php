@@ -4,8 +4,9 @@ namespace Tests\Concerns;
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Testing\TestResponse;
+use Tests\TestCase;
 
-/** @mixin \Tests\TestCase */
+/** @mixin TestCase */
 trait InteractsWithSpaBrowser
 {
     private array $browserCookies = [];

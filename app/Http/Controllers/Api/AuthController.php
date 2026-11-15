@@ -7,6 +7,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use Illuminate\Auth\SessionGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -20,7 +21,7 @@ class AuthController extends Controller
         $user = User::create($request->validated());
         $user->refresh();
 
-        /** @var \Illuminate\Auth\SessionGuard $guard */
+        /** @var SessionGuard $guard */
         $guard = Auth::guard('web');
         $guard->login($user);
         $request->session()->regenerate();
@@ -31,7 +32,7 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request): UserResource
     {
-        /** @var \Illuminate\Auth\SessionGuard $guard */
+        /** @var SessionGuard $guard */
         $guard = Auth::guard('web');
         if (! $guard->attempt($request->validated())) {
             $exception = ValidationException::withMessages([

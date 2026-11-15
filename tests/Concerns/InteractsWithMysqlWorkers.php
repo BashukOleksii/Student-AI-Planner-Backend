@@ -5,8 +5,9 @@ namespace Tests\Concerns;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
 use Tests\Support\TestDatabase;
+use Tests\TestCase;
 
-/** @mixin \Tests\TestCase */
+/** @mixin TestCase */
 trait InteractsWithMysqlWorkers
 {
     private function startMysqlWorker(string $script, array $input, array $arguments = []): Process

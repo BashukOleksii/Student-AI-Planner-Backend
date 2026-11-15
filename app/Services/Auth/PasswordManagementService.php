@@ -5,6 +5,7 @@ namespace App\Services\Auth;
 use App\Jobs\SendPasswordResetLink;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
@@ -38,7 +39,7 @@ class PasswordManagementService
                 throw ValidationException::withMessages(['current_password' => [__('validation.current_password')]]);
             }
             $this->savePassword($user, $credentials['password']);
-            /** @var \Illuminate\Auth\Passwords\PasswordBroker $broker */
+            /** @var PasswordBroker $broker */
             $broker = Password::broker();
             $broker->deleteToken($user);
             $this->sessions($user)->where('id', '!=', $sessionId)->delete();
