@@ -2,7 +2,7 @@
 
 // Read PHPUnit's expanded inventory; never infer case totals from PHP method counts.
 $root = dirname(__DIR__, 2);
-$manifest = json_decode(file_get_contents($root.'/docs/testing/compact-suite-manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+$manifest = json_decode(file_get_contents($root.'/tests/compact-suite-manifest.json'), true, flags: JSON_THROW_ON_ERROR);
 $inventory = simplexml_load_file($argv[1] ?? throw new RuntimeException('Pass PHPUnit --list-tests-xml output.'));
 $counts = array_fill_keys(['unit', 'rest', 'integration', 'migration', 'concurrency', 'ai', 'workflow', 'smoke'], 0);
 $seen = [];

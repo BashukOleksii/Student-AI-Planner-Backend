@@ -1,0 +1,336 @@
+{
+    "target": 660,
+    "maximum": 700,
+    "classes": {
+        "Tests\\Unit\\CompactTimeIntervalServiceTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactAvailabilityOccurrenceServiceTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactRemainingEffortServiceTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactBreakConstraintServiceTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactSessionDurationConstraintServiceTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactWorkloadConstraintServiceTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactPlanningConstraintServiceTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactStudySessionAllocationServiceTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactEffectiveScheduleCalculatorTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactProgressStatisticsServiceTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactProgressTrendsServiceTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactProgressComparisonServiceTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactRelativeReminderRulesTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactScheduleWorkbookParserTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactSemesterScheduleImportPlannerTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactStudyReplanningAnalysisServiceTest": {
+            "category": "unit"
+        },
+        "Tests\\Unit\\CompactStudySessionLifecycleRulesTest": {
+            "category": "unit"
+        },
+        "Tests\\Feature\\CompactAuthProfileTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactEmailVerificationTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactTaskApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactTaskIndexTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactTaskLifecycleTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactTaskMissedStatusTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactSubtaskApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactSubtaskLifecycleTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactSubtaskReorderTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactEducationInstitutionApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactAcademicPeriodApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactSubjectApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactTeacherApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactLessonApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactScheduleViewTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactSemesterScheduleManagementTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactSemesterScheduleReadApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactSemesterScheduleImportWorkflowTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactPlanningPreferenceApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactStudyAvailabilityApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactFreeSlotsApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactStudyPlanApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactStudySessionApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactStudySessionLifecycleTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactReminderApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactNotificationInboxApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactProgressStatisticsApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactProgressTrendsApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactProgressComparisonApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactWorkloadAdviceApiTest": {
+            "category": "rest"
+        },
+        "Tests\\Feature\\CompactFreeTimeServiceTest": {
+            "category": "integration"
+        },
+        "Tests\\Feature\\CompactStudyPlanningServiceTest": {
+            "category": "integration"
+        },
+        "Tests\\Feature\\CompactPlanningWorkSelectionServiceTest": {
+            "category": "integration"
+        },
+        "Tests\\Feature\\CompactPlanningCandidateEvaluationServiceTest": {
+            "category": "integration"
+        },
+        "Tests\\Feature\\CompactEffectiveScheduleServiceTest": {
+            "category": "integration"
+        },
+        "Tests\\Feature\\CompactScheduleImportCandidateClassifierTest": {
+            "category": "integration"
+        },
+        "Tests\\Feature\\CompactScheduleOccurrenceResolverTest": {
+            "category": "integration"
+        },
+        "Tests\\Feature\\CompactReminderDeliveryTest": {
+            "category": "integration"
+        },
+        "Tests\\Feature\\CompactPlanningAttentionTest": {
+            "category": "integration"
+        },
+        "Tests\\Feature\\CompactAutomaticRecoveryDetectionTest": {
+            "category": "integration"
+        },
+        "Tests\\Feature\\CompactStudyReplanningPreviewTest": {
+            "category": "integration"
+        },
+        "Tests\\Feature\\CompactStudyReplanningConfirmationTest": {
+            "category": "integration"
+        },
+        "Tests\\Feature\\CompactAiChatTest": {
+            "category": "ai"
+        },
+        "Tests\\Feature\\CompactAiToolsIntegrationTest": {
+            "category": "ai"
+        },
+        "Tests\\Feature\\CompactAiTaskActionsTest": {
+            "category": "ai"
+        },
+        "Tests\\Feature\\CompactAiLessonActionsTest": {
+            "category": "ai"
+        },
+        "Tests\\Feature\\CompactAiAvailabilityActionsTest": {
+            "category": "ai"
+        },
+        "Tests\\Feature\\CompactAiSemesterActionsTest": {
+            "category": "ai"
+        },
+        "Tests\\Feature\\CompactAiPlanningActionsTest": {
+            "category": "ai"
+        },
+        "Tests\\Feature\\CompactAiSubtaskReminderActionsTest": {
+            "category": "ai"
+        },
+        "Tests\\Feature\\CompactAiSessionLifecycleActionsTest": {
+            "category": "ai"
+        },
+        "Tests\\Feature\\CompactAiStudyAvailabilityToolTest": {
+            "category": "ai"
+        },
+        "Tests\\Feature\\CompactWorkCompletionTest": {
+            "category": "workflow"
+        },
+        "Tests\\Feature\\CompactAcademicRecoveryWorkflowTest": {
+            "category": "workflow"
+        },
+        "Tests\\Feature\\CompactAutomaticLearningRecoveryTest": {
+            "category": "workflow"
+        },
+        "Tests\\Feature\\CompactProgressStatisticsIntegrationTest": {
+            "category": "workflow"
+        },
+        "Tests\\Feature\\CompactProgressTrendsIntegrationTest": {
+            "category": "workflow"
+        },
+        "Tests\\Feature\\CompactProgressComparisonIntegrationTest": {
+            "category": "workflow"
+        },
+        "Tests\\Feature\\CompactSemesterPlanningCalendarTest": {
+            "category": "workflow"
+        },
+        "Tests\\Feature\\CompactSemesterScheduleManagementImportTest": {
+            "category": "workflow"
+        },
+        "Tests\\Feature\\CompactSplitReplanningTest": {
+            "category": "workflow"
+        },
+        "Tests\\Feature\\CompactPlanningCompletionRulesTest": {
+            "category": "workflow"
+        },
+        "Tests\\Feature\\CompactPlanningSourceTriggersTest": {
+            "category": "workflow"
+        },
+        "Tests\\Feature\\CompactStudyPlanConcurrencyTest": {
+            "category": "concurrency"
+        },
+        "Tests\\Feature\\CompactStudySessionConcurrencyTest": {
+            "category": "concurrency"
+        },
+        "Tests\\Feature\\CompactStudyReplanningConcurrencyTest": {
+            "category": "concurrency"
+        },
+        "Tests\\Feature\\CompactAiTaskActionConcurrencyTest": {
+            "category": "concurrency"
+        },
+        "Tests\\Feature\\CompactAiLessonActionConcurrencyTest": {
+            "category": "concurrency"
+        },
+        "Tests\\Feature\\CompactAiAvailabilityActionConcurrencyTest": {
+            "category": "concurrency"
+        },
+        "Tests\\Feature\\CompactAiChatConcurrencyTest": {
+            "category": "concurrency"
+        },
+        "Tests\\Feature\\CompactReminderDeliveryConcurrencyTest": {
+            "category": "concurrency"
+        },
+        "Tests\\Feature\\CompactAutomaticRecoveryConcurrencyTest": {
+            "category": "concurrency"
+        },
+        "Tests\\Feature\\CompactSemesterScheduleImportConcurrencyTest": {
+            "category": "concurrency"
+        },
+        "Tests\\Feature\\CompactSemesterScheduleManagementConcurrencyTest": {
+            "category": "concurrency"
+        },
+        "Tests\\Feature\\CompactTaskPersistenceTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactLessonPersistenceTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactStudySessionPersistenceTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactReminderPersistenceTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactAcademicContextPersistenceTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactScheduleImportPersistenceTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactPlanningPersistenceTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactPlanningMigrationTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactTaskMissedMigrationTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactSemesterScheduleMigrationTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactSemesterScheduleManagementPersistenceTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactSemesterScheduleImportPersistenceTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactAiTaskActionPersistenceTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactAiChatPersistenceTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactAiLessonActionMigrationTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactAiAvailabilityActionMigrationTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactAiSemesterOccurrenceCreateMigrationTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactRecoverySuggestionPersistenceTest": {
+            "category": "migration"
+        },
+        "Tests\\Feature\\CompactSmokeTest": {
+            "category": "smoke"
+        }
+    }
+}
