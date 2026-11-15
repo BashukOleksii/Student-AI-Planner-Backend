@@ -13,7 +13,7 @@ S1/S2 define core intended behavior; S3 contains development directions. Optiona
 
 ## Method and coverage summary
 
-Read AGENTS.md before editing; checked actual branch/status/full SHA/recent history and repository layout. Reviewed architecture, domain/business/database notes, [automatic planning](../automatic-study-planning.md), [adaptive replanning](../adaptive-replanning.md), [AI foundation](../ai-tools-foundation.md), ADR-001–005 and Stages 11–18 contracts/results. Traced current routes through Controllers, Requests, Services, Policies, Resources, Models, migrations and relevant tests. Current executable code governs every implementation claim; historical reports supply context and provenance.
+Checked actual branch/status/full SHA/recent history and repository layout. Reviewed architecture, domain/business/database notes, [automatic planning](../automatic-study-planning.md), [adaptive replanning](../adaptive-replanning.md), [AI foundation](../ai-tools-foundation.md), ADR-001–005 and Stages 11–18 contracts/results. Traced current routes through Controllers, Requests, Services, Policies, Resources, Models, migrations and relevant tests. Current executable code governs every implementation claim; historical reports supply context and provenance.
 
 The [requirements audit](backend-requirements-audit.md) has exactly one primary entry for each R01–R48, with original meaning/reference, Backend responsibility, source/method evidence, REST/AI mapping, PHPUnit evidence, separate statuses, remaining gap and Frontend guidance. Counts:
 

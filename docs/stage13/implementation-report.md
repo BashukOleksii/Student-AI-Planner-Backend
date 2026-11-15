@@ -47,5 +47,5 @@ Gemini action regression step also runs unchanged. The final delivery reports th
 exact commit, run link and outcome. No retained/application database is used for
 destructive test execution.
 
-All work stays on `main`, with no branch, worktree or Pull Request. `AGENTS.md`
-now records this workflow rule for future Backend work.
+All work stays on `main`, with no branch, worktree or Pull Request. The current
+[development workflow](../../README.md#development-workflow) documents this rule.

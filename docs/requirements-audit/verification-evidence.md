@@ -13,7 +13,6 @@ Commands below summarize the read batches; `sed`, `cat` and `rg` inspected the f
 | Command/check | Observed result | What it establishes |
 |---|---|---|
 | `git status --short --branch`, `git rev-parse HEAD`, `git log -4 --oneline` | Clean `main` initially; audited SHA above | Current checkout differs from earlier calendar-fix commits |
-| `cat AGENTS.md` | Read repository instructions | Documentation-only scope and main workflow |
 | `rg --files docs routes app tests` and `rg --files database/migrations` | Inventoried implemented layers and tests | Actual code paths exist; not proof that their tests pass |
 | `rg --files /home/oleksiibashuk/CourseProject` with requirements/ODT/statement filter | Found frontend source bundle and historical assessments; no original ODT/statement file | Source limitation described in functional coverage |
 | `cat`/`sed`/`rg` over API/console routes, calendar/planning/recovery/AI/reminder/progress/task/auth code, representative Requests, Resources, Policies and migrations | Findings I1–I7 | Static call paths and explicit API boundaries; no production observation |

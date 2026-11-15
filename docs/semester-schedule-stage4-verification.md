@@ -2,7 +2,7 @@
 
 Baseline: local `main` and `git ls-remote origin refs/heads/main` both at
 `9a00da6abcaa43d7acd67f534c3b4ececee0b86b`; initial working tree clean. Read
-AGENTS.md, current architecture/domain/business/persistence docs, foundation,
+current architecture/domain/business/persistence docs, foundation,
 Stage 2/3 contracts, ADR-006/007 and relevant implementations before changes.
 Work remains on main, with no branch/worktree/PR or push.
 

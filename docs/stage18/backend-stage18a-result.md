@@ -3,7 +3,7 @@
 ## Scope and inspected architecture
 
 Baseline: clean `main`, `2aef224118ad4bad371e0d36da96450970a5683f`.
-AGENTS.md was read before implementation. No branch, worktree, PR, GitHub access,
+No branch, worktree, PR, GitHub access,
 Frontend access, `.env` modification or retained-database reset was performed.
 
 Reviewed architecture/domain/business rules, database review notes and ADR-001–005;

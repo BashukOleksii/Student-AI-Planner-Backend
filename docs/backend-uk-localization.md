@@ -3,7 +3,7 @@
 ## Обсяг і початковий аудит
 
 2026-11-14: `main`, HEAD `ae7e5cb`, початкові `git status --short` і diff
-порожні. Прочитано AGENTS.md та фактичні Requests, Services, Resources,
+порожні. Прочитано фактичні Requests, Services, Resources,
 винятки, import pipeline і `bootstrap/app.php`. Це зміна текстового подання:
 правила, маршрути, ключі/типи JSON, статуси, коди причин, час доставки й
 підтвердження дій збережені. Frontend, AWS, SMTP і вільні відповіді AI не

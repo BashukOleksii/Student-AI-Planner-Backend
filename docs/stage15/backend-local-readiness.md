@@ -24,7 +24,7 @@
   недоступний**. На `5173` виявлено listener `[::1]:5173`; це не перевірка Vue,
   його сторінок або працездатності Frontend.
 
-Перевірено локальні `AGENTS.md`, `.env.example`, зазначені config-файли,
+Перевірено локальні `.env.example`, зазначені config-файли,
 `routes/api.php`, `routes/console.php`, Gemini adapter / AgentLimits, Reminder
 delivery Service/Command, password delivery Service/Job, чинні
 [readiness](../backend-integration-readiness.md),

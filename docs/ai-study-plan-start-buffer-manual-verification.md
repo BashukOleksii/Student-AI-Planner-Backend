@@ -26,8 +26,7 @@ AI-перевірка expiration вилучає тільки цей сервер
 
 ## Фактично виконано
 
-Початковий `git status --short` порожній, гілка `main`. Прочитано AGENTS.md,
-зазначені Controller/Services, суміжні planner/confirmation/resource/request,
+Початковий `git status --short` порожній, гілка `main`. Прочитано зазначені Controller/Services, суміжні planner/confirmation/resource/request,
 маршрути, релевантні наявні тести, архітектурну/доменну/бізнес-документацію,
 контракти планування та ADR-004.
 

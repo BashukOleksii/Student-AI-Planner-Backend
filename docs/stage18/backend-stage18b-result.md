@@ -3,7 +3,7 @@
 ## Architecture review and baseline
 
 Implementation started on clean `main` at Stage 18A commit
-`9521448c6f76dd0d366aff5382e89c41968df11b`. AGENTS.md was read before editing.
+`9521448c6f76dd0d366aff5382e89c41968df11b`.
 Reviewed the Stage 18A read contract and its **Stage 18B proposal architecture —
 design only**, relevant architecture/domain/business/database documentation and
 ADRs, actual availability writer/Request/Policy/model/Resource/controller, User

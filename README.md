@@ -67,7 +67,7 @@ Useful feature contracts:
 The reproducible offline smoke (guarded disposable MySQL only; no OpenAI key needed):
 
 ```sh
-vendor/bin/phpunit tests/Feature/BackendIntegrationSmokeTest.php
+scripts/testing/phpunit-disposable-mysql.sh --configuration phpunit-smoke.xml
 ```
 ## AI provider configuration
 
@@ -112,7 +112,26 @@ and [Backend result](docs/stage12/backend-result.md) before Frontend integration
 - [Database review and Stage 02 questions](docs/database-review-notes.md)
 - [ADR-001: Backend architecture decision](docs/decisions/ADR-001-backend-architecture.md)
 
-[AGENTS.md](AGENTS.md) is the primary instruction file for repository work.
+## Development workflow
+
+Work on `main` and preserve existing local changes. The repository uses no feature
+branches, feature worktrees or Pull Requests for development.
+
+Before architecture, persistence, planning or AI-tool changes, review the current
+implementation together with the architecture, domain model, business rules,
+database review and relevant ADRs linked above. Resolve implementation/document
+conflicts explicitly. Keep controllers and Tools thin, with reusable deterministic
+business rules in Services; authorization and data ownership remain server-side.
+
+Use MySQL and Laravel migrations, preserve existing data and applied migration
+history, and respect forward-only migration constraints. Configuration must use
+environment variables; do not commit secrets or require developer-specific paths.
+
+Follow the [current testing strategy](docs/test-strategy.md): add or update relevant
+tests for significant changes, start with focused checks, then run broader checks
+for shared behavior and `vendor/bin/pint --test`. Database tests use the guarded
+disposable MySQL runner, never a retained development/production database or
+SQLite. Do not weaken checks merely to obtain a passing run.
 
 ## Production deployment
 
