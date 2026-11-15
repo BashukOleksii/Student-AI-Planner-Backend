@@ -1,0 +1,1427 @@
+{
+  "target": 660,
+  "maximum": 700,
+  "counting": "Each PHPUnit testMethod node, including each DataProvider row, has exactly one primary category. Smoke is a subset of the complete suite.",
+  "classes": {
+    "Tests\\Unit\\CompactTimeIntervalServiceTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactTimeIntervalServiceTest.php",
+      "origin_file": "tests/Unit/TimeIntervalServiceTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\TimeIntervalServiceTest::test_merge_returns_the_exact_normalized_union#empty",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_subtraction_preserves_half_open_boundaries_and_never_intersects_blockers#empty both",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_clipping_is_an_exact_sorted_intersection#empty",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_minimum_uses_exact_seconds_and_includes_equality_after_normalization",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_integer_limits_never_require_floating_point_duration_comparisons",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_invalid_minimum_is_rejected_even_for_empty_input#0",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_invalid_clip_range_is_rejected_even_for_empty_input#0",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_malformed_intervals_are_rejected_by_every_collection_operation#equal",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_duration_preserves_seconds_and_all_operations_leave_inputs_unchanged",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_composed_operations_are_order_independent_and_timezone_independent",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_merge_returns_the_exact_normalized_union#integer extremes compare without subtraction",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_subtraction_preserves_half_open_boundaries_and_never_intersects_blockers#negative endpoints",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_clipping_is_an_exact_sorted_intersection#already inside",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_invalid_minimum_is_rejected_even_for_empty_input#8",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_invalid_clip_range_is_rejected_even_for_empty_input#9",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_malformed_intervals_are_rejected_by_every_collection_operation#object element",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_merge_returns_the_exact_normalized_union#single",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_subtraction_preserves_half_open_boundaries_and_never_intersects_blockers#empty bases",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_clipping_is_an_exact_sorted_intersection#both sides",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_invalid_minimum_is_rejected_even_for_empty_input#1",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_invalid_clip_range_is_rejected_even_for_empty_input#1",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_malformed_intervals_are_rejected_by_every_collection_operation#reversed",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_merge_returns_the_exact_normalized_union#collection keys do not affect output",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_subtraction_preserves_half_open_boundaries_and_never_intersects_blockers#one second hole",
+        "Tests\\Unit\\TimeIntervalServiceTest::test_clipping_is_an_exact_sorted_intersection#one second intersection"
+      ]
+    },
+    "Tests\\Unit\\CompactAvailabilityOccurrenceServiceTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactAvailabilityOccurrenceServiceTest.php",
+      "origin_file": "tests/Unit/AvailabilityOccurrenceServiceTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_expansion_matches_explicit_utc_intervals_and_is_repeatable_without_input_mutation#empty",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_invalid_windows_are_rejected_even_when_the_weekday_would_not_match#0",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_invalid_dates_and_reversed_ranges_are_rejected_even_without_windows#0",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_invalid_timezone_is_rejected_even_without_windows#0",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_window_collection_requires_a_list",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_server_default_timezone_does_not_change_dates_weekdays_or_offsets",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_generated_occurrences_are_normalized_by_the_existing_interval_service",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_expansion_matches_explicit_utc_intervals_and_is_repeatable_without_input_mutation#historical seconds offset Monrovia",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_invalid_windows_are_rejected_even_when_the_weekday_would_not_match#26",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_invalid_dates_and_reversed_ranges_are_rejected_even_without_windows#12",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_invalid_timezone_is_rejected_even_without_windows#8",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_expansion_matches_explicit_utc_intervals_and_is_repeatable_without_input_mutation#weekday does not match",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_invalid_windows_are_rejected_even_when_the_weekday_would_not_match#1",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_invalid_dates_and_reversed_ranges_are_rejected_even_without_windows#1",
+        "Tests\\Unit\\AvailabilityOccurrenceServiceTest::test_invalid_timezone_is_rejected_even_without_windows#1"
+      ]
+    },
+    "Tests\\Unit\\CompactRemainingEffortServiceTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactRemainingEffortServiceTest.php",
+      "origin_file": "tests/Unit/RemainingEffortServiceTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\RemainingEffortServiceTest::test_exact_actual_first_credit_and_independent_reservations#empty sources",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_malformed_values_and_overflow_are_explicit#estimate 0",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_representable_minute_multiplication_boundary",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_clock_and_server_timezone_are_not_calculation_inputs",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_exact_actual_first_credit_and_independent_reservations#maximum total without overflow",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_malformed_values_and_overflow_are_explicit#invalid scheduled duration even when actual exists",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_exact_actual_first_credit_and_independent_reservations#missing estimate is unknown",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_malformed_values_and_overflow_are_explicit#actual 0",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_exact_actual_first_credit_and_independent_reservations#reservation after fully credited effort",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_malformed_values_and_overflow_are_explicit#reservation sum overflow",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_exact_actual_first_credit_and_independent_reservations#missing estimate retains known credit and reservation",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_malformed_values_and_overflow_are_explicit#estimate 1",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_exact_actual_first_credit_and_independent_reservations#multiple reservations keep seconds",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_malformed_values_and_overflow_are_explicit#completed sum overflow",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_exact_actual_first_credit_and_independent_reservations#actual shorter than scheduled",
+        "Tests\\Unit\\RemainingEffortServiceTest::test_malformed_values_and_overflow_are_explicit#actual 1"
+      ]
+    },
+    "Tests\\Unit\\CompactBreakConstraintServiceTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactBreakConstraintServiceTest.php",
+      "origin_file": "tests/Unit/BreakConstraintServiceTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\BreakConstraintServiceTest::test_separation_is_exact_deterministic_and_does_not_mutate_inputs#empty null break",
+        "Tests\\Unit\\BreakConstraintServiceTest::test_invalid_break_configuration_is_rejected_even_without_anchors#0",
+        "Tests\\Unit\\BreakConstraintServiceTest::test_invalid_candidate_or_anchor_is_rejected_with_no_configured_break#candidate 0",
+        "Tests\\Unit\\BreakConstraintServiceTest::test_omitted_break_is_identical_to_explicit_null",
+        "Tests\\Unit\\BreakConstraintServiceTest::test_timezone_and_current_clock_have_no_effect",
+        "Tests\\Unit\\BreakConstraintServiceTest::test_separation_is_exact_deterministic_and_does_not_mutate_inputs#wide merged anchors",
+        "Tests\\Unit\\BreakConstraintServiceTest::test_invalid_break_configuration_is_rejected_even_without_anchors#13",
+        "Tests\\Unit\\BreakConstraintServiceTest::test_invalid_candidate_or_anchor_is_rejected_with_no_configured_break#non-array anchor 5",
+        "Tests\\Unit\\BreakConstraintServiceTest::test_separation_is_exact_deterministic_and_does_not_mutate_inputs#empty configured break",
+        "Tests\\Unit\\BreakConstraintServiceTest::test_invalid_break_configuration_is_rejected_even_without_anchors#1",
+        "Tests\\Unit\\BreakConstraintServiceTest::test_invalid_candidate_or_anchor_is_rejected_with_no_configured_break#anchor 0",
+        "Tests\\Unit\\BreakConstraintServiceTest::test_separation_is_exact_deterministic_and_does_not_mutate_inputs#wide valid candidate needs no duration subtraction"
+      ]
+    },
+    "Tests\\Unit\\CompactSessionDurationConstraintServiceTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactSessionDurationConstraintServiceTest.php",
+      "origin_file": "tests/Unit/SessionDurationConstraintServiceTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\SessionDurationConstraintServiceTest::test_configured_bounds_use_exact_seconds_and_return_explicit_violations#both absent one second",
+        "Tests\\Unit\\SessionDurationConstraintServiceTest::test_each_configured_bound_rejects_invalid_values_without_coercion#minimum 0",
+        "Tests\\Unit\\SessionDurationConstraintServiceTest::test_minimum_greater_than_maximum_is_invalid_configuration_not_a_business_violation#0",
+        "Tests\\Unit\\SessionDurationConstraintServiceTest::test_invalid_interval_is_rejected_even_with_both_bounds_absent#0",
+        "Tests\\Unit\\SessionDurationConstraintServiceTest::test_duration_overflow_is_propagated_from_c1_without_float_comparisons",
+        "Tests\\Unit\\SessionDurationConstraintServiceTest::test_omitted_bounds_are_identical_to_explicit_null_bounds",
+        "Tests\\Unit\\SessionDurationConstraintServiceTest::test_exact_duration_validation_is_delegated_to_the_existing_c1_service",
+        "Tests\\Unit\\SessionDurationConstraintServiceTest::test_server_timezone_and_frozen_clock_do_not_affect_result",
+        "Tests\\Unit\\SessionDurationConstraintServiceTest::test_configured_bounds_use_exact_seconds_and_return_explicit_violations#crosses Unix epoch",
+        "Tests\\Unit\\SessionDurationConstraintServiceTest::test_each_configured_bound_rejects_invalid_values_without_coercion#maximum 13",
+        "Tests\\Unit\\SessionDurationConstraintServiceTest::test_minimum_greater_than_maximum_is_invalid_configuration_not_a_business_violation#2",
+        "Tests\\Unit\\SessionDurationConstraintServiceTest::test_invalid_interval_is_rejected_even_with_both_bounds_absent#12"
+      ]
+    },
+    "Tests\\Unit\\CompactWorkloadConstraintServiceTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactWorkloadConstraintServiceTest.php",
+      "origin_file": "tests/Unit/WorkloadConstraintServiceTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\WorkloadConstraintServiceTest::test_exact_scheduled_workload_is_deterministic_and_inputs_are_unchanged#no limits no sessions",
+        "Tests\\Unit\\WorkloadConstraintServiceTest::test_malformed_input_is_rejected_even_when_limits_are_absent#candidate 0",
+        "Tests\\Unit\\WorkloadConstraintServiceTest::test_server_timezone_does_not_change_calendar_allocation",
+        "Tests\\Unit\\WorkloadConstraintServiceTest::test_exact_scheduled_workload_is_deterministic_and_inputs_are_unchanged#integer minimum second",
+        "Tests\\Unit\\WorkloadConstraintServiceTest::test_malformed_input_is_rejected_even_when_limits_are_absent#negative local offset overflow",
+        "Tests\\Unit\\WorkloadConstraintServiceTest::test_exact_scheduled_workload_is_deterministic_and_inputs_are_unchanged#no limits existing workload",
+        "Tests\\Unit\\WorkloadConstraintServiceTest::test_malformed_input_is_rejected_even_when_limits_are_absent#session 0",
+        "Tests\\Unit\\WorkloadConstraintServiceTest::test_exact_scheduled_workload_is_deterministic_and_inputs_are_unchanged#integer maximum second",
+        "Tests\\Unit\\WorkloadConstraintServiceTest::test_malformed_input_is_rejected_even_when_limits_are_absent#positive local offset overflow",
+        "Tests\\Unit\\WorkloadConstraintServiceTest::test_exact_scheduled_workload_is_deterministic_and_inputs_are_unchanged#exact daily",
+        "Tests\\Unit\\WorkloadConstraintServiceTest::test_malformed_input_is_rejected_even_when_limits_are_absent#candidate 1",
+        "Tests\\Unit\\WorkloadConstraintServiceTest::test_exact_scheduled_workload_is_deterministic_and_inputs_are_unchanged#representable grand total with no limits"
+      ]
+    },
+    "Tests\\Unit\\CompactPlanningConstraintServiceTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactPlanningConstraintServiceTest.php",
+      "origin_file": "tests/Unit/PlanningConstraintServiceTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\PlanningConstraintServiceTest::test_combined_evaluation_returns_all_violations_in_stable_order_without_mutation#fully configured valid",
+        "Tests\\Unit\\PlanningConstraintServiceTest::test_invalid_inputs_raise_exceptions_even_when_an_earlier_business_rule_fails#interval 0 field 0",
+        "Tests\\Unit\\PlanningConstraintServiceTest::test_existing_constraint_algorithms_are_delegated_and_business_violations_do_not_short_circuit",
+        "Tests\\Unit\\PlanningConstraintServiceTest::test_server_timezone_does_not_change_combined_evaluation",
+        "Tests\\Unit\\PlanningConstraintServiceTest::test_combined_evaluation_returns_all_violations_in_stable_order_without_mutation#Kyiv fold workload both real occurrences",
+        "Tests\\Unit\\PlanningConstraintServiceTest::test_invalid_inputs_raise_exceptions_even_when_an_earlier_business_rule_fails#non-array interval field 3",
+        "Tests\\Unit\\PlanningConstraintServiceTest::test_combined_evaluation_returns_all_violations_in_stable_order_without_mutation#explicit all null",
+        "Tests\\Unit\\PlanningConstraintServiceTest::test_invalid_inputs_raise_exceptions_even_when_an_earlier_business_rule_fails#interval 0 field 1"
+      ]
+    },
+    "Tests\\Unit\\CompactStudySessionAllocationServiceTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactStudySessionAllocationServiceTest.php",
+      "origin_file": "tests/Unit/StudySessionAllocationServiceTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_exact_greedy_allocations_and_projected_constraints#earliest slot input order normalized",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_workload_calendar_boundaries_and_later_feasible_starts#later same interval spreads minimum over midnight",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_reason_codes_are_evidence_and_exact_remaining_effort_is_retained",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_event_boundary_search_matches_an_independent_small_exhaustive_c8_oracle#0",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_final_tiny_remainder_is_reported_without_an_undersized_session",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_subminimum_work_reports_only_duration_even_when_other_constraints_are_exhausted",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_earliest_start_and_largest_duration_match_exhaustive_oracle_at_day_and_week_boundary#0",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_difficult_boundary_search_has_no_per_second_constraint_probing",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_malformed_inputs_and_overflow_fail_explicitly#0",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_exact_greedy_allocations_and_projected_constraints#weekly limit cuts work",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_workload_calendar_boundaries_and_later_feasible_starts#ISO year label includes prior calendar year",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_event_boundary_search_matches_an_independent_small_exhaustive_c8_oracle#15",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_earliest_start_and_largest_duration_match_exhaustive_oracle_at_day_and_week_boundary#31",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_malformed_inputs_and_overflow_fail_explicitly#15",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_exact_greedy_allocations_and_projected_constraints#stable work order preserved",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_workload_calendar_boundaries_and_later_feasible_starts#feasible pocket even both region endpoints fail",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_event_boundary_search_matches_an_independent_small_exhaustive_c8_oracle#1",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_earliest_start_and_largest_duration_match_exhaustive_oracle_at_day_and_week_boundary#1",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_malformed_inputs_and_overflow_fail_explicitly#1",
+        "Tests\\Unit\\StudySessionAllocationServiceTest::test_exact_greedy_allocations_and_projected_constraints#overloaded day has no new capacity"
+      ]
+    },
+    "Tests\\Unit\\CompactEffectiveScheduleCalculatorTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactEffectiveScheduleCalculatorTest.php",
+      "origin_file": "tests/Unit/EffectiveScheduleCalculatorTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_iso_week_labels_use_monday_and_nominal_calendar_dates#0",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_invalid_or_unrepresentable_week_labels_fail_explicitly#0",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_real_fixture_has_fifteen_occurrences_each_week_and_exactly_one_alternating_tuesday_pair",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_anchor_parity_is_configurable_and_works_backwards_across_year_boundary",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_snapshot_is_a_complete_frozen_day_and_empty_snapshot_cancels_every_pair",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_working_saturday_uses_only_its_saved_rows_and_never_recopies_friday",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_semester_boundaries_are_inclusive#0",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_half_open_adjacency_is_valid_and_same_slot_on_disjoint_weeks_is_valid",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_invalid_rules_fail_even_when_not_on_the_requested_weekday#duplicate",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_local_dst_endpoints_are_resolved_strictly#Kyiv spring gap",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_invalid_dates_anchor_timezone_and_snapshot_are_rejected#0",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_iso_week_labels_use_monday_and_nominal_calendar_dates#5",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_invalid_or_unrepresentable_week_labels_fail_explicitly#3",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_semester_boundaries_are_inclusive#3",
+        "Tests\\Unit\\EffectiveScheduleCalculatorTest::test_invalid_rules_fail_even_when_not_on_the_requested_weekday#pair zero"
+      ]
+    },
+    "Tests\\Unit\\CompactProgressStatisticsServiceTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactProgressStatisticsServiceTest.php",
+      "origin_file": "tests/Unit/ProgressStatisticsServiceTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_completion_classification_uses_status_and_exact_persisted_instants#on_time",
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_full_scheduled_seconds_are_separate_from_known_actual_minutes#0",
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_start_attribution_excludes_overlapping_preperiod_and_upper_boundary_sessions",
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_empty_data_and_skipped_membership_have_exact_zero_totals",
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_disjoint_membership_does_not_count_envelope_gaps",
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_calculations_are_deterministic_utc_and_do_not_mutate_inputs_or_combine_parent_child_metrics",
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_invalid_persisted_timestamps_fail_instead_of_normalizing#0",
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_completion_classification_uses_status_and_exact_persisted_instants#before upper",
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_full_scheduled_seconds_are_separate_from_known_actual_minutes#7",
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_invalid_persisted_timestamps_fail_instead_of_normalizing#3",
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_completion_classification_uses_status_and_exact_persisted_instants#equality",
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_full_scheduled_seconds_are_separate_from_known_actual_minutes#1",
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_invalid_persisted_timestamps_fail_instead_of_normalizing#1",
+        "Tests\\Unit\\ProgressStatisticsServiceTest::test_completion_classification_uses_status_and_exact_persisted_instants#upper equality"
+      ]
+    },
+    "Tests\\Unit\\CompactProgressTrendsServiceTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactProgressTrendsServiceTest.php",
+      "origin_file": "tests/Unit/ProgressTrendsServiceTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\ProgressTrendsServiceTest::test_empty_period_is_zero_filled_ordered_and_independent_of_server_timezone",
+        "Tests\\Unit\\ProgressTrendsServiceTest::test_completion_classifications_parent_child_separation_half_open_boundaries_and_totals",
+        "Tests\\Unit\\ProgressTrendsServiceTest::test_start_attribution_full_duration_and_known_unknown_actual_time#0",
+        "Tests\\Unit\\ProgressTrendsServiceTest::test_exact_daily_membership_across_dst_skipped_repeated_and_disjoint_dates#0",
+        "Tests\\Unit\\ProgressTrendsServiceTest::test_exact_totals_reject_overflow_and_preserve_input",
+        "Tests\\Unit\\ProgressTrendsServiceTest::test_totals_never_coerce_invalid_metric_values#0",
+        "Tests\\Unit\\ProgressTrendsServiceTest::test_direct_pure_calculation_enforces_real_ordered_bounded_dates#0",
+        "Tests\\Unit\\ProgressTrendsServiceTest::test_start_attribution_full_duration_and_known_unknown_actual_time#5",
+        "Tests\\Unit\\ProgressTrendsServiceTest::test_exact_daily_membership_across_dst_skipped_repeated_and_disjoint_dates#5",
+        "Tests\\Unit\\ProgressTrendsServiceTest::test_totals_never_coerce_invalid_metric_values#5",
+        "Tests\\Unit\\ProgressTrendsServiceTest::test_direct_pure_calculation_enforces_real_ordered_bounded_dates#2",
+        "Tests\\Unit\\ProgressTrendsServiceTest::test_start_attribution_full_duration_and_known_unknown_actual_time#1"
+      ]
+    },
+    "Tests\\Unit\\CompactProgressComparisonServiceTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactProgressComparisonServiceTest.php",
+      "origin_file": "tests/Unit/ProgressComparisonServiceTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\ProgressComparisonServiceTest::test_invalid_period_pairs_are_rejected#0",
+        "Tests\\Unit\\ProgressComparisonServiceTest::test_valid_year_over_year_equal_nominal_periods_and_storage_edges",
+        "Tests\\Unit\\ProgressComparisonServiceTest::test_every_delta_leaf_is_exact_signed_ordered_and_inputs_are_immutable",
+        "Tests\\Unit\\ProgressComparisonServiceTest::test_overflowed_or_noninteger_operands_are_rejected_on_either_side#0",
+        "Tests\\Unit\\ProgressComparisonServiceTest::test_missing_or_extra_metric_keys_fail_closed",
+        "Tests\\Unit\\ProgressComparisonServiceTest::test_independent_work_all_statuses_unknown_actuals_and_factual_directions",
+        "Tests\\Unit\\ProgressComparisonServiceTest::test_comparison_uses_exact_dst_and_historical_date_membership#0",
+        "Tests\\Unit\\ProgressComparisonServiceTest::test_invalid_period_pairs_are_rejected#6"
+      ]
+    },
+    "Tests\\Unit\\CompactRelativeReminderRulesTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactRelativeReminderRulesTest.php",
+      "origin_file": "tests/Unit/RelativeReminderRulesTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\RelativeReminderRulesTest::test_exact_offset_types_and_signed_smallint#0",
+        "Tests\\Unit\\RelativeReminderRulesTest::test_exact_utc_arithmetic#0",
+        "Tests\\Unit\\RelativeReminderRulesTest::test_overflow_is_rejected_without_clamping#0",
+        "Tests\\Unit\\RelativeReminderRulesTest::test_missing_or_invalid_anchor_is_not_invented#0",
+        "Tests\\Unit\\RelativeReminderRulesTest::test_anchor_compatibility_and_creation_modes_leave_input_unchanged",
+        "Tests\\Unit\\RelativeReminderRulesTest::test_patch_preserves_mode_and_identity",
+        "Tests\\Unit\\RelativeReminderRulesTest::test_recalculation_or_cancellation_preserves_history#0",
+        "Tests\\Unit\\RelativeReminderRulesTest::test_exact_clock_equality_cancels_and_invalid_persisted_anchor_fails",
+        "Tests\\Unit\\RelativeReminderRulesTest::test_exact_offset_types_and_signed_smallint#16",
+        "Tests\\Unit\\RelativeReminderRulesTest::test_exact_utc_arithmetic#10"
+      ]
+    },
+    "Tests\\Unit\\CompactScheduleWorkbookParserTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactScheduleWorkbookParserTest.php",
+      "origin_file": "tests/Unit/ScheduleWorkbookParserTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\ScheduleWorkbookParserTest::test_real_workbook_produces_exact_weekly_template_without_inferred_fields",
+        "Tests\\Unit\\ScheduleWorkbookParserTest::test_region_can_be_shifted_and_times_and_whitespace_are_read_from_cells",
+        "Tests\\Unit\\ScheduleWorkbookParserTest::test_tiny_unsupported_layout_throws_controlled_error",
+        "Tests\\Unit\\ScheduleWorkbookParserTest::test_malformed_schedule_is_rejected#0",
+        "Tests\\Unit\\ScheduleWorkbookParserTest::test_two_complete_regions_are_ambiguous",
+        "Tests\\Unit\\ScheduleWorkbookParserTest::test_unreadable_file_throws_controlled_error"
+      ]
+    },
+    "Tests\\Unit\\CompactSemesterScheduleImportPlannerTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactSemesterScheduleImportPlannerTest.php",
+      "origin_file": "tests/Unit/SemesterScheduleImportPlannerTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\SemesterScheduleImportPlannerTest::test_pair_labels_map_explicitly_to_numbers#0",
+        "Tests\\Unit\\SemesterScheduleImportPlannerTest::test_unsupported_pair_is_never_inferred",
+        "Tests\\Unit\\SemesterScheduleImportPlannerTest::test_slot_identity_survives_catalog_time_and_room_changes",
+        "Tests\\Unit\\SemesterScheduleImportPlannerTest::test_reordered_baseline_keys_are_not_a_manual_edit",
+        "Tests\\Unit\\SemesterScheduleImportPlannerTest::test_manual_and_edited_missing_rows_are_preserved_while_removed_managed_rows_are_deleted",
+        "Tests\\Unit\\SemesterScheduleImportPlannerTest::test_identical_manual_rule_satisfies_import_without_adoption_but_difference_blocks",
+        "Tests\\Unit\\SemesterScheduleImportPlannerTest::test_identical_duplicates_are_classified_and_contradictions_are_errors",
+        "Tests\\Unit\\SemesterScheduleImportPlannerTest::test_adjacent_intervals_and_alternating_slots_are_valid_but_all_week_overlap_is_not",
+        "Tests\\Unit\\SemesterScheduleImportPlannerTest::test_missing_catalog_resolution_is_not_silently_written",
+        "Tests\\Unit\\SemesterScheduleImportPlannerTest::test_explicit_manual_flag_keeps_an_identical_baseline_protected"
+      ]
+    },
+    "Tests\\Unit\\CompactStudyReplanningAnalysisServiceTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactStudyReplanningAnalysisServiceTest.php",
+      "origin_file": "tests/Unit/StudyReplanningAnalysisServiceTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\StudyReplanningAnalysisServiceTest::test_valid_fully_reserved_session_excludes_itself_from_all_sources",
+        "Tests\\Unit\\StudyReplanningAnalysisServiceTest::test_equal_intervals_and_lesson_id_collision_are_not_excluded_by_value",
+        "Tests\\Unit\\StudyReplanningAnalysisServiceTest::test_classification_uses_existing_c8_codes#minimum",
+        "Tests\\Unit\\StudyReplanningAnalysisServiceTest::test_unsafe_work_is_classified_without_relocation#0",
+        "Tests\\Unit\\StudyReplanningAnalysisServiceTest::test_clock_equality_is_not_future_and_microseconds_are_not_truncated",
+        "Tests\\Unit\\StudyReplanningAnalysisServiceTest::test_oversubscribed_reservations_use_exact_remaining_effort",
+        "Tests\\Unit\\StudyReplanningAnalysisServiceTest::test_deadline_priority_start_and_id_order_is_stable",
+        "Tests\\Unit\\StudyReplanningAnalysisServiceTest::test_projections_share_capacity_breaks_and_work_effort_without_mutating_inputs",
+        "Tests\\Unit\\StudyReplanningAnalysisServiceTest::test_valid_reservation_stays_protected_while_invalid_neighbor_moves",
+        "Tests\\Unit\\StudyReplanningAnalysisServiceTest::test_one_successor_limit_does_not_split_or_balance_short_tail",
+        "Tests\\Unit\\StudyReplanningAnalysisServiceTest::test_exact_partial_and_unplaced_replacements#0",
+        "Tests\\Unit\\StudyReplanningAnalysisServiceTest::test_malformed_or_unknown_exclusions_fail#0"
+      ]
+    },
+    "Tests\\Unit\\CompactStudySessionLifecycleRulesTest": {
+      "category": "unit",
+      "file": "tests/Unit/CompactStudySessionLifecycleRulesTest.php",
+      "origin_file": "tests/Unit/StudySessionLifecycleRulesTest.php",
+      "retained_cases": [
+        "Tests\\Unit\\StudySessionLifecycleRulesTest::test_exact_transition_policy#planned complete 08:59:59.999999",
+        "Tests\\Unit\\StudySessionLifecycleRulesTest::test_actual_minutes_never_coerce#0",
+        "Tests\\Unit\\StudySessionLifecycleRulesTest::test_new_completion_requires_reported_actual_and_maximum_is_valid",
+        "Tests\\Unit\\StudySessionLifecycleRulesTest::test_strict_wire_timestamp#0",
+        "Tests\\Unit\\StudySessionLifecycleRulesTest::test_timestamp_round_trip_at_mysql_bounds_and_leap_day",
+        "Tests\\Unit\\StudySessionLifecycleRulesTest::test_valid_chain_and_partial_summary_do_not_modify_inputs",
+        "Tests\\Unit\\StudySessionLifecycleRulesTest::test_split_history_accepts_multiple_successors",
+        "Tests\\Unit\\StudySessionLifecycleRulesTest::test_invalid_graphs_fail_closed#0",
+        "Tests\\Unit\\StudySessionLifecycleRulesTest::test_replacement_cannot_inflate_reservation#0",
+        "Tests\\Unit\\StudySessionLifecycleRulesTest::test_exact_transition_policy#cancelled reschedule 12:00:00.123456",
+        "Tests\\Unit\\StudySessionLifecycleRulesTest::test_actual_minutes_never_coerce#8",
+        "Tests\\Unit\\StudySessionLifecycleRulesTest::test_strict_wire_timestamp#13",
+        "Tests\\Unit\\StudySessionLifecycleRulesTest::test_invalid_graphs_fail_closed#8"
+      ]
+    },
+    "Tests\\Feature\\CompactAuthProfileTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactAuthProfileTest.php",
+      "origin_file": "tests/Feature/AuthProfileTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AuthProfileTest::test_registration_persists_hash_defaults_and_authenticates_a_rotated_session",
+        "Tests\\Feature\\AuthProfileTest::test_registration_accepts_an_iana_timezone",
+        "Tests\\Feature\\AuthProfileTest::test_invalid_registration_is_rejected#required fields",
+        "Tests\\Feature\\AuthProfileTest::test_duplicate_email_registration_is_rejected",
+        "Tests\\Feature\\AuthProfileTest::test_login_authenticates_and_rotates_session_without_issuing_a_token",
+        "Tests\\Feature\\AuthProfileTest::test_partial_profile_updates_and_own_email_are_accepted"
+      ]
+    },
+    "Tests\\Feature\\CompactEmailVerificationTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactEmailVerificationTest.php",
+      "origin_file": "tests/Feature/EmailVerificationTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\EmailVerificationTest::test_only_explicit_request_sends_to_current_account_and_client_cannot_choose_recipient",
+        "Tests\\Feature\\EmailVerificationTest::test_resends_are_limited_per_account_per_minute_and_hour",
+        "Tests\\Feature\\EmailVerificationTest::test_verified_account_never_receives_another_verification_email",
+        "Tests\\Feature\\EmailVerificationTest::test_real_notification_renders_ukrainian_html_and_text_to_current_address_in_memory_only",
+        "Tests\\Feature\\EmailVerificationTest::test_signed_post_marks_verified_once_and_profile_exposes_the_result",
+        "Tests\\Feature\\EmailVerificationTest::test_email_change_resets_verification_old_link_fails_and_new_link_works"
+      ]
+    },
+    "Tests\\Feature\\CompactTaskApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactTaskApiTest.php",
+      "origin_file": "tests/Feature/TaskApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\TaskApiTest::test_minimal_create_defaults_and_public_shape",
+        "Tests\\Feature\\TaskApiTest::test_owned_subject_and_all_optional_fields",
+        "Tests\\Feature\\TaskApiTest::test_explicit_nullable_fields_can_be_null_on_create",
+        "Tests\\Feature\\TaskApiTest::test_approved_priority_and_estimate_bounds#0",
+        "Tests\\Feature\\TaskApiTest::test_invalid_input_has_no_create_or_partial_patch_mutation#title 0",
+        "Tests\\Feature\\TaskApiTest::test_title_is_required_on_create"
+      ]
+    },
+    "Tests\\Feature\\CompactTaskIndexTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactTaskIndexTest.php",
+      "origin_file": "tests/Feature/TaskIndexTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\TaskIndexTest::test_empty_collection_has_standard_pagination",
+        "Tests\\Feature\\TaskIndexTest::test_listing_is_owned_non_deleted_and_read_only_with_subject_masking",
+        "Tests\\Feature\\TaskIndexTest::test_status_filters#0",
+        "Tests\\Feature\\TaskIndexTest::test_canonical_string_priority_filters#0"
+      ]
+    },
+    "Tests\\Feature\\CompactTaskLifecycleTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactTaskLifecycleTest.php",
+      "origin_file": "tests/Feature/TaskLifecycleTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\TaskLifecycleTest::test_complete_preserves_unrelated_fields_and_returns_exact_resource_with_actual_late_completion",
+        "Tests\\Feature\\TaskLifecycleTest::test_task_without_deadline_can_complete",
+        "Tests\\Feature\\TaskLifecycleTest::test_reopen_preserves_unrelated_fields_and_recompletion_uses_a_new_instant",
+        "Tests\\Feature\\TaskLifecycleTest::test_repeated_operation_is_idempotent_without_any_update_query#0",
+        "Tests\\Feature\\TaskLifecycleTest::test_completion_clock_is_utc_even_with_different_server_and_user_timezones",
+        "Tests\\Feature\\TaskLifecycleTest::test_direct_service_calls_do_not_mutate_soft_deleted_tasks#0"
+      ]
+    },
+    "Tests\\Feature\\CompactTaskMissedStatusTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactTaskMissedStatusTest.php",
+      "origin_file": "tests/Feature/TaskMissedStatusTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\TaskMissedStatusTest::test_explicit_miss_preserves_deadline_and_remaining_plan_after_credit_and_reservations",
+        "Tests\\Feature\\TaskMissedStatusTest::test_missed_task_can_reopen_or_complete_without_changing_subtasks#0",
+        "Tests\\Feature\\TaskMissedStatusTest::test_stale_model_cannot_mark_a_concurrently_completed_task_missed",
+        "Tests\\Feature\\TaskMissedStatusTest::test_missed_task_can_reopen_or_complete_without_changing_subtasks#1"
+      ]
+    },
+    "Tests\\Feature\\CompactSubtaskApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactSubtaskApiTest.php",
+      "origin_file": "tests/Feature/SubtaskApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SubtaskApiTest::test_minimal_create_exact_resource_and_trusted_internal_fields_under_completed_parent",
+        "Tests\\Feature\\SubtaskApiTest::test_full_create_valid_values_and_patch#0",
+        "Tests\\Feature\\SubtaskApiTest::test_create_accepts_null_optionals_and_requires_title",
+        "Tests\\Feature\\SubtaskApiTest::test_positions_append_from_active_maximum_and_ignore_deleted_history",
+        "Tests\\Feature\\SubtaskApiTest::test_last_position_is_usable_then_capacity_failure_is_controlled_without_renumbering",
+        "Tests\\Feature\\SubtaskApiTest::test_collection_is_position_then_id_ordered_and_read_only"
+      ]
+    },
+    "Tests\\Feature\\CompactSubtaskLifecycleTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactSubtaskLifecycleTest.php",
+      "origin_file": "tests/Feature/SubtaskLifecycleTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SubtaskLifecycleTest::test_complete_is_late_utc_whole_second_and_preserves_exact_public_fields",
+        "Tests\\Feature\\SubtaskLifecycleTest::test_complete_reopen_and_complete_again_records_new_instant_and_regular_patch_preserves_lifecycle",
+        "Tests\\Feature\\SubtaskLifecycleTest::test_repeated_operation_preserves_all_persisted_data_without_update#0",
+        "Tests\\Feature\\SubtaskLifecycleTest::test_parent_siblings_sessions_and_deadlines_are_preserved_while_reminders_cancel_once#0",
+        "Tests\\Feature\\SubtaskLifecycleTest::test_stale_child_models_do_not_determine_the_transition#0",
+        "Tests\\Feature\\SubtaskLifecycleTest::test_serialized_stale_requests_preserve_first_completion_then_allow_a_new_one"
+      ]
+    },
+    "Tests\\Feature\\CompactSubtaskReorderTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactSubtaskReorderTest.php",
+      "origin_file": "tests/Feature/SubtaskReorderTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SubtaskReorderTest::test_valid_permutations_normalize_positions_and_preserve_other_fields#empty",
+        "Tests\\Feature\\SubtaskReorderTest::test_identical_dense_order_is_idempotent_without_update_and_create_still_appends",
+        "Tests\\Feature\\SubtaskReorderTest::test_invalid_request_shapes_and_ids_return_validation_without_writes#missing",
+        "Tests\\Feature\\SubtaskReorderTest::test_json_objects_and_malformed_values_cannot_masquerade_as_arrays#0",
+        "Tests\\Feature\\SubtaskReorderTest::test_non_json_permutation_is_rejected",
+        "Tests\\Feature\\SubtaskReorderTest::test_integral_json_float_matching_an_existing_id_is_rejected"
+      ]
+    },
+    "Tests\\Feature\\CompactEducationInstitutionApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactEducationInstitutionApiTest.php",
+      "origin_file": "tests/Feature/EducationInstitutionApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\EducationInstitutionApiTest::test_collection_is_user_scoped_and_ordered_by_name_then_id",
+        "Tests\\Feature\\EducationInstitutionApiTest::test_empty_collection_is_a_resource_collection",
+        "Tests\\Feature\\EducationInstitutionApiTest::test_owner_can_show_update_and_keep_same_name_without_reassigning_owner",
+        "Tests\\Feature\\EducationInstitutionApiTest::test_per_user_name_uniqueness_for_create_and_update"
+      ]
+    },
+    "Tests\\Feature\\CompactAcademicPeriodApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactAcademicPeriodApiTest.php",
+      "origin_file": "tests/Feature/AcademicPeriodApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AcademicPeriodApiTest::test_list_is_user_scoped_and_ordered_by_start_then_id",
+        "Tests\\Feature\\AcademicPeriodApiTest::test_empty_list_uses_resource_collection",
+        "Tests\\Feature\\AcademicPeriodApiTest::test_create_with_owned_institution_and_owner_show",
+        "Tests\\Feature\\AcademicPeriodApiTest::test_equal_date_range_is_valid_on_create_and_partial_patch",
+        "Tests\\Feature\\AcademicPeriodApiTest::test_invalid_complete_range_and_partial_date_changes_return_422_without_changes",
+        "Tests\\Feature\\AcademicPeriodApiTest::test_invalid_input_is_rejected_for_create_and_patch#0"
+      ]
+    },
+    "Tests\\Feature\\CompactSubjectApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactSubjectApiTest.php",
+      "origin_file": "tests/Feature/SubjectApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SubjectApiTest::test_list_is_current_user_scoped_and_ordered_by_name",
+        "Tests\\Feature\\SubjectApiTest::test_empty_list_is_a_resource_collection",
+        "Tests\\Feature\\SubjectApiTest::test_all_optional_fields_owned_institution_and_owner_show",
+        "Tests\\Feature\\SubjectApiTest::test_name_unique_per_owner_across_institutions_but_code_is_not_unique",
+        "Tests\\Feature\\SubjectApiTest::test_valid_colors_are_preserved_on_create_and_patch#0",
+        "Tests\\Feature\\SubjectApiTest::test_invalid_fields_fail_create_and_patch_without_mutating#0"
+      ]
+    },
+    "Tests\\Feature\\CompactTeacherApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactTeacherApiTest.php",
+      "origin_file": "tests/Feature/TeacherApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\TeacherApiTest::test_list_is_user_scoped_and_ordered_by_name_then_id_for_duplicate_names",
+        "Tests\\Feature\\TeacherApiTest::test_empty_list_returns_resource_collection",
+        "Tests\\Feature\\TeacherApiTest::test_owned_institution_create_owner_show_and_partial_update_attach_detach",
+        "Tests\\Feature\\TeacherApiTest::test_duplicate_teacher_names_are_allowed_on_create_and_update"
+      ]
+    },
+    "Tests\\Feature\\CompactLessonApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactLessonApiTest.php",
+      "origin_file": "tests/Feature/LessonApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\LessonApiTest::test_optional_associations_may_have_different_institutions_but_same_user",
+        "Tests\\Feature\\LessonApiTest::test_all_approved_types_are_accepted#0",
+        "Tests\\Feature\\LessonApiTest::test_explicit_null_optionals_are_accepted_on_create",
+        "Tests\\Feature\\LessonApiTest::test_post_requires_all_nonnullable_fields_and_no_general_index_exists",
+        "Tests\\Feature\\LessonApiTest::test_invalid_manual_fields_fail_create_and_patch_without_changes#0",
+        "Tests\\Feature\\LessonApiTest::test_noncanonical_or_invalid_utc_is_rejected_on_create_and_patch#0"
+      ]
+    },
+    "Tests\\Feature\\CompactScheduleViewTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactScheduleViewTest.php",
+      "origin_file": "tests/Feature/ScheduleViewTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ScheduleViewTest::test_date_and_week_reject_noncanonical_dates#0",
+        "Tests\\Feature\\ScheduleViewTest::test_empty_schedules_have_correct_metadata#0",
+        "Tests\\Feature\\ScheduleViewTest::test_today_uses_each_users_local_date_independently_of_server_timezone",
+        "Tests\\Feature\\ScheduleViewTest::test_date_uses_overlap_boundaries_and_only_effective_owned_lessons",
+        "Tests\\Feature\\ScheduleViewTest::test_iso_week_contains_all_seven_days_and_excludes_surrounding_boundaries",
+        "Tests\\Feature\\ScheduleViewTest::test_dst_calendar_ranges_use_true_utc_boundaries#0"
+      ]
+    },
+    "Tests\\Feature\\CompactSemesterScheduleManagementTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactSemesterScheduleManagementTest.php",
+      "origin_file": "tests/Feature/SemesterScheduleManagementTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SemesterScheduleManagementTest::test_manual_creation_detail_uniqueness_and_empty_safe_deletion",
+        "Tests\\Feature\\SemesterScheduleManagementTest::test_rules_propagate_on_normal_dates_and_keep_ids_across_identity_changes",
+        "Tests\\Feature\\SemesterScheduleManagementTest::test_alternating_rules_and_anchor_updates_use_shared_calculator",
+        "Tests\\Feature\\SemesterScheduleManagementTest::test_invalid_rule_fields_are_controlled_without_writes#0",
+        "Tests\\Feature\\SemesterScheduleManagementTest::test_conflicts_reject_duplicate_effective_pairs_and_overlaps_but_accept_adjacency",
+        "Tests\\Feature\\SemesterScheduleManagementTest::test_single_pair_copy_changes_preserve_others_and_freeze_full_day"
+      ]
+    },
+    "Tests\\Feature\\CompactSemesterScheduleReadApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactSemesterScheduleReadApiTest.php",
+      "origin_file": "tests/Feature/SemesterScheduleReadApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SemesterScheduleReadApiTest::test_list_contains_only_owned_schedules_and_empty_list_needs_no_creation",
+        "Tests\\Feature\\SemesterScheduleReadApiTest::test_detail_contains_owned_academic_context_and_explicit_anchor",
+        "Tests\\Feature\\SemesterScheduleReadApiTest::test_date_validation_cannot_be_overridden_by_query_arguments#0",
+        "Tests\\Feature\\SemesterScheduleReadApiTest::test_day_occurrence_is_a_stable_virtual_resource_with_optional_metadata",
+        "Tests\\Feature\\SemesterScheduleReadApiTest::test_iso_week_preserves_pair_numbers_and_alternates_tuesday",
+        "Tests\\Feature\\SemesterScheduleReadApiTest::test_replacement_is_frozen_for_one_day_and_deletion_restores_base"
+      ]
+    },
+    "Tests\\Feature\\CompactSemesterScheduleImportWorkflowTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactSemesterScheduleImportWorkflowTest.php",
+      "origin_file": "tests/Feature/SemesterScheduleImportWorkflowTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SemesterScheduleImportWorkflowTest::test_upload_confirm_and_stage2_reads_form_a_complete_weekly_import",
+        "Tests\\Feature\\SemesterScheduleImportWorkflowTest::test_missing_catalogs_are_prepared_without_writes_and_manual_catalog_changes_require_revalidation",
+        "Tests\\Feature\\SemesterScheduleImportWorkflowTest::test_ambiguous_owned_teacher_requires_catalog_repair",
+        "Tests\\Feature\\SemesterScheduleImportWorkflowTest::test_changed_authoritative_state_invalidates_confirmation#0",
+        "Tests\\Feature\\SemesterScheduleImportWorkflowTest::test_repeated_confirmation_and_identical_reimport_do_not_duplicate_or_touch_rules",
+        "Tests\\Feature\\SemesterScheduleImportWorkflowTest::test_two_previews_for_one_period_require_reconfirmation_after_the_first_commit"
+      ]
+    },
+    "Tests\\Feature\\CompactPlanningPreferenceApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactPlanningPreferenceApiTest.php",
+      "origin_file": "tests/Feature/PlanningPreferenceApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\PlanningPreferenceApiTest::test_missing_preferences_return_null_configuration_without_persistence",
+        "Tests\\Feature\\PlanningPreferenceApiTest::test_get_returns_only_current_users_values",
+        "Tests\\Feature\\PlanningPreferenceApiTest::test_storage_boundaries_and_equal_bounds_are_accepted_as_json_integers",
+        "Tests\\Feature\\PlanningPreferenceApiTest::test_invalid_scalars_are_validation_errors_without_persisting#max_daily_study_minutes 0",
+        "Tests\\Feature\\PlanningPreferenceApiTest::test_put_requires_each_key#0",
+        "Tests\\Feature\\PlanningPreferenceApiTest::test_cross_field_rules_reject_create_and_replacement_before_database_errors#0"
+      ]
+    },
+    "Tests\\Feature\\CompactStudyAvailabilityApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactStudyAvailabilityApiTest.php",
+      "origin_file": "tests/Feature/StudyAvailabilityApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\StudyAvailabilityApiTest::test_empty_list_returns_resource_collection",
+        "Tests\\Feature\\StudyAvailabilityApiTest::test_invalid_create_is_422_and_does_not_persist#weekday zero",
+        "Tests\\Feature\\StudyAvailabilityApiTest::test_create_requires_all_interval_fields",
+        "Tests\\Feature\\StudyAvailabilityApiTest::test_explicit_sunday_monday_midnight_split_preserves_local_times",
+        "Tests\\Feature\\StudyAvailabilityApiTest::test_overlapping_and_identical_creates_fail_before_database_unique_constraint#0",
+        "Tests\\Feature\\StudyAvailabilityApiTest::test_adjacency_different_weekdays_and_other_users_do_not_conflict"
+      ]
+    },
+    "Tests\\Feature\\CompactFreeSlotsApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactFreeSlotsApiTest.php",
+      "origin_file": "tests/Feature/FreeSlotsApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\FreeSlotsApiTest::test_individual_invalid_dates_return_standard_validation_errors_without_range_parsing#start_date 0",
+        "Tests\\Feature\\FreeSlotsApiTest::test_reversed_range_and_32_dates_fail_but_31_local_dates_across_dst_are_accepted",
+        "Tests\\Feature\\FreeSlotsApiTest::test_noncanonical_or_out_of_range_minimum_query_values_are_rejected#0",
+        "Tests\\Feature\\FreeSlotsApiTest::test_valid_minimum_minutes_are_converted_to_seconds_and_filter_inclusively#absent does not filter one second",
+        "Tests\\Feature\\FreeSlotsApiTest::test_empty_availability_returns_exact_authenticated_metadata_without_creating_preferences#0",
+        "Tests\\Feature\\FreeSlotsApiTest::test_no_minimum_does_not_read_preference_defaults_or_apply_pf2_constraints"
+      ]
+    },
+    "Tests\\Feature\\CompactStudyPlanApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactStudyPlanApiTest.php",
+      "origin_file": "tests/Feature/StudyPlanApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\StudyPlanApiTest::test_preview_is_actual_stage_b_with_public_utc_resource_encrypted_token_and_no_writes",
+        "Tests\\Feature\\StudyPlanApiTest::test_full_plan_is_created_with_exact_fields_and_no_other_application_mutations",
+        "Tests\\Feature\\StudyPlanApiTest::test_partial_plan_requires_explicit_true_and_persists_only_the_reviewed_allocation",
+        "Tests\\Feature\\StudyPlanApiTest::test_empty_plan_is_a_valid_preview_but_cannot_be_confirmed#0",
+        "Tests\\Feature\\StudyPlanApiTest::test_preview_input_is_exact_body_only_and_rejects_server_fields#0",
+        "Tests\\Feature\\StudyPlanApiTest::test_post_query_parameters_never_override_or_supply_body_input"
+      ]
+    },
+    "Tests\\Feature\\CompactStudySessionApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactStudySessionApiTest.php",
+      "origin_file": "tests/Feature/StudySessionApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\StudySessionApiTest::test_list_uses_half_open_overlap_status_independence_and_stable_start_id_order_without_writes",
+        "Tests\\Feature\\StudySessionApiTest::test_list_date_range_uses_exact_local_membership_across_dst_and_skipped_dates#0",
+        "Tests\\Feature\\StudySessionApiTest::test_list_requires_canonical_bounded_query_dates#0",
+        "Tests\\Feature\\StudySessionApiTest::test_get_body_cannot_supply_dates_and_31_dates_are_accepted",
+        "Tests\\Feature\\StudySessionApiTest::test_list_date_range_uses_exact_local_membership_across_dst_and_skipped_dates#6",
+        "Tests\\Feature\\StudySessionApiTest::test_list_requires_canonical_bounded_query_dates#5"
+      ]
+    },
+    "Tests\\Feature\\CompactStudySessionLifecycleTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactStudySessionLifecycleTest.php",
+      "origin_file": "tests/Feature/StudySessionLifecycleTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\StudySessionLifecycleTest::test_completion_preserves_history_and_uses_actual_first_accounting#0",
+        "Tests\\Feature\\StudySessionLifecycleTest::test_full_precision_lifecycle_boundaries#0",
+        "Tests\\Feature\\StudySessionLifecycleTest::test_all_terminal_states_reject_every_action_without_writes#completed complete",
+        "Tests\\Feature\\StudySessionLifecycleTest::test_completion_http_rejects_non_integer_and_explicit_null#0",
+        "Tests\\Feature\\StudySessionLifecycleTest::test_arbitrary_fields_are_rejected_even_when_null#0",
+        "Tests\\Feature\\StudySessionLifecycleTest::test_valid_owned_deleted_work_history_can_transition#0"
+      ]
+    },
+    "Tests\\Feature\\CompactReminderApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactReminderApiTest.php",
+      "origin_file": "tests/Feature/ReminderApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ReminderApiTest::test_create_each_target_or_general_preserves_all_other_tables#0",
+        "Tests\\Feature\\ReminderApiTest::test_strict_body_validation#0",
+        "Tests\\Feature\\ReminderApiTest::test_ineligible_targets#0",
+        "Tests\\Feature\\ReminderApiTest::test_future_boundaries_and_full_precision",
+        "Tests\\Feature\\ReminderApiTest::test_update_preserves_identity_and_target_and_rejects_replacement",
+        "Tests\\Feature\\ReminderApiTest::test_general_message_cannot_be_removed_and_exact_whitespace_is_preserved"
+      ]
+    },
+    "Tests\\Feature\\CompactNotificationInboxApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactNotificationInboxApiTest.php",
+      "origin_file": "tests/Feature/NotificationInboxApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\NotificationInboxApiTest::test_owned_list_representation_filters_pagination_and_stable_order_do_not_write",
+        "Tests\\Feature\\NotificationInboxApiTest::test_mark_read_is_idempotent_and_never_changes_payload_or_reminder",
+        "Tests\\Feature\\NotificationInboxApiTest::test_read_body_is_empty_and_query_cannot_override_server_timestamp",
+        "Tests\\Feature\\NotificationInboxApiTest::test_history_survives_source_changes_and_physical_purge_without_rewriting_payload"
+      ]
+    },
+    "Tests\\Feature\\CompactProgressStatisticsApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactProgressStatisticsApiTest.php",
+      "origin_file": "tests/Feature/ProgressStatisticsApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ProgressStatisticsApiTest::test_valid_local_periods_and_stable_empty_contract#0",
+        "Tests\\Feature\\ProgressStatisticsApiTest::test_strict_dates_range_and_unknown_query_fields#0",
+        "Tests\\Feature\\ProgressStatisticsApiTest::test_both_query_dates_required_and_body_cannot_supply_or_override_them",
+        "Tests\\Feature\\ProgressStatisticsApiTest::test_current_counts_are_lifetime_and_parent_child_status_and_deadlines_are_independent",
+        "Tests\\Feature\\ProgressStatisticsApiTest::test_missed_current_counts_are_separate_owned_active_and_do_not_change_completion_denominator",
+        "Tests\\Feature\\ProgressStatisticsApiTest::test_completion_percentage_uses_only_current_owned_active_tasks_across_all_dates#0"
+      ]
+    },
+    "Tests\\Feature\\CompactProgressTrendsApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactProgressTrendsApiTest.php",
+      "origin_file": "tests/Feature/ProgressTrendsApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ProgressTrendsApiTest::test_zero_filled_contract_for_one_day_week_month_custom_and_storage_edge_labels#0",
+        "Tests\\Feature\\ProgressTrendsApiTest::test_exact_g1_query_validation_and_unknown_filter_rejection#0",
+        "Tests\\Feature\\ProgressTrendsApiTest::test_mysql_attribution_matches_exact_daily_timezone_membership_and_g1#0",
+        "Tests\\Feature\\ProgressTrendsApiTest::test_full_scheduled_duration_on_short_and_long_dst_days#0",
+        "Tests\\Feature\\ProgressTrendsApiTest::test_lateness_uses_exact_own_deadlines_and_current_state_after_edits_reopening_and_deletion",
+        "Tests\\Feature\\ProgressTrendsApiTest::test_soft_deleted_work_is_excluded_and_sessions_retain_deleted_parent_child_history"
+      ]
+    },
+    "Tests\\Feature\\CompactProgressComparisonApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactProgressComparisonApiTest.php",
+      "origin_file": "tests/Feature/ProgressComparisonApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ProgressComparisonApiTest::test_empty_contract_for_valid_one_day_31_day_nonadjacent_year_over_year_and_storage_edge_periods#0",
+        "Tests\\Feature\\ProgressComparisonApiTest::test_strict_calendar_unknown_query_and_pair_validation#0",
+        "Tests\\Feature\\ProgressComparisonApiTest::test_all_four_query_dates_required_and_body_cannot_supply_or_override_them",
+        "Tests\\Feature\\ProgressComparisonApiTest::test_all_persisted_metrics_signed_deltas_and_unknown_actual_flags_reconcile_both_periods",
+        "Tests\\Feature\\ProgressComparisonApiTest::test_exact_dst_skipped_and_disjoint_historical_membership#0",
+        "Tests\\Feature\\ProgressComparisonApiTest::test_equal_nominal_dst_days_preserve_different_elapsed_seconds"
+      ]
+    },
+    "Tests\\Feature\\CompactWorkloadAdviceApiTest": {
+      "category": "rest",
+      "file": "tests/Feature/CompactWorkloadAdviceApiTest.php",
+      "origin_file": "tests/Feature/WorkloadAdviceApiTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\WorkloadAdviceApiTest::test_empty_exact_contract_has_no_tokens_or_materialized_preferences",
+        "Tests\\Feature\\WorkloadAdviceApiTest::test_advice_matches_the_direct_planner_and_reports_only_observed_constraints#0",
+        "Tests\\Feature\\WorkloadAdviceApiTest::test_missing_estimate_expiry_and_completed_work_are_excluded_while_missed_work_remains_actionable",
+        "Tests\\Feature\\WorkloadAdviceApiTest::test_priority_rank_preserves_deadlines_parent_priority_and_child_positions_without_parent_duplicates",
+        "Tests\\Feature\\WorkloadAdviceApiTest::test_existing_overload_has_separate_measured_evidence_and_excludes_retired_sessions#0",
+        "Tests\\Feature\\WorkloadAdviceApiTest::test_completed_effort_future_reservations_and_owner_boundaries_are_shared_with_planning"
+      ]
+    },
+    "Tests\\Feature\\CompactFreeTimeServiceTest": {
+      "category": "integration",
+      "file": "tests/Feature/CompactFreeTimeServiceTest.php",
+      "origin_file": "tests/Feature/FreeTimeServiceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\FreeTimeServiceTest::test_empty_expansion_skips_blocker_queries_and_does_not_materialize_preferences#0",
+        "Tests\\Feature\\FreeTimeServiceTest::test_preferences_never_supply_defaults_limits_or_breaks#0",
+        "Tests\\Feature\\FreeTimeServiceTest::test_matching_owned_windows_expand_and_normalize_across_inclusive_dates#multiple windows sorted",
+        "Tests\\Feature\\FreeTimeServiceTest::test_only_non_deleted_active_lessons_block#0",
+        "Tests\\Feature\\FreeTimeServiceTest::test_effective_active_replacement_blocks_while_replaced_original_remains_ineffective",
+        "Tests\\Feature\\FreeTimeServiceTest::test_lesson_and_session_overlap_queries_include_spanning_events_and_exclude_exact_adjacency#lesson inside",
+        "Tests\\Feature\\FreeTimeServiceTest::test_only_planned_sessions_block_even_when_the_requested_date_is_historical#0"
+      ]
+    },
+    "Tests\\Feature\\CompactStudyPlanningServiceTest": {
+      "category": "integration",
+      "file": "tests/Feature/CompactStudyPlanningServiceTest.php",
+      "origin_file": "tests/Feature/StudyPlanningServiceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\StudyPlanningServiceTest::test_stage_a_to_b_returns_exact_in_memory_contract_without_materializing_preferences",
+        "Tests\\Feature\\StudyPlanningServiceTest::test_empty_or_excluded_stage_a_work_remains_excluded#0",
+        "Tests\\Feature\\StudyPlanningServiceTest::test_effective_lesson_and_session_source_policies_are_reused#0",
+        "Tests\\Feature\\StudyPlanningServiceTest::test_completed_and_planned_scheduled_workload_is_distinct_from_stage_a_actual_credit#0",
+        "Tests\\Feature\\StudyPlanningServiceTest::test_consecutive_generated_sessions_project_occupied_time_breaks_and_workload",
+        "Tests\\Feature\\StudyPlanningServiceTest::test_active_replacement_and_breaks_allow_exact_elapsed_equality",
+        "Tests\\Feature\\StudyPlanningServiceTest::test_sources_before_and_after_requested_local_dates_still_require_breaks",
+        "Tests\\Feature\\StudyPlanningServiceTest::test_short_tail_is_balanced_only_with_valid_next_placement"
+      ]
+    },
+    "Tests\\Feature\\CompactPlanningWorkSelectionServiceTest": {
+      "category": "integration",
+      "file": "tests/Feature/CompactPlanningWorkSelectionServiceTest.php",
+      "origin_file": "tests/Feature/PlanningWorkSelectionServiceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\PlanningWorkSelectionServiceTest::test_empty_user_and_one_task_return_the_exact_public_contract",
+        "Tests\\Feature\\PlanningWorkSelectionServiceTest::test_parent_and_child_statuses_are_independent_and_excluded_without_mutation#0",
+        "Tests\\Feature\\PlanningWorkSelectionServiceTest::test_active_children_override_parent_estimate_and_missing_sibling_is_partially_eligible",
+        "Tests\\Feature\\PlanningWorkSelectionServiceTest::test_only_deleted_children_restore_task_authority_without_reassigning_child_history",
+        "Tests\\Feature\\PlanningWorkSelectionServiceTest::test_parent_history_and_deleted_child_history_do_not_credit_surviving_children",
+        "Tests\\Feature\\PlanningWorkSelectionServiceTest::test_each_status_has_exact_credit_or_reservation_semantics#planned historical",
+        "Tests\\Feature\\PlanningWorkSelectionServiceTest::test_historical_actual_first_credits_and_second_precision#0"
+      ]
+    },
+    "Tests\\Feature\\CompactPlanningCandidateEvaluationServiceTest": {
+      "category": "integration",
+      "file": "tests/Feature/CompactPlanningCandidateEvaluationServiceTest.php",
+      "origin_file": "tests/Feature/PlanningCandidateEvaluationServiceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\PlanningCandidateEvaluationServiceTest::test_availability_and_nullable_preferences#valid no row",
+        "Tests\\Feature\\PlanningCandidateEvaluationServiceTest::test_workload_status_selection_and_scheduled_not_actual_duration#0",
+        "Tests\\Feature\\PlanningCandidateEvaluationServiceTest::test_mixed_statuses_and_equal_overlapping_records_are_additive_once_per_record",
+        "Tests\\Feature\\PlanningCandidateEvaluationServiceTest::test_workload_full_local_periods_and_overlap_boundaries#earlier same local day",
+        "Tests\\Feature\\PlanningCandidateEvaluationServiceTest::test_only_effective_lessons_and_planned_sessions_are_break_anchors#lesson active",
+        "Tests\\Feature\\PlanningCandidateEvaluationServiceTest::test_break_envelope_and_exact_elapsed_seconds#before equality",
+        "Tests\\Feature\\PlanningCandidateEvaluationServiceTest::test_no_lesson_type_exemptions_and_active_replacements_count#0"
+      ]
+    },
+    "Tests\\Feature\\CompactEffectiveScheduleServiceTest": {
+      "category": "integration",
+      "file": "tests/Feature/CompactEffectiveScheduleServiceTest.php",
+      "origin_file": "tests/Feature/EffectiveScheduleServiceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\EffectiveScheduleServiceTest::test_alternating_tuesdays_and_updated_base_rules_are_read_without_materialization",
+        "Tests\\Feature\\EffectiveScheduleServiceTest::test_date_exception_is_independent_and_deletion_restores_the_base_day",
+        "Tests\\Feature\\EffectiveScheduleServiceTest::test_working_saturday_is_a_frozen_isolated_snapshot",
+        "Tests\\Feature\\EffectiveScheduleServiceTest::test_reads_use_persisted_timezone_and_do_not_write_or_mutate_input_models",
+        "Tests\\Feature\\EffectiveScheduleServiceTest::test_mysql_prevents_cross_schedule_snapshot_provenance_even_for_same_owner",
+        "Tests\\Feature\\EffectiveScheduleServiceTest::test_duplicate_period_day_and_pair_keys_are_enforced_on_insert",
+        "Tests\\Feature\\EffectiveScheduleServiceTest::test_kyiv_dst_gap_is_not_silently_shifted_by_eloquent_or_php"
+      ]
+    },
+    "Tests\\Feature\\CompactScheduleImportCandidateClassifierTest": {
+      "category": "integration",
+      "file": "tests/Feature/CompactScheduleImportCandidateClassifierTest.php",
+      "origin_file": "tests/Feature/ScheduleImportCandidateClassifierTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ScheduleImportCandidateClassifierTest::test_real_workbook_pipeline_classifies_thirty_valid_creates_without_writes",
+        "Tests\\Feature\\ScheduleImportCandidateClassifierTest::test_active_identical_import_is_duplicate_even_with_a_corrected_type_and_no_batch#0",
+        "Tests\\Feature\\ScheduleImportCandidateClassifierTest::test_active_identity_source_changes_classify_update_and_preserve_stored_type#0",
+        "Tests\\Feature\\ScheduleImportCandidateClassifierTest::test_cancelled_or_replaced_identity_is_preserved_without_projecting_it#0",
+        "Tests\\Feature\\ScheduleImportCandidateClassifierTest::test_preserved_original_does_not_project_but_active_replacement_blocks_other_candidates",
+        "Tests\\Feature\\ScheduleImportCandidateClassifierTest::test_deleted_identity_is_reserved_for_restore_without_restoring_or_changing_type#0",
+        "Tests\\Feature\\ScheduleImportCandidateClassifierTest::test_restore_conflict_propagates_to_repeated_rows_and_does_not_restore_history"
+      ]
+    },
+    "Tests\\Feature\\CompactScheduleOccurrenceResolverTest": {
+      "category": "integration",
+      "file": "tests/Feature/CompactScheduleOccurrenceResolverTest.php",
+      "origin_file": "tests/Feature/ScheduleOccurrenceResolverTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ScheduleOccurrenceResolverTest::test_real_workbook_pipeline_resolves_thirty_candidates_without_writes",
+        "Tests\\Feature\\ScheduleOccurrenceResolverTest::test_duplicate_exact_teacher_names_are_ambiguous_without_institution_preference",
+        "Tests\\Feature\\ScheduleOccurrenceResolverTest::test_different_owned_institutions_do_not_prevent_resolution",
+        "Tests\\Feature\\ScheduleOccurrenceResolverTest::test_subject_resolution_requires_strict_name_equality_not_collation_or_code#0",
+        "Tests\\Feature\\ScheduleOccurrenceResolverTest::test_teacher_resolution_requires_strict_name_equality#0",
+        "Tests\\Feature\\ScheduleOccurrenceResolverTest::test_similar_teacher_names_do_not_make_an_exact_teacher_ambiguous",
+        "Tests\\Feature\\ScheduleOccurrenceResolverTest::test_occurrence_provided_identifiers_and_status_are_ignored"
+      ]
+    },
+    "Tests\\Feature\\CompactReminderDeliveryTest": {
+      "category": "integration",
+      "file": "tests/Feature/CompactReminderDeliveryTest.php",
+      "origin_file": "tests/Feature/ReminderDeliveryTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ReminderDeliveryTest::test_all_target_modes_deliver_atomically_and_preserve_every_other_table#0",
+        "Tests\\Feature\\ReminderDeliveryTest::test_missed_parent_keeps_task_child_and_session_reminders_eligible_and_preserves_sent_inbox_on_completion",
+        "Tests\\Feature\\ReminderDeliveryTest::test_zero_and_positive_session_offsets_and_overdue_planned_sessions_do_not_infer_missed_state",
+        "Tests\\Feature\\ReminderDeliveryTest::test_structurally_valid_but_ineligible_sources_cancel_with_history#0",
+        "Tests\\Feature\\ReminderDeliveryTest::test_corrupt_candidate_fails_closed_with_exact_rollback_and_batch_continues#3",
+        "Tests\\Feature\\ReminderDeliveryTest::test_notification_and_status_write_failures_roll_back_and_can_retry#0",
+        "Tests\\Feature\\ReminderDeliveryTest::test_schema_uniqueness_json_morphs_and_set_null_preserve_history"
+      ]
+    },
+    "Tests\\Feature\\CompactPlanningAttentionTest": {
+      "category": "integration",
+      "file": "tests/Feature/CompactPlanningAttentionTest.php",
+      "origin_file": "tests/Feature/PlanningAttentionTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\PlanningAttentionTest::test_trigger_commits_once_and_rollbacks_never_dispatch",
+        "Tests\\Feature\\PlanningAttentionTest::test_nested_rollback_does_not_suppress_a_later_committed_request",
+        "Tests\\Feature\\PlanningAttentionTest::test_current_owned_attention_disappears_after_fix_and_never_moves_sessions",
+        "Tests\\Feature\\PlanningAttentionTest::test_job_coalesces_latest_changes_and_suggestion_deduplication",
+        "Tests\\Feature\\PlanningAttentionTest::test_dispatch_failure_does_not_undo_preferences_and_scheduler_recovers",
+        "Tests\\Feature\\PlanningAttentionTest::test_database_queue_delivery_invokes_the_shared_detector_after_commit",
+        "Tests\\Feature\\PlanningAttentionTest::test_changes_around_a_running_delivery_are_not_lost"
+      ]
+    },
+    "Tests\\Feature\\CompactAutomaticRecoveryDetectionTest": {
+      "category": "integration",
+      "file": "tests/Feature/CompactAutomaticRecoveryDetectionTest.php",
+      "origin_file": "tests/Feature/AutomaticRecoveryDetectionTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AutomaticRecoveryDetectionTest::test_scheduler_is_bounded_separate_from_reminders_and_command_never_applies_a_plan",
+        "Tests\\Feature\\AutomaticRecoveryDetectionTest::test_invalid_command_bounds_are_rejected_without_creating_reviews#0",
+        "Tests\\Feature\\AutomaticRecoveryDetectionTest::test_bounded_scan_rotates_owners_and_never_repeats_an_unchanged_active_need",
+        "Tests\\Feature\\AutomaticRecoveryDetectionTest::test_large_account_is_not_truncated_and_invalidates_its_old_active_review",
+        "Tests\\Feature\\AutomaticRecoveryDetectionTest::test_fingerprint_ignores_clock_ticks_but_availability_changes_make_the_review_stale",
+        "Tests\\Feature\\AutomaticRecoveryDetectionTest::test_partial_new_allocation_requires_explicit_acceptance_and_reports_remaining_work",
+        "Tests\\Feature\\AutomaticRecoveryDetectionTest::test_valid_reserved_work_does_not_create_unnecessary_recovery"
+      ]
+    },
+    "Tests\\Feature\\CompactStudyReplanningPreviewTest": {
+      "category": "integration",
+      "file": "tests/Feature/CompactStudyReplanningPreviewTest.php",
+      "origin_file": "tests/Feature/StudyReplanningPreviewTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\StudyReplanningPreviewTest::test_valid_future_session_remains_protected_despite_ordinary_c10_self_conflict",
+        "Tests\\Feature\\StudyReplanningPreviewTest::test_lesson_change_produces_exact_replacement_and_repeated_select_only_snapshots",
+        "Tests\\Feature\\StudyReplanningPreviewTest::test_request_has_strict_dates_identifiers_and_body_only_fields#0",
+        "Tests\\Feature\\StudyReplanningPreviewTest::test_query_parameters_cannot_supply_a_post_body_and_31_dates_pass",
+        "Tests\\Feature\\StudyReplanningPreviewTest::test_current_constraints_detect_invalid_sources#0",
+        "Tests\\Feature\\StudyReplanningPreviewTest::test_work_ineligibility_is_distinct_from_source_corruption#0",
+        "Tests\\Feature\\StudyReplanningPreviewTest::test_past_or_running_plans_are_diagnosed_without_missed_inference#0"
+      ]
+    },
+    "Tests\\Feature\\CompactStudyReplanningConfirmationTest": {
+      "category": "integration",
+      "file": "tests/Feature/CompactStudyReplanningConfirmationTest.php",
+      "origin_file": "tests/Feature/StudyReplanningConfirmationTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\StudyReplanningConfirmationTest::test_confirmation_body_is_strict#0",
+        "Tests\\Feature\\StudyReplanningConfirmationTest::test_query_cannot_supply_token_or_acceptance_and_cannot_override_body",
+        "Tests\\Feature\\StudyReplanningConfirmationTest::test_full_batch_preserves_intervals_history_effort_and_reminders",
+        "Tests\\Feature\\StudyReplanningConfirmationTest::test_multiple_sources_and_work_units_preserve_valid_and_cannot_replan",
+        "Tests\\Feature\\StudyReplanningConfirmationTest::test_partial_unplaced_and_mixed_acceptance#0",
+        "Tests\\Feature\\StudyReplanningConfirmationTest::test_no_action_is_never_a_success#0",
+        "Tests\\Feature\\StudyReplanningConfirmationTest::test_current_material_changes_conflict_without_partial_writes#0"
+      ]
+    },
+    "Tests\\Feature\\CompactAiChatTest": {
+      "category": "ai",
+      "file": "tests/Feature/CompactAiChatTest.php",
+      "origin_file": "tests/Feature/AiChatTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiChatTest::test_conversation_crud_reads_are_owned_bounded_ordered_and_do_not_call_provider",
+        "Tests\\Feature\\AiChatTest::test_greeting_turn_is_committed_once_and_duplicate_replay_is_durable_and_content_bound",
+        "Tests\\Feature\\AiChatTest::test_each_h1_tool_executes_with_real_owned_data_and_persists_correlated_history#0",
+        "Tests\\Feature\\AiChatTest::test_multiple_calls_multiple_rounds_and_second_message_replay_complete_structured_context",
+        "Tests\\Feature\\AiChatTest::test_history_pages_are_chronological_and_stable_under_appends_and_hide_system_metadata",
+        "Tests\\Feature\\AiChatTest::test_bounded_history_drops_entire_leading_partial_turn_and_never_invents_orphan_call_context",
+        "Tests\\Feature\\AiChatTest::test_invalid_content_and_unknown_fields_fail_before_provider_or_turn_claim#0",
+        "Tests\\Feature\\AiChatTest::test_json_object_utf8_idempotency_and_pagination_validation_are_exact"
+      ]
+    },
+    "Tests\\Feature\\CompactAiToolsIntegrationTest": {
+      "category": "ai",
+      "file": "tests/Feature/CompactAiToolsIntegrationTest.php",
+      "origin_file": "tests/Feature/AiToolsIntegrationTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiToolsIntegrationTest::test_schedule_reuses_effective_replacements_owned_presentation_and_local_date_rules",
+        "Tests\\Feature\\AiToolsIntegrationTest::test_task_page_size_is_bounded_at_fifty_with_accurate_total",
+        "Tests\\Feature\\AiToolsIntegrationTest::test_schedule_combines_legacy_and_semester_sources_with_distinct_identities",
+        "Tests\\Feature\\AiToolsIntegrationTest::test_schedule_and_sessions_preserve_dst_boundaries#0",
+        "Tests\\Feature\\AiToolsIntegrationTest::test_tasks_preserve_filters_pagination_soft_deletion_order_and_safe_subjects"
+      ]
+    },
+    "Tests\\Feature\\CompactAiTaskActionsTest": {
+      "category": "ai",
+      "file": "tests/Feature/CompactAiTaskActionsTest.php",
+      "origin_file": "tests/Feature/AiTaskActionsTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiTaskActionsTest::test_create_is_proposal_only_committed_once_and_confirmation_replays_immutable_receipt_without_provider",
+        "Tests\\Feature\\AiTaskActionsTest::test_update_keeps_omitted_fields_clears_explicit_nulls_and_uses_taskservice",
+        "Tests\\Feature\\AiTaskActionsTest::test_deadline_update_reconciles_relative_reminder_and_preserves_sessions",
+        "Tests\\Feature\\AiTaskActionsTest::test_completion_cancels_reviewed_future_sessions_preserves_history_and_reopening_recreates_nothing",
+        "Tests\\Feature\\AiTaskActionsTest::test_rejection_is_idempotent_and_never_mutates_tasks"
+      ]
+    },
+    "Tests\\Feature\\CompactAiLessonActionsTest": {
+      "category": "ai",
+      "file": "tests/Feature/CompactAiLessonActionsTest.php",
+      "origin_file": "tests/Feature/AiLessonActionsTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiLessonActionsTest::test_each_action_is_reviewed_without_writes_delegates_to_lesson_service_and_replays_one_receipt#0",
+        "Tests\\Feature\\AiLessonActionsTest::test_rejection_and_expiry_leave_all_business_rows_unchanged#0",
+        "Tests\\Feature\\AiLessonActionsTest::test_confirmation_rejects_changed_lesson_graph_and_reviewed_associations#0",
+        "Tests\\Feature\\AiLessonActionsTest::test_invalid_instants_intervals_and_overlap_fail_preparation_but_adjacency_is_valid",
+        "Tests\\Feature\\AiLessonActionsTest::test_confirmation_revalidates_new_overlap_without_changing_the_pending_action#0"
+      ]
+    },
+    "Tests\\Feature\\CompactAiAvailabilityActionsTest": {
+      "category": "ai",
+      "file": "tests/Feature/CompactAiAvailabilityActionsTest.php",
+      "origin_file": "tests/Feature/AiAvailabilityActionsTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiAvailabilityActionsTest::test_each_preparation_is_select_only_with_no_pending_actions_or_external_effects#0",
+        "Tests\\Feature\\AiAvailabilityActionsTest::test_explicit_confirmation_delegates_once_to_existing_service_and_replays_immutable_receipt#0",
+        "Tests\\Feature\\AiAvailabilityActionsTest::test_rejection_expiry_and_planning_consent_rejection_preserve_business_data#0",
+        "Tests\\Feature\\AiAvailabilityActionsTest::test_service_and_ai_share_complete_candidate_validation_without_writes#0",
+        "Tests\\Feature\\AiAvailabilityActionsTest::test_partial_update_revalidates_the_complete_interval_and_self_exclusion"
+      ]
+    },
+    "Tests\\Feature\\CompactAiSemesterActionsTest": {
+      "category": "ai",
+      "file": "tests/Feature/CompactAiSemesterActionsTest.php",
+      "origin_file": "tests/Feature/AiSemesterActionsTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiSemesterActionsTest::test_proposal_is_read_only_confirmation_is_owned_atomic_and_replayable#0",
+        "Tests\\Feature\\AiSemesterActionsTest::test_addition_to_working_saturday_preserves_saved_lessons_identities_provenance_and_rules",
+        "Tests\\Feature\\AiSemesterActionsTest::test_base_day_addition_freezes_only_selected_date",
+        "Tests\\Feature\\AiSemesterActionsTest::test_invalid_single_additions_fail_without_proposal_or_calendar_changes#0",
+        "Tests\\Feature\\AiSemesterActionsTest::test_addition_failure_reason_reaches_chat_replay_and_history_without_calendar_changes#0"
+      ]
+    },
+    "Tests\\Feature\\CompactAiPlanningActionsTest": {
+      "category": "ai",
+      "file": "tests/Feature/CompactAiPlanningActionsTest.php",
+      "origin_file": "tests/Feature/AiPlanningActionsTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiPlanningActionsTest::test_complete_review_commits_only_with_turn_and_confirmation_executes_once_without_provider#0",
+        "Tests\\Feature\\AiPlanningActionsTest::test_partial_plan_requires_client_boolean_and_preserves_every_reviewed_session",
+        "Tests\\Feature\\AiPlanningActionsTest::test_adaptive_partial_and_unplaced_consequences_have_distinct_required_consents#0",
+        "Tests\\Feature\\AiPlanningActionsTest::test_empty_or_nonactionable_reviews_never_leave_a_confirmable_action#0",
+        "Tests\\Feature\\AiPlanningActionsTest::test_material_changes_cannot_be_applied_silently_or_fabricate_receipts#0",
+        "Tests\\Feature\\AiPlanningActionsTest::test_confirmation_rejects_coerced_or_unreviewed_fields#0",
+        "Tests\\Feature\\AiPlanningActionsTest::test_failure_after_business_or_receipt_write_rolls_back_every_domain_effect#0"
+      ]
+    },
+    "Tests\\Feature\\CompactAiSubtaskReminderActionsTest": {
+      "category": "ai",
+      "file": "tests/Feature/CompactAiSubtaskReminderActionsTest.php",
+      "origin_file": "tests/Feature/AiSubtaskReminderActionsTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiSubtaskReminderActionsTest::test_all_actions_propose_without_business_writes_commit_with_turn_and_execute_once_without_provider#0",
+        "Tests\\Feature\\AiSubtaskReminderActionsTest::test_rejection_and_expiration_never_change_business_data_for_any_action#0",
+        "Tests\\Feature\\AiSubtaskReminderActionsTest::test_subtask_position_is_assigned_only_at_confirmation_and_capacity_is_authoritative",
+        "Tests\\Feature\\AiSubtaskReminderActionsTest::test_subtask_null_omission_parent_deadlines_and_reminder_synchronization_use_shared_domain_rules",
+        "Tests\\Feature\\AiSubtaskReminderActionsTest::test_subtask_completion_cancels_only_appropriate_reminders_and_reopening_recreates_nothing",
+        "Tests\\Feature\\AiSubtaskReminderActionsTest::test_reminder_creation_previews_and_confirms_absolute_and_relative_modes#0"
+      ]
+    },
+    "Tests\\Feature\\CompactAiSessionLifecycleActionsTest": {
+      "category": "ai",
+      "file": "tests/Feature/CompactAiSessionLifecycleActionsTest.php",
+      "origin_file": "tests/Feature/AiSessionLifecycleActionsTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiSessionLifecycleActionsTest::test_confirmation_is_owned_atomic_and_replayable#0",
+        "Tests\\Feature\\AiSessionLifecycleActionsTest::test_stale_review_cannot_mutate_session_or_issue_receipt#0",
+        "Tests\\Feature\\AiSessionLifecycleActionsTest::test_confirmation_is_owned_atomic_and_replayable#1",
+        "Tests\\Feature\\AiSessionLifecycleActionsTest::test_stale_review_cannot_mutate_session_or_issue_receipt#1"
+      ]
+    },
+    "Tests\\Feature\\CompactAiStudyAvailabilityToolTest": {
+      "category": "ai",
+      "file": "tests/Feature/CompactAiStudyAvailabilityToolTest.php",
+      "origin_file": "tests/Feature/AiStudyAvailabilityToolTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiStudyAvailabilityToolTest::test_no_arguments_return_exact_local_fields_and_persisted_owner_timezone",
+        "Tests\\Feature\\AiStudyAvailabilityToolTest::test_filtering_uses_iso_weekdays_and_counts_only_owned_matches",
+        "Tests\\Feature\\AiStudyAvailabilityToolTest::test_pagination_orders_by_weekday_start_and_id_stably",
+        "Tests\\Feature\\AiStudyAvailabilityToolTest::test_output_is_bounded_with_accurate_total_and_no_silent_truncation",
+        "Tests\\Feature\\AiStudyAvailabilityToolTest::test_invalid_arguments_are_sanitized_before_database_dispatch#day_of_week malformed 0"
+      ]
+    },
+    "Tests\\Feature\\CompactWorkCompletionTest": {
+      "category": "workflow",
+      "file": "tests/Feature/CompactWorkCompletionTest.php",
+      "origin_file": "tests/Feature/WorkCompletionTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\WorkCompletionTest::test_review_consent_boundary_history_and_reopening",
+        "Tests\\Feature\\WorkCompletionTest::test_exact_set_and_zero_reviews_are_rechecked",
+        "Tests\\Feature\\WorkCompletionTest::test_child_scope_reminders_and_atomic_failure",
+        "Tests\\Feature\\WorkCompletionTest::test_write_failure_rolls_back_sessions_work_reminders_and_scan_generation",
+        "Tests\\Feature\\WorkCompletionTest::test_session_completion_is_independent_by_default_and_combined_action_uses_linked_child",
+        "Tests\\Feature\\WorkCompletionTest::test_combined_task_completion_rolls_back_on_stale_review_and_session_save_failure",
+        "Tests\\Feature\\WorkCompletionTest::test_combined_task_completion_and_completed_work_capability"
+      ]
+    },
+    "Tests\\Feature\\CompactAcademicRecoveryWorkflowTest": {
+      "category": "workflow",
+      "file": "tests/Feature/CompactAcademicRecoveryWorkflowTest.php",
+      "origin_file": "tests/Feature/AcademicRecoveryWorkflowTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AcademicRecoveryWorkflowTest::test_registered_students_plan_recover_academic_conflicts_and_read_confirmed_state_without_inventing_completion"
+      ]
+    },
+    "Tests\\Feature\\CompactAutomaticLearningRecoveryTest": {
+      "category": "workflow",
+      "file": "tests/Feature/CompactAutomaticLearningRecoveryTest.php",
+      "origin_file": "tests/Feature/AutomaticLearningRecoveryTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AutomaticLearningRecoveryTest::test_detection_has_no_business_writes_and_confirmation_is_owned_and_replayable",
+        "Tests\\Feature\\AutomaticLearningRecoveryTest::test_elapsed_planned_outcome_stays_unknown_and_only_explicit_miss_enables_recovery",
+        "Tests\\Feature\\AutomaticLearningRecoveryTest::test_deadline_change_invalidates_a_review_without_writing_sessions",
+        "Tests\\Feature\\AutomaticLearningRecoveryTest::test_academic_conflict_proposes_replanning_and_only_confirmation_cancels_obsolete_reminders",
+        "Tests\\Feature\\AutomaticLearningRecoveryTest::test_unplaced_replanning_requires_both_explicit_consents"
+      ]
+    },
+    "Tests\\Feature\\CompactProgressStatisticsIntegrationTest": {
+      "category": "workflow",
+      "file": "tests/Feature/CompactProgressStatisticsIntegrationTest.php",
+      "origin_file": "tests/Feature/ProgressStatisticsIntegrationTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ProgressStatisticsIntegrationTest::test_stage_c_confirmed_plan_is_scheduled_time_without_invented_actual_effort",
+        "Tests\\Feature\\ProgressStatisticsIntegrationTest::test_stage_d_actual_actions_are_reflected_without_changing_work_or_history#1",
+        "Tests\\Feature\\ProgressStatisticsIntegrationTest::test_stage_e2_atomic_replanning_history_is_separate_from_completed_effort",
+        "Tests\\Feature\\ProgressStatisticsIntegrationTest::test_f1_f2_f3a_reminders_delivery_and_inbox_read_state_survive_statistics_reads"
+      ]
+    },
+    "Tests\\Feature\\CompactProgressTrendsIntegrationTest": {
+      "category": "workflow",
+      "file": "tests/Feature/CompactProgressTrendsIntegrationTest.php",
+      "origin_file": "tests/Feature/ProgressTrendsIntegrationTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ProgressTrendsIntegrationTest::test_actual_task_child_completion_session_completion_and_rescheduled_successor_reconcile_every_bucket_and_g1"
+      ]
+    },
+    "Tests\\Feature\\CompactProgressComparisonIntegrationTest": {
+      "category": "workflow",
+      "file": "tests/Feature/CompactProgressComparisonIntegrationTest.php",
+      "origin_file": "tests/Feature/ProgressComparisonIntegrationTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ProgressComparisonIntegrationTest::test_real_lifecycle_fixture_rescheduling_known_actuals_and_reminder_inbox_state_reconcile"
+      ]
+    },
+    "Tests\\Feature\\CompactSemesterPlanningCalendarTest": {
+      "category": "workflow",
+      "file": "tests/Feature/CompactSemesterPlanningCalendarTest.php",
+      "origin_file": "tests/Feature/SemesterPlanningCalendarTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SemesterPlanningCalendarTest::test_semester_only_parity_manual_edits_and_rest_contract",
+        "Tests\\Feature\\SemesterPlanningCalendarTest::test_replacements_cancellation_extras_and_selected_saturday_snapshots#cancelled day",
+        "Tests\\Feature\\SemesterPlanningCalendarTest::test_legacy_imports_and_their_replacements_are_suppressed_only_in_their_own_authoritative_period",
+        "Tests\\Feature\\SemesterPlanningCalendarTest::test_overlapping_semesters_are_unioned_without_losing_source_identity"
+      ]
+    },
+    "Tests\\Feature\\CompactSemesterScheduleManagementImportTest": {
+      "category": "workflow",
+      "file": "tests/Feature/CompactSemesterScheduleManagementImportTest.php",
+      "origin_file": "tests/Feature/SemesterScheduleManagementImportTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SemesterScheduleManagementImportTest::test_manual_imported_edit_keeps_baseline_and_is_permanently_protected_even_after_restoring_values",
+        "Tests\\Feature\\SemesterScheduleManagementImportTest::test_manual_deletion_blocks_same_workbook_until_explicit_release_and_new_confirmation",
+        "Tests\\Feature\\SemesterScheduleManagementImportTest::test_imported_identity_move_and_later_delete_protect_both_original_and_current_slot"
+      ]
+    },
+    "Tests\\Feature\\CompactSplitReplanningTest": {
+      "category": "workflow",
+      "file": "tests/Feature/CompactSplitReplanningTest.php",
+      "origin_file": "tests/Feature/SplitReplanningTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SplitReplanningTest::test_split_requires_separate_consent_preserves_tree_and_cannot_be_replayed",
+        "Tests\\Feature\\SplitReplanningTest::test_split_is_capped_by_remaining_effort_and_needs_partial_consent",
+        "Tests\\Feature\\SplitReplanningTest::test_preference_change_invalidates_split_review_without_retiring_source"
+      ]
+    },
+    "Tests\\Feature\\CompactPlanningCompletionRulesTest": {
+      "category": "workflow",
+      "file": "tests/Feature/CompactPlanningCompletionRulesTest.php",
+      "origin_file": "tests/Feature/PlanningCompletionRulesTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\PlanningCompletionRulesTest::test_deadline_passage_and_scheduled_detection_do_not_infer_missed_status",
+        "Tests\\Feature\\PlanningCompletionRulesTest::test_missing_actual_is_rejected_by_http_service_and_ai_without_changes",
+        "Tests\\Feature\\PlanningCompletionRulesTest::test_effective_deadline_is_exposed_without_changing_expired_work",
+        "Tests\\Feature\\PlanningCompletionRulesTest::test_subtask_api_exposes_parent_or_earlier_child_deadline",
+        "Tests\\Feature\\PlanningCompletionRulesTest::test_existing_detector_reacts_to_conditions_without_mutating_sessions"
+      ]
+    },
+    "Tests\\Feature\\CompactPlanningSourceTriggersTest": {
+      "category": "workflow",
+      "file": "tests/Feature/CompactPlanningSourceTriggersTest.php",
+      "origin_file": "tests/Feature/PlanningSourceTriggersTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\PlanningSourceTriggersTest::test_import_rules_date_changes_and_working_saturday_use_the_same_owner_delivery"
+      ]
+    },
+    "Tests\\Feature\\CompactStudyPlanConcurrencyTest": {
+      "category": "concurrency",
+      "file": "tests/Feature/CompactStudyPlanConcurrencyTest.php",
+      "origin_file": "tests/Feature/StudyPlanConcurrencyTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\StudyPlanConcurrencyTest::test_simultaneous_confirmations_contend_on_real_owner_lock_and_only_one_batch_commits",
+        "Tests\\Feature\\StudyPlanConcurrencyTest::test_confirmation_waits_for_cooperating_mutation_then_reads_committed_changed_state#0",
+        "Tests\\Feature\\StudyPlanConcurrencyTest::test_confirmation_waits_for_cooperating_mutation_then_reads_committed_changed_state#3"
+      ]
+    },
+    "Tests\\Feature\\CompactStudySessionConcurrencyTest": {
+      "category": "concurrency",
+      "file": "tests/Feature/CompactStudySessionConcurrencyTest.php",
+      "origin_file": "tests/Feature/StudySessionConcurrencyTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\StudySessionConcurrencyTest::test_real_competing_mutations_commit_only_one_transition#0",
+        "Tests\\Feature\\StudySessionConcurrencyTest::test_task_deletion_and_rescheduling_contend_and_leave_no_live_reservation",
+        "Tests\\Feature\\StudySessionConcurrencyTest::test_stage_c_confirmation_waits_for_actual_cancellation_and_reads_the_committed_release",
+        "Tests\\Feature\\StudySessionConcurrencyTest::test_reschedule_waits_for_stage_c_then_observes_new_committed_blockers"
+      ]
+    },
+    "Tests\\Feature\\CompactStudyReplanningConcurrencyTest": {
+      "category": "concurrency",
+      "file": "tests/Feature/CompactStudyReplanningConcurrencyTest.php",
+      "origin_file": "tests/Feature/StudyReplanningConcurrencyTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\StudyReplanningConcurrencyTest::test_two_blocked_confirmations_apply_exactly_one_multi_source_batch",
+        "Tests\\Feature\\StudyReplanningConcurrencyTest::test_waiter_regenerates_after_actual_cooperating_mutation_commits#0",
+        "Tests\\Feature\\StudyReplanningConcurrencyTest::test_stage_c_waiter_observes_committed_e2_replacements"
+      ]
+    },
+    "Tests\\Feature\\CompactAiTaskActionConcurrencyTest": {
+      "category": "concurrency",
+      "file": "tests/Feature/CompactAiTaskActionConcurrencyTest.php",
+      "origin_file": "tests/Feature/AiTaskActionConcurrencyTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiTaskActionConcurrencyTest::test_two_simultaneous_create_confirmations_execute_once_and_share_the_durable_receipt",
+        "Tests\\Feature\\AiTaskActionConcurrencyTest::test_confirmation_versus_rejection_serializes_one_terminal_outcome#0",
+        "Tests\\Feature\\AiTaskActionConcurrencyTest::test_confirmation_waiting_for_owner_rechecks_authoritative_expiration"
+      ]
+    },
+    "Tests\\Feature\\CompactAiLessonActionConcurrencyTest": {
+      "category": "concurrency",
+      "file": "tests/Feature/CompactAiLessonActionConcurrencyTest.php",
+      "origin_file": "tests/Feature/AiLessonActionConcurrencyTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiLessonActionConcurrencyTest::test_two_confirmations_share_one_lesson_insert_and_one_durable_receipt",
+        "Tests\\Feature\\AiLessonActionConcurrencyTest::test_confirmation_waiting_for_direct_edit_reads_current_state_after_owner_lock"
+      ]
+    },
+    "Tests\\Feature\\CompactAiAvailabilityActionConcurrencyTest": {
+      "category": "concurrency",
+      "file": "tests/Feature/CompactAiAvailabilityActionConcurrencyTest.php",
+      "origin_file": "tests/Feature/AiAvailabilityActionConcurrencyTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiAvailabilityActionConcurrencyTest::test_parallel_confirmation_replays_one_insert_and_one_receipt",
+        "Tests\\Feature\\AiAvailabilityActionConcurrencyTest::test_confirmation_waits_for_rest_owner_lock_then_rejects_current_changed_state",
+        "Tests\\Feature\\AiAvailabilityActionConcurrencyTest::test_expiry_during_business_write_rolls_back_window_receipt_and_history"
+      ]
+    },
+    "Tests\\Feature\\CompactAiChatConcurrencyTest": {
+      "category": "concurrency",
+      "file": "tests/Feature/CompactAiChatConcurrencyTest.php",
+      "origin_file": "tests/Feature/AiChatConcurrencyTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiChatConcurrencyTest::test_overlapping_rest_turns_conflict_without_network_locks_and_successful_retry_replays_once",
+        "Tests\\Feature\\AiChatConcurrencyTest::test_expired_worker_cannot_finalize_or_release_replacement_claim#0"
+      ]
+    },
+    "Tests\\Feature\\CompactReminderDeliveryConcurrencyTest": {
+      "category": "concurrency",
+      "file": "tests/Feature/CompactReminderDeliveryConcurrencyTest.php",
+      "origin_file": "tests/Feature/ReminderDeliveryConcurrencyTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ReminderDeliveryConcurrencyTest::test_two_actual_dispatchers_commit_exactly_one_notification",
+        "Tests\\Feature\\ReminderDeliveryConcurrencyTest::test_dispatch_and_actual_lifecycle_mutation_serialize_in_both_orders#0",
+        "Tests\\Feature\\ReminderDeliveryConcurrencyTest::test_waiting_dispatcher_sees_rollback_after_notification_or_sent_write_and_retries_once#0"
+      ]
+    },
+    "Tests\\Feature\\CompactAutomaticRecoveryConcurrencyTest": {
+      "category": "concurrency",
+      "file": "tests/Feature/CompactAutomaticRecoveryConcurrencyTest.php",
+      "origin_file": "tests/Feature/AutomaticRecoveryConcurrencyTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AutomaticRecoveryConcurrencyTest::test_two_real_blocked_confirmations_apply_once_and_replay_the_same_immutable_receipt",
+        "Tests\\Feature\\AutomaticRecoveryConcurrencyTest::test_source_or_clock_changes_during_a_real_owner_lock_wait_prevent_application#0",
+        "Tests\\Feature\\AutomaticRecoveryConcurrencyTest::test_source_or_clock_changes_during_a_real_owner_lock_wait_prevent_application#1"
+      ]
+    },
+    "Tests\\Feature\\CompactSemesterScheduleImportConcurrencyTest": {
+      "category": "concurrency",
+      "file": "tests/Feature/CompactSemesterScheduleImportConcurrencyTest.php",
+      "origin_file": "tests/Feature/SemesterScheduleImportConcurrencyTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SemesterScheduleImportConcurrencyTest::test_two_independent_confirmations_apply_once_and_replay_identical_receipt",
+        "Tests\\Feature\\SemesterScheduleImportConcurrencyTest::test_waiting_commit_rechecks_changes_committed_while_waiting_for_owner_lock"
+      ]
+    },
+    "Tests\\Feature\\CompactSemesterScheduleManagementConcurrencyTest": {
+      "category": "concurrency",
+      "file": "tests/Feature/CompactSemesterScheduleManagementConcurrencyTest.php",
+      "origin_file": "tests/Feature/SemesterScheduleManagementConcurrencyTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SemesterScheduleManagementConcurrencyTest::test_simultaneous_edits_apply_one_and_reject_the_stale_other",
+        "Tests\\Feature\\SemesterScheduleManagementConcurrencyTest::test_simultaneous_delete_and_copy_snapshot_preserve_fk_integrity"
+      ]
+    },
+    "Tests\\Feature\\CompactTaskPersistenceTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactTaskPersistenceTest.php",
+      "origin_file": "tests/Feature/TaskPersistenceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\TaskPersistenceTest::test_exact_schema_defaults_casts_and_soft_deletion#0",
+        "Tests\\Feature\\TaskPersistenceTest::test_enums_match_exact_vocabulary",
+        "Tests\\Feature\\TaskPersistenceTest::test_approved_priorities_are_accepted#0",
+        "Tests\\Feature\\TaskPersistenceTest::test_mysql_rejects_invalid_values_on_insert_and_update#tasks unsupported status",
+        "Tests\\Feature\\TaskPersistenceTest::test_positive_estimates_and_pending_transition_are_accepted#0",
+        "Tests\\Feature\\TaskPersistenceTest::test_task_soft_delete_does_not_implement_future_service_cleanup_and_hard_delete_cascades"
+      ]
+    },
+    "Tests\\Feature\\CompactLessonPersistenceTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactLessonPersistenceTest.php",
+      "origin_file": "tests/Feature/LessonPersistenceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\LessonPersistenceTest::test_columns_match_approved_types_nullability_and_defaults",
+        "Tests\\Feature\\LessonPersistenceTest::test_datetime_and_enum_casts_and_room_round_trip",
+        "Tests\\Feature\\LessonPersistenceTest::test_php_enums_have_exactly_the_approved_scalar_values",
+        "Tests\\Feature\\LessonPersistenceTest::test_mysql_accepts_approved_vocabulary_and_eloquent_casts_it#0",
+        "Tests\\Feature\\LessonPersistenceTest::test_mysql_rejects_unsupported_vocabulary_on_insert_and_update#0"
+      ]
+    },
+    "Tests\\Feature\\CompactStudySessionPersistenceTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactStudySessionPersistenceTest.php",
+      "origin_file": "tests/Feature/StudySessionPersistenceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\StudySessionPersistenceTest::test_approved_statuses_cast_and_retain_completion_metadata#0",
+        "Tests\\Feature\\StudySessionPersistenceTest::test_mysql_rejects_invalid_values_on_insert_and_update#equal interval",
+        "Tests\\Feature\\StudySessionPersistenceTest::test_rescheduling_relationships_multiple_successors_and_set_null",
+        "Tests\\Feature\\StudySessionPersistenceTest::test_database_permits_self_reference_but_future_service_must_reject_it"
+      ]
+    },
+    "Tests\\Feature\\CompactReminderPersistenceTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactReminderPersistenceTest.php",
+      "origin_file": "tests/Feature/ReminderPersistenceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ReminderPersistenceTest::test_exact_schema_general_absolute_factory_and_database_defaults",
+        "Tests\\Feature\\ReminderPersistenceTest::test_statuses_and_sent_datetime_cast#0",
+        "Tests\\Feature\\ReminderPersistenceTest::test_relative_anchors_signed_offsets_relationships_and_target_set_null#0"
+      ]
+    },
+    "Tests\\Feature\\CompactAcademicContextPersistenceTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactAcademicContextPersistenceTest.php",
+      "origin_file": "tests/Feature/AcademicContextPersistenceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AcademicContextPersistenceTest::test_user_relationships_and_cascade_deletes_are_scoped_to_the_owner#institution",
+        "Tests\\Feature\\AcademicContextPersistenceTest::test_optional_institution_relationships_and_set_null_delete#period",
+        "Tests\\Feature\\AcademicContextPersistenceTest::test_user_deletion_cascades_through_linked_academic_records",
+        "Tests\\Feature\\AcademicContextPersistenceTest::test_approved_unique_keys_are_scoped_to_one_user#institution"
+      ]
+    },
+    "Tests\\Feature\\CompactScheduleImportPersistenceTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactScheduleImportPersistenceTest.php",
+      "origin_file": "tests/Feature/ScheduleImportPersistenceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\ScheduleImportPersistenceTest::test_columns_match_approved_types_nullability_and_defaults#batches",
+        "Tests\\Feature\\ScheduleImportPersistenceTest::test_batch_factory_reuses_the_owner_of_an_explicit_period",
+        "Tests\\Feature\\ScheduleImportPersistenceTest::test_batch_casts_counters_and_committed_datetime"
+      ]
+    },
+    "Tests\\Feature\\CompactPlanningPersistenceTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactPlanningPersistenceTest.php",
+      "origin_file": "tests/Feature/PlanningPersistenceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\PlanningPersistenceTest::test_timezone_has_the_approved_database_definition_and_default",
+        "Tests\\Feature\\PlanningPersistenceTest::test_timezone_can_be_mass_assigned",
+        "Tests\\Feature\\PlanningPersistenceTest::test_preferences_use_the_user_primary_key_and_both_relationships"
+      ]
+    },
+    "Tests\\Feature\\CompactPlanningMigrationTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactPlanningMigrationTest.php",
+      "origin_file": "tests/Feature/PlanningMigrationTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\PlanningMigrationTest::test_reversible_legacy_baseline_can_be_rolled_back_and_reapplied_without_losing_existing_users"
+      ]
+    },
+    "Tests\\Feature\\CompactTaskMissedMigrationTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactTaskMissedMigrationTest.php",
+      "origin_file": "tests/Feature/TaskMissedMigrationTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\TaskMissedMigrationTest::test_upgrade_preserves_rows_enforces_all_three_states_and_refuses_lossy_rollback"
+      ]
+    },
+    "Tests\\Feature\\CompactSemesterScheduleMigrationTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactSemesterScheduleMigrationTest.php",
+      "origin_file": "tests/Feature/SemesterScheduleMigrationTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SemesterScheduleMigrationTest::test_additive_upgrade_preserves_legacy_rows_and_refuses_destructive_downgrade"
+      ]
+    },
+    "Tests\\Feature\\CompactSemesterScheduleManagementPersistenceTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactSemesterScheduleManagementPersistenceTest.php",
+      "origin_file": "tests/Feature/SemesterScheduleManagementPersistenceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SemesterScheduleManagementPersistenceTest::test_forward_migration_preserves_rows_and_refuses_removing_manual_protections"
+      ]
+    },
+    "Tests\\Feature\\CompactSemesterScheduleImportPersistenceTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactSemesterScheduleImportPersistenceTest.php",
+      "origin_file": "tests/Feature/SemesterScheduleImportPersistenceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\SemesterScheduleImportPersistenceTest::test_mysql_enforces_owner_identity_provenance_and_receipt_constraints",
+        "Tests\\Feature\\SemesterScheduleImportPersistenceTest::test_additive_migration_preserves_legacy_data_and_refuses_history_downgrade"
+      ]
+    },
+    "Tests\\Feature\\CompactAiTaskActionPersistenceTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactAiTaskActionPersistenceTest.php",
+      "origin_file": "tests/Feature/AiTaskActionPersistenceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiTaskActionPersistenceTest::test_schema_keys_constraints_json_microseconds_and_conversation_cascade",
+        "Tests\\Feature\\AiTaskActionPersistenceTest::test_migration_round_trip_is_additive_and_preserves_turns_and_messages"
+      ]
+    },
+    "Tests\\Feature\\CompactAiChatPersistenceTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactAiChatPersistenceTest.php",
+      "origin_file": "tests/Feature/AiChatPersistenceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiChatPersistenceTest::test_turn_schema_unique_idempotency_and_conversation_cascade_are_enforced_by_mysql",
+        "Tests\\Feature\\AiChatPersistenceTest::test_additive_migration_round_trip_preserves_existing_conversations_and_messages",
+        "Tests\\Feature\\AiChatPersistenceTest::test_legacy_history_replay_and_receipts_are_not_rewritten_or_classified_by_their_text"
+      ]
+    },
+    "Tests\\Feature\\CompactAiLessonActionMigrationTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactAiLessonActionMigrationTest.php",
+      "origin_file": "tests/Feature/AiLessonActionMigrationTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiLessonActionMigrationTest::test_forward_migration_preserves_legacy_receipts_accepts_exactly_eighteen_types_and_refuses_downgrade"
+      ]
+    },
+    "Tests\\Feature\\CompactAiAvailabilityActionMigrationTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactAiAvailabilityActionMigrationTest.php",
+      "origin_file": "tests/Feature/AiAvailabilityActionMigrationTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiAvailabilityActionMigrationTest::test_forward_upgrade_preserves_all_legacy_actions_receipts_and_unrelated_constraints"
+      ]
+    },
+    "Tests\\Feature\\CompactAiSemesterOccurrenceCreateMigrationTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactAiSemesterOccurrenceCreateMigrationTest.php",
+      "origin_file": "tests/Feature/AiSemesterOccurrenceCreateMigrationTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\AiSemesterOccurrenceCreateMigrationTest::test_clean_migration_chain_accepts_current_and_historical_types_and_rejects_unknown_types",
+        "Tests\\Feature\\AiSemesterOccurrenceCreateMigrationTest::test_upgrade_adds_only_one_type_preserves_populated_history_and_refuses_rollback"
+      ]
+    },
+    "Tests\\Feature\\CompactRecoverySuggestionPersistenceTest": {
+      "category": "migration",
+      "file": "tests/Feature/CompactRecoverySuggestionPersistenceTest.php",
+      "origin_file": "tests/Feature/RecoverySuggestionPersistenceTest.php",
+      "retained_cases": [
+        "Tests\\Feature\\RecoverySuggestionPersistenceTest::test_current_mysql_constraints_encrypt_tokens_and_enforce_review_lifecycle_and_uniqueness",
+        "Tests\\Feature\\RecoverySuggestionPersistenceTest::test_forward_only_migration_refuses_without_touching_reviews_or_scan_history"
+      ]
+    },
+    "Tests\\Feature\\CompactSmokeTest": {
+      "category": "smoke",
+      "file": "tests/Feature/CompactSmokeTest.php",
+      "origin_file": null,
+      "retained_cases": []
+    }
+  },
+  "adaptations": [
+    "Assertions reused from current business kernels; expanded provider matrices trimmed to representative explicit rows, without retaining old test classes.",
+    "User/session resources include current reminder preferences, status_label, change_kind and enriched replanning source intervals.",
+    "Localized XLSX/import/task-lifecycle messages follow current Ukrainian API contracts.",
+    "Work completion uses the current completion review and cancellation; reports attribute the cancelled successor correctly. Actual session duration is mandatory.",
+    "AI availability confirmation must advance recovery_scan_states requested_version once while preserving other business tables.",
+    "Historical migration fixtures insert only columns present at that boundary; historical fixture creation is quiet to avoid running modern planning observers before their tables exist.",
+    "Special negative access/signature/cross-owner probes removed; replaced by existing email render, DST gap and bounded tool-page kernels. Ordinary list/lifecycle payloads omit access-override fields.",
+    "Only external AI providers/transports are substituted; orchestration, Tools and domain execution are exercised. Delegation spies forward to real services.",
+    "The account-enumeration assertion was replaced by the ordinary partial profile-update workflow; no negative credential/access audit is retained."
+  ]
+}

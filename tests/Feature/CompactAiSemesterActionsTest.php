@@ -1,0 +1,329 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\AcademicPeriod;
+use App\Models\AiMessage;
+use App\Models\AiPendingAction;
+use App\Models\EducationInstitution;
+use App\Models\Subject;
+use App\Models\Teacher;
+use App\Models\User;
+use App\Services\AI\Actions\SemesterActionService;
+use App\Services\AI\LlmProvider;
+use App\Services\Schedule\EffectiveScheduleService;
+use App\Services\Schedule\SemesterScheduleManagementService;
+use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Testing\DatabaseTruncation;
+use Illuminate\Http\Client\Factory;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Tests\Concerns\InteractsWithAiResponses;
+use Tests\TestCase;
+
+#[Group('ai')]
+#[Group('mysql')]
+class CompactAiSemesterActionsTest extends TestCase
+{
+    use DatabaseTruncation, InteractsWithAiResponses;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->travelTo(CarbonImmutable::parse('2026-10-16T08:00:00Z'));
+        config(['ai.provider' => getenv('AI_TEST_PROVIDER') ?: 'openai', 'ai.openai_key' => 'offline', 'ai.model' => 'offline', 'ai.gemini_key' => 'offline-gemini-key', 'ai.gemini_model' => 'gemini-offline-fixture', 'ai.requests_per_minute' => 60]);
+        Http::preventStrayRequests();
+        $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
+    }
+
+    private function fixture(): array
+    {
+        $owner = User::factory()->create(['timezone' => 'Europe/Kyiv']);
+        $institution = EducationInstitution::factory()->for($owner)->create();
+        $period = AcademicPeriod::factory()->for($owner)->for($institution)->create(['starts_on' => '2026-10-19', 'ends_on' => '2026-11-01']);
+        $schedule = $owner->semesterSchedules()->create(['academic_period_id' => $period->id, 'group_name' => 'Calendar', 'parity_anchor_on' => '2026-10-19', 'first_week_parity' => 'numerator']);
+        $teacher = Teacher::factory()->for($owner)->create();
+        $subject = Subject::factory()->for($owner)->create();
+        $manager = app(SemesterScheduleManagementService::class);
+        $fields = ['weekday' => 2, 'week_pattern' => 'all', 'pair_number' => 1, 'starts_at_local' => '08:00:00', 'ends_at_local' => '09:00:00', 'subject_id' => $subject->id, 'teacher_id' => $teacher->id, 'lesson_type' => null];
+        $manager->createRule($owner, $schedule, [...$fields, 'schedule_token' => $manager->read($owner, $schedule)['meta']['schedule_token']]);
+        $manager->createRule($owner, $schedule, [...$fields, 'pair_number' => 2, 'starts_at_local' => '10:00:00', 'ends_at_local' => '11:00:00', 'schedule_token' => $manager->read($owner, $schedule)['meta']['schedule_token']]);
+        $rule = $schedule->weeklyLessonRules()->orderBy('id')->first();
+        $this->actingAs($owner, 'web');
+        $conversation = $this->json('POST', '/api/ai/conversations', [], [], JSON_FORCE_OBJECT)->assertCreated()->json('data.id');
+        $base = '/api/ai/conversations/'.$conversation;
+
+        return compact('owner', 'schedule', 'manager', 'fields', 'rule', 'base');
+    }
+
+    private function snapshot(): array
+    {
+        return collect(['semester_schedules', 'weekly_lesson_rules', 'schedule_date_exceptions', 'schedule_date_exception_lessons', 'semester_schedule_suppressed_slots', 'lessons', 'study_sessions', 'tasks', 'reminders', 'teachers', 'subjects'])->mapWithKeys(fn ($table) => [$table => DB::table($table)->get()->map(fn ($row) => (array) $row)->all()])->all();
+    }
+
+    private function propose(array $f, string $name, array $arguments): string
+    {
+        Http::swap(new Factory);
+        Http::preventStrayRequests();
+        $responses = [[$this->aiCall($name, json_encode($arguments), 'semester_'.Str::uuid())], [$this->aiText('Changed everything.')]];
+        Http::fake(function () use (&$responses) {
+            return Http::response($this->aiResponse(array_shift($responses)));
+        });
+        $response = $this->postJson($f['base'].'/messages', ['content' => 'Propose the semester change.'], ['Idempotency-Key' => (string) Str::uuid()])->assertOk()->assertJsonPath('data.action.state', 'confirmation_required');
+        $this->assertStringContainsString('підготовлено до підтвердження', $response->json('data.content'));
+
+        return $response->json('data.action.id');
+    }
+
+    private function addition(array $f, string $date = '2026-10-20'): array
+    {
+        return ['semester_schedule_id' => $f['schedule']->id, 'date' => $date, 'pair_number' => 3, 'starts_at_local' => '12:00:00', 'ends_at_local' => '13:00:00', 'subject_id' => $f['fields']['subject_id'], 'teacher_id' => $f['fields']['teacher_id'], 'room' => '301'];
+    }
+
+    public static function operations(): array
+    {
+        return [0 => ['propose_semester_rule_create']];
+    }
+
+    #[DataProvider('operations')]
+    public function test_proposal_is_read_only_confirmation_is_owned_atomic_and_replayable(string $name): void
+    {
+        $f = $this->fixture();
+        $target = ['semester_schedule_id' => $f['schedule']->id];
+        $day = [...$target, 'date' => '2026-10-20'];
+        $occurrence = [...$day, 'occurrence_id' => 'semester:'.$f['schedule']->id.':2026-10-20:rule:'.$f['rule']->id];
+        if ($name === 'propose_semester_date_delete') {
+            $f['manager']->replaceDate($f['owner'], $f['schedule'], '2026-10-20', ['mode' => 'replace', 'lessons' => [], 'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
+        }
+        $arguments = match ($name) {
+            'propose_semester_rule_create' => [...$target, ...$f['fields'], 'weekday' => 3],
+            'propose_semester_rule_update' => [...$target, 'weekly_lesson_rule_id' => $f['rule']->id, 'room' => 'Reviewed'],
+            'propose_semester_rule_delete' => [...$target, 'weekly_lesson_rule_id' => $f['rule']->id],
+            'propose_semester_date_replace' => [...$day, 'mode' => 'copy_base', 'changes' => [['weekly_lesson_rule_id' => $f['rule']->id, 'room' => 'One date']]],
+            'propose_semester_date_delete' => $day,
+            'propose_semester_working_saturday' => [...$target, 'occurs_on' => '2026-10-24', 'copied_weekday' => 2],
+            'propose_semester_occurrence_update' => [...$occurrence, 'room' => 'One occurrence'],
+            'propose_semester_occurrence_cancel' => $occurrence,
+            'propose_semester_settings_update' => [...$target, 'group_name' => 'New group'],
+            'propose_semester_occurrence_create' => $this->addition($f),
+        };
+        $before = $this->snapshot();
+        $id = $this->propose($f, $name, $arguments);
+        $this->assertSame($before, $this->snapshot());
+        $path = $f['base'].'/actions/'.$id.'/confirm';
+        AiMessage::creating(fn () => throw new RuntimeException('history failure'));
+        try {
+            $this->json('POST', $path, [], [], JSON_FORCE_OBJECT)->assertStatus(500);
+        } finally {
+            AiMessage::flushEventListeners();
+        }
+        $this->assertSame($before, $this->snapshot());
+        $this->assertSame('pending', AiPendingAction::findOrFail($id)->status);
+        $receipt = $this->json('POST', $path, [], [], JSON_FORCE_OBJECT)->assertOk()->assertJsonPath('data.status', 'executed')->json('data.receipt');
+        $this->assertSame($receipt, $this->json('POST', $path, [], [], JSON_FORCE_OBJECT)->assertOk()->json('data.receipt'));
+        $this->assertStringNotContainsString('schedule_token', json_encode($receipt));
+        $after = $this->snapshot();
+        foreach (['lessons', 'study_sessions', 'tasks', 'reminders'] as $table) {
+            $this->assertSame($before[$table], $after[$table]);
+        }
+        if (str_starts_with($name, 'propose_semester_occurrence_')) {
+            $lessons = app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-20');
+            $this->assertSame(match ($name) {
+                'propose_semester_occurrence_cancel' => 1,
+                'propose_semester_occurrence_create' => 3,
+                default => 2,
+            }, count($lessons));
+            $this->assertSame($name === 'propose_semester_occurrence_create' ? '12:00:00' : '10:00:00', substr($lessons[array_key_last($lessons)]['starts_at'], 11, 8));
+            $this->assertSame(2, $f['schedule']->weeklyLessonRules()->count());
+        }
+    }
+
+    public function test_addition_to_working_saturday_preserves_saved_lessons_identities_provenance_and_rules(): void
+    {
+        $f = $this->fixture();
+        $f['manager']->workingSaturday($f['owner'], $f['schedule'], ['occurs_on' => '2026-10-24', 'copied_weekday' => 2, 'source_week_parity' => 'numerator', 'selected_weekly_rule_ids' => $f['schedule']->weeklyLessonRules()->pluck('id')->all(), 'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
+        $graph = $f['manager']->read($f['owner'], $f['schedule']);
+        $first = $graph['lessons']->first();
+        $f['manager']->changeOccurrence($f['owner'], $f['schedule'], '2026-10-24', 'semester:'.$f['schedule']->id.':2026-10-24:snapshot:'.$first->id, ['room' => 'Frozen Saturday room'], false, ['schedule_token' => $graph['meta']['schedule_token']]);
+        $before = $this->snapshot();
+        $links = DB::table('schedule_date_exception_lesson_teacher')->orderBy('schedule_date_exception_lesson_id')->get()->all();
+        $effective = app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-24');
+        $revision = $f['schedule']->fresh()->management_revision;
+        $id = $this->propose($f, 'propose_semester_occurrence_create', $this->addition($f, '2026-10-24'));
+        $this->assertSame($before, $this->snapshot());
+        $preview = AiPendingAction::findOrFail($id)->preview;
+        $this->assertSame('2026-10-24', $preview['after']['date']);
+        $this->assertSame('working_saturday', $preview['after']['kind']);
+        $this->assertSame('numerator', $preview['after']['source_week_parity']);
+        $new = collect($preview['after']['lessons'])->firstWhere('pair_number', 3);
+        $this->assertSame('301', $new['room']);
+        $this->assertSame($f['owner']->subjects()->findOrFail($new['subject_id'])->name, $new['subject']['name']);
+        $this->assertSame($f['owner']->teachers()->findOrFail($new['teacher_id'])->name, $new['teacher']['name']);
+        $this->travelTo(CarbonImmutable::parse('2026-10-16T08:05:00Z'));
+        $path = $f['base'].'/actions/'.$id.'/confirm';
+        $receipt = $this->json('POST', $path, [], [], JSON_FORCE_OBJECT)->assertOk()->assertJsonPath('data.status', 'executed')->json('data.receipt');
+        $after = $this->snapshot();
+        $this->assertSame($before['weekly_lesson_rules'], $after['weekly_lesson_rules']);
+        $this->assertSame($before['schedule_date_exceptions'], $after['schedule_date_exceptions']);
+        $this->assertSame($before['schedule_date_exception_lessons'], array_slice($after['schedule_date_exception_lessons'], 0, 2));
+        $this->assertEquals($links, DB::table('schedule_date_exception_lesson_teacher')->whereIn('schedule_date_exception_lesson_id', array_column($before['schedule_date_exception_lessons'], 'id'))->orderBy('schedule_date_exception_lesson_id')->get()->all());
+        $lessons = app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-24');
+        $this->assertSame([1, 2, 3], array_column($lessons, 'pair_number'));
+        $this->assertSame($effective, array_slice($lessons, 0, 2));
+        $this->assertSame('added', $lessons[2]['change_kind']);
+        $this->assertSame($revision + 1, $f['schedule']->fresh()->management_revision);
+        $this->assertSame($receipt, $this->json('POST', $path, [], [], JSON_FORCE_OBJECT)->assertOk()->json('data.receipt'));
+        $this->assertSame($after, $this->snapshot());
+    }
+
+    public function test_base_day_addition_freezes_only_selected_date(): void
+    {
+        $f = $this->fixture();
+        $before = $this->snapshot();
+        $other = app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-27');
+        $id = $this->propose($f, 'propose_semester_occurrence_create', $this->addition($f));
+        $this->assertSame($before, $this->snapshot());
+        $this->json('POST', $f['base'].'/actions/'.$id.'/confirm', [], [], JSON_FORCE_OBJECT)->assertOk();
+        $lessons = app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-20');
+        $this->assertSame([1, 2, 3], array_column($lessons, 'pair_number'));
+        $this->assertSame(['base', 'base', 'added'], array_column($lessons, 'change_kind'));
+        $this->assertSame($other, app(EffectiveScheduleService::class)->date($f['owner'], $f['schedule'], '2026-10-27'));
+        $this->assertSame($before['weekly_lesson_rules'], $this->snapshot()['weekly_lesson_rules']);
+        $this->assertDatabaseCount('schedule_date_exceptions', 1);
+        $rows = $f['manager']->read($f['owner'], $f['schedule'])['lessons'];
+        $this->assertSame($f['schedule']->weeklyLessonRules()->pluck('id')->all(), $rows->where('is_added', false)->pluck('source_weekly_rule_id')->all());
+        $this->assertNull($rows->firstWhere('pair_number', 3)->source_weekly_rule_id);
+    }
+
+    public static function invalidAdditions(): array
+    {
+        return [0 => ['occupied pair']];
+    }
+
+    #[DataProvider('invalidAdditions')]
+    public function test_invalid_single_additions_fail_without_proposal_or_calendar_changes(string $case): void
+    {
+        $f = $this->fixture();
+        $arguments = $this->addition($f);
+        switch ($case) {
+            case 'occupied pair':
+                $arguments['pair_number'] = 1;
+                break;
+            case 'overlap':
+                $arguments['starts_at_local'] = '08:30:00';
+                break;
+            case 'occupied pair and overlap':
+                $arguments = [...$arguments, 'pair_number' => 2, 'starts_at_local' => '08:30:00'];
+                break;
+            case 'foreign subject':
+                $arguments['subject_id'] = Subject::factory()->create()->id;
+                break;
+            case 'foreign teacher':
+                $arguments['teacher_id'] = Teacher::factory()->create()->id;
+                break;
+            case 'foreign schedule':
+                $f['owner'] = User::factory()->create();
+                break;
+            case 'wrong teacher':
+                $arguments['teacher_id'] = Teacher::factory()->for($f['owner'])->create()->id;
+                break;
+            case 'outside semester':
+                $arguments['date'] = '2026-11-02';
+                break;
+            case 'invalid time':
+                $arguments['ends_at_local'] = '11:00:00';
+                break;
+            case 'ambiguous local time':
+                $arguments = [...$arguments, 'date' => '2026-10-25', 'starts_at_local' => '03:30:00', 'ends_at_local' => '04:30:00'];
+                break;
+            case 'cancelled date':
+                $f['manager']->replaceDate($f['owner'], $f['schedule'], $arguments['date'], ['mode' => 'replace', 'lessons' => [], 'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
+                break;
+        }
+        $before = $this->snapshot();
+        $prepared = app(SemesterActionService::class)->prepare($f['owner'], 'propose_semester_occurrence_create', $arguments, 'invalid_addition');
+        $this->assertNull($prepared['proposal']);
+        $this->assertSame($case === 'foreign schedule' ? 'not_found' : 'invalid_arguments', $prepared['result']['error']['code']);
+        $this->assertSame(match ($case) {
+            'occupied pair', 'occupied pair and overlap' => 'pair_number_taken',
+            'overlap' => 'time_overlap',
+            'cancelled date' => 'date_cancelled',
+            default => null,
+        }, $prepared['result']['error']['reason'] ?? null);
+        $this->assertSame($before, $this->snapshot());
+        $this->assertDatabaseCount('ai_pending_actions', 0);
+    }
+
+    public static function additionFailureResponses(): array
+    {
+        return [0 => ['occupied pair', 'pair_number_taken', 'invalid_arguments']];
+    }
+
+    #[DataProvider('additionFailureResponses')]
+    public function test_addition_failure_reason_reaches_chat_replay_and_history_without_calendar_changes(string $case, ?string $reason, string $code): void
+    {
+        $f = $this->fixture();
+        $f['manager']->workingSaturday($f['owner'], $f['schedule'], ['occurs_on' => '2026-10-24', 'copied_weekday' => 2, 'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
+        $arguments = $this->addition($f, '2026-10-24');
+        $arguments = match ($case) {
+            'occupied pair' => [...$arguments, 'pair_number' => 1],
+            'overlap' => [...$arguments, 'starts_at_local' => '08:30:00'],
+            'occupied pair and overlap' => [...$arguments, 'pair_number' => 2, 'starts_at_local' => '08:30:00'],
+            'invalid arguments' => [...$arguments, 'pair_number' => '3'],
+            'invalid interval with occupied pair' => [...$arguments, 'pair_number' => 1, 'ends_at_local' => '11:00:00'],
+            'unavailable schedule' => [...$arguments, 'semester_schedule_id' => $f['schedule']->id + 1000],
+            default => $arguments,
+        };
+        if ($case === 'cancelled date') {
+            $f['manager']->replaceDate($f['owner'], $f['schedule'], $arguments['date'], ['mode' => 'replace', 'lessons' => [], 'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
+        }
+        if (in_array($case, ['stale state', 'internal failure'], true)) {
+            $manager = $this->createMock(SemesterScheduleManagementService::class);
+            $manager->expects($this->once())->method('createOccurrence')->willThrowException($case === 'stale state' ? new ConflictHttpException('time_overlap: private stale state') : new RuntimeException('SQL: private pair_number_taken debug data'));
+            $this->app->instance(SemesterScheduleManagementService::class, $manager);
+        }
+        $before = $this->snapshot();
+        $name = 'propose_semester_occurrence_create';
+        $expected = ['ok' => false, 'tool' => $name, 'error' => ['code' => $code, ...$reason === null ? [] : ['reason' => $reason], 'message' => match ($code) {
+            'not_found' => 'Resource not found.',
+            'action_stale' => 'The semester schedule changed. Read it again.',
+            'execution_failed' => 'Semester proposal could not be prepared.',
+            default => 'Invalid semester action arguments.',
+        }]];
+        $summary = ['call_id' => 'failed_addition', 'name' => $name, 'ok' => false, 'error_code' => $code, ...$reason === null ? [] : ['error_reason' => $reason]];
+        $round = 0;
+        $provider = $this->createMock(LlmProvider::class);
+        $provider->expects($this->exactly(3))->method('respond')->willReturnCallback(function ($instructions, $history) use (&$round, $arguments, $name, $expected): array {
+            if ($round++ === 0) {
+                return ['text' => null, 'calls' => [['id' => 'failed_addition', 'name' => $name, 'arguments' => $arguments]], 'state' => []];
+            }
+            $tool = collect($history)->firstWhere('role', 'tool');
+            $this->assertSame($expected, json_decode($tool['content'], true, flags: JSON_THROW_ON_ERROR));
+
+            return ['text' => 'The lesson was added successfully.', 'calls' => [], 'state' => []];
+        });
+        $this->app->instance(LlmProvider::class, $provider);
+        $key = (string) Str::uuid();
+        $body = ['content' => 'Додай пару на робочу суботу.'];
+        $response = $this->postJson($f['base'].'/messages', $body, ['Idempotency-Key' => $key])->assertOk();
+        $this->assertSame([$summary], $response->json('data.tools'));
+        $this->assertArrayNotHasKey('action', $response->json('data'));
+        $this->assertSame('Пропозицію не створено. Зміни не виконано.', $response->json('data.content'));
+        $replay = $this->postJson($f['base'].'/messages', $body, ['Idempotency-Key' => $key])->assertOk();
+        $this->assertSame($response->json('data'), $replay->json('data'));
+        $messages = $this->getJson($f['base'].'/messages')->assertOk()->json('data');
+        $tool = collect($messages)->firstWhere('role', 'tool');
+        $this->assertNull($tool['content']);
+        $this->assertSame([...$summary, 'error_code' => $code === 'action_stale' ? null : $code], $tool['tool_result']);
+        $stored = AiMessage::where('role', 'tool')->sole();
+        $this->assertSame($expected, json_decode($stored->content, true, flags: JSON_THROW_ON_ERROR));
+        $this->postJson($f['base'].'/messages', ['content' => 'Поясни попередній результат.'], ['Idempotency-Key' => (string) Str::uuid()])->assertOk();
+        $this->assertSame($before, $this->snapshot());
+        $this->assertDatabaseCount('ai_pending_actions', 0);
+    }
+}

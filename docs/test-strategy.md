@@ -1,86 +1,54 @@
 # Backend testing
 
-Current execution results, baseline failures, replacement coverage and limitations are recorded in [the rebuild report](testing/backend-test-rebuild-report.md). Historical Stage/CI totals are not current evidence.
+The compact suite deliberately replaces the former 7,065-case offline suite. It is a coverage-budget decision, not evidence that the retired suite passed. Historical reports in `docs/testing/` and Stage directories remain historical. Current results are in [the compact-suite report](testing/compact-suite-report.md) and [machine-readable results](testing/compact-suite-results.json).
 
-## Organization
+## Scope and counting
 
-The default `phpunit.xml` discovers every test under `tests/Unit` and `tests/Feature` exactly once. No critical directory or failed group is excluded. Keep pure deterministic tests in Unit and Laravel/REST/MySQL/fake-provider workflows in Feature. Existing high-value allocation, authorization, provider-wire, persistence and real-process concurrency regressions are retained.
+`phpunit.xml` still discovers every class in `tests/Unit` and `tests/Feature`; no old directory or failing group is excluded. Old PHP test classes are removed, rather than retained behind discovery exclusions. Each discovered DataProvider row counts separately. The target is 660, with a hard maximum of 700.
 
-Feature classes have non-duplicating PHPUnit group attributes:
+| Primary category | Cases |
+| --- | ---: |
+| Unit | 220 |
+| Feature/REST (`rest`) | 170 |
+| Integration | 85 |
+| Migration | 45 |
+| Concurrency | 30 |
+| AI with substituted providers | 55 |
+| Cross-module (`workflow`) | 35 |
+| Smoke | 20 |
+| Total | 660 |
 
-| Selector | Purpose |
-|---|---|
-| `mysql` | All Laravel Feature tests using the guarded MySQL application bootstrap |
-| `migration` | Current constraints/persistence and explicit historical predecessor upgrades |
-| `concurrency` | Independent MySQL clients, including real InnoDB lock waits |
-| `ai` | Fake-provider transport, orchestration, proposal/confirmation and Tool execution |
-| `security` | Authentication, authorization, isolation and database-safety probes |
-| `recovery` | Session recovery, adaptive replanning, durable automatic reviews and scans |
-| `workflow` | Authenticated cross-module workflows |
-| `smoke` | Essential methods, also retained in the default complete suite |
+Each case has exactly one primary category. `mysql` is only an execution dependency marker. `phpunit-smoke.xml` selects the same 20 smoke cases already included in the full suite, never another 20 unique cases.
 
-`phpunit-smoke.xml` discovers the same Feature directory and includes only methods/classes tagged `smoke`. It includes the mixed calendar read, nine semester actions, automatic recovery ownership/replay and complete semester-edit/recovery workflow. A smoke pass does not replace the complete suite.
+The [manifest](testing/compact-suite-manifest.json) assigns every replacement class and records each reused original case. The [retirement inventory](testing/compact-suite-retirement.json) records original classes, method expansion counts and retained counts. Reused assertions and helper fixtures are intentional: compact replacement does not require rewriting a sound domain oracle. Provider matrices are explicit local arrays containing selected rows; omitted rows and unused helper methods are removed from executable test classes.
 
-`tests/Concerns` contains reusable browser, fake-provider, MySQL assertion/worker and recovery fixtures. `tests/Support/AiCapabilities.php` derives current Tool manifests from registries; tests compare names/schema semantics and uniqueness rather than historical counts. Native provider-specific null/omission and continuation checks remain separate. Fixed clocks and explicit historical migration boundaries prevent calendar and schema drift.
+Coverage follows the current routes and Services: task/child lifecycle and remaining effort; effective semester and legacy schedules; XLSX parsing and import; available time, constraints, allocation, confirmation and recovery; reminders and inbox; statistical reports; and AI proposals, confirmation receipts and history. Unit cases include exact seconds, boundaries, calendar/DST behavior, integer arithmetic, representative invalid domain inputs and independent allocation oracles. Representative scalar families replace exhaustive combinations. This is not exhaustive combinatorial coverage.
 
-## Safe local execution
+There is no dedicated security/attack suite. Functional login and ordinary account workflows remain. Cross-user probes embedded in retained atomicity flows were removed. Policies, middleware, CSRF, authorization, database guards and production behavior are unchanged.
 
-Prefer a fresh process-owned server over an existing database:
+## Execution and evidence
 
 ```sh
-vendor/bin/phpunit --testsuite Unit
-scripts/testing/phpunit-disposable-mysql.sh --group migration --group concurrency
-scripts/testing/phpunit-disposable-mysql.sh --group ai
-scripts/testing/phpunit-disposable-mysql.sh --group security
-scripts/testing/phpunit-disposable-mysql.sh --group workflow
-scripts/testing/phpunit-disposable-mysql.sh --configuration phpunit-smoke.xml
-scripts/testing/phpunit-disposable-mysql.sh
+vendor/bin/phpunit --list-tests
+vendor/bin/phpunit --list-tests-xml /tmp/planner-inventory.xml
+vendor/bin/phpunit --testsuite Unit --log-junit /tmp/planner-unit.xml
+scripts/testing/phpunit-disposable-mysql.sh --log-junit /tmp/planner-full.xml
+scripts/testing/phpunit-disposable-mysql.sh --configuration phpunit-smoke.xml --log-junit /tmp/planner-smoke.xml
+php scripts/testing/summarize-compact-suite.php /tmp/planner-inventory.xml /tmp/planner-unit.xml /tmp/planner-full.xml /tmp/planner-smoke.xml
 vendor/bin/pint --test
+git diff --check
 ```
 
-The runner requires local MySQL 8.x binaries, PHP/extensions, OpenSSL and Composer dependencies. It initializes an empty private temporary datadir, verifies the connected server's datadir and absence of application schemas, creates a new randomly named empty database, exports testing/MySQL selectors and fake delivery configuration, and shuts down/removes only that temporary server on exit. Port defaults to 13380; set `PLANNER_TEST_PORT` to an unused local port if necessary. It neither discovers nor connects to a production/development instance. A missing prerequisite or identity mismatch stops execution.
+Run the database commands sequentially. The existing runner initializes its own temporary MySQL 8.x datadir, checks its identity and emptiness, creates a randomly named schema, and removes only that owned server on exit. Do not substitute SQLite or use a retained development/production database. `tests/TestCase.php`, `tests/Support/TestDatabase.php` and the per-server/schema lease remain unchanged. The bootstrap prevents stray provider HTTP requests. Fake transport/provider responses exercise the real orchestrator, Tools and Services; no paid provider call is needed.
 
-For an independently provisioned environment, establish equivalent evidence of disposal before running any Feature test. `APP_ENV`, database naming and `.env` values alone are insufficient. The existing testing/mysql/exact selected-database guards remain in `tests/TestCase.php`. An additional server-UUID/database keyed local file lease refuses a second PHPUnit process against that same database before cleanup. Intentional worker clients inside a concurrency test do not run suite cleanup. Separate machines/runners must still use separate disposable MySQL instances or schemas; a local file lease is not a distributed lock.
+Concurrency cases use independent processes/connections and real InnoDB lock instrumentation with controlled readiness/release, plus committed-state and rollback checks. Migration cases cover current physical constraints and populated forward upgrades. `UsesForwardOnlyMigrations` handles teardown without rolling back forward-only production history. Applied migrations are not rewritten.
 
-Run database suites sequentially. PHPUnit 12 uses repeated selectors (`--group migration --group concurrency`), not one comma-joined group name. Preserve mail/notifications fakes; the offline bootstrap prevents stray HTTP requests. Test workers carry the trusted connection configuration explicitly.
+CI's existing disposable hosted migration verification and formatting/deployment mechanisms remain unchanged. It has no old individual PHPUnit file selectors to redirect. Local complete/unit/smoke evidence must be checked independently; the existing hosted workflow alone does not establish a full compact-suite pass.
 
-## External and historical boundaries
+## Shared full-stack and separate deployment checks
 
-`tests/Live` remains explicitly opt-in for paid provider observations and is outside the offline suite. Do not run it during routine verification. The transport/orchestration/action contracts are tested with deterministic providers instead. `tests/Deployment` contains separate Python safety checks; these are not business PHPUnit tests and do not deploy anything. No real browser, external email/push or paid LLM capability is implied by a local pass.
+Keep `scripts/testing/fullstack-disposable-mysql.sh`, `tests/Support/system-router.php`, `system-fixtures.php`, `SystemTestProvider.php`, the real XLSX fixture and their dependencies. They provision a separate temporary MySQL server, Laravel HTTP and the independently checked-out Vue app. This task does not invoke that runner or modify the frontend. It continues to use actual orchestrator/Tools/Services with the model provider substituted in the private test router.
 
-Current forward migrations must upgrade cleanly and preserve history. Historical reversible migrations are tested against explicitly rebuilt predecessors on the disposable schema. Never claim the entire current application can downgrade through forward-only migrations, remove migration guards, or rewrite an applied migration to satisfy a historical test.
+`tests/Deployment/test_deployment.py` remains a separate Python deployment check, outside PHPUnit and its 660-case budget; it was not moved or hidden by this replacement. The obsolete opt-in paid-provider PHPUnit class was removed. Database and deployment safety mechanisms remain, even though special negative tests for them are outside this requested functional suite.
 
-## Independent Vue + Laravel browser verification
-
-The independent frontend's real-browser suite can be run against a separately
-provisioned MySQL process (not the regression suite's resetting database):
-
-```sh
-scripts/testing/fullstack-disposable-mysql.sh /absolute/path/to/Student-AI-Planner-Frontend
-vendor/bin/phpunit tests/Unit/SystemHarnessEntrypointTest.php
-```
-
-The frontend checkout must contain `playwright.fullstack.config.ts`. The runner
-proves a new server/datadir, zero application schemas and an empty new database,
-then applies migrations, starts Laravel HTTP on localhost:18000 and Vite on
-localhost:15173, and runs Chromium with actual cookie/CSRF requests. It refuses
-occupied HTTP ports and never connects to the retained development database.
-An ephemeral APP_KEY, database sessions/cache/queue, isolated storage/log mail and
-synthetic browser-registered accounts confine all writes and delivery. The test
-HTTP entry rechecks UUID/datadir/database on every request and prohibits stray
-provider HTTP requests. Production bootstrap/configuration remains unchanged.
-
-`tests/Support/SystemTestProvider.php` replaces only model selection at the
-`LlmProvider` boundary in the private test router. Registered Tools, orchestrator,
-confirmation Services and persisted receipts execute normally. Guarded CLI
-fixtures establish elapsed history and expiry cases only on that exact server.
-The ordinary app does not gain a fake provider or test endpoints. This suite is
-not evidence of paid natural-language model selection. The real five-minute
-scheduler observation may add up to five minutes to runtime.
-
-Results, UUID/process evidence, browser checks and scheduler logs are stored in
-the frontend's ignored `fullstack-results/`, outside ordinary Playwright's cleanup
-root. Private mail/token-bearing storage is deleted with the temporary server;
-never commit it. Detailed coverage and normal retained-demo startup commands are
-in the frontend's `docs/system-integration-report.md` and
-`docs/local-full-stack-setup.md`.
+External paid-model quality, real mail/push delivery, browser rendering, production deployment, every retired scalar/provider-wire combination and dedicated security testing are outside this suite. See the compact report for omitted functional areas and all current verification failures.
