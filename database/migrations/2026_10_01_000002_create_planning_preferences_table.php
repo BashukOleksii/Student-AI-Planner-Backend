@@ -19,6 +19,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
+        // The installed Schema Builder does not provide a CHECK constraint API.
         DB::statement(<<<'SQL'
             ALTER TABLE planning_preferences
                 ADD CONSTRAINT planning_preferences_max_daily_positive

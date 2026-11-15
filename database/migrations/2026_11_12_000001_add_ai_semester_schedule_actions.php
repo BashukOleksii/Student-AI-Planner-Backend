@@ -27,6 +27,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Forward-only: preserve reviewed semester and earlier action history and receipts even when no current rows exist.
         throw new RuntimeException('AI semester schedule actions are forward-only. Restore compatibility with a new forward migration.');
     }
 };

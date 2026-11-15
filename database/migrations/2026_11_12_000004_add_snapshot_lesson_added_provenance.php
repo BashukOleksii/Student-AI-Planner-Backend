@@ -9,6 +9,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // No backfill: historical null links can mean either additions or deleted rules.
         Schema::table('schedule_date_exception_lessons', function (Blueprint $table): void {
             $table->boolean('is_added')->nullable();
         });

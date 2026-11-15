@@ -32,6 +32,8 @@ return new class extends Migration
             $table->unique(['user_id', 'academic_period_id', 'import_fingerprint']);
         });
 
+        // Self-replacement is a future Service invariant: MySQL rejects a CHECK
+        // referencing AUTO_INCREMENT id (3818) or the self SET NULL FK (3823).
         DB::statement(<<<'SQL'
             ALTER TABLE lessons
                 ADD CONSTRAINT lessons_valid_interval

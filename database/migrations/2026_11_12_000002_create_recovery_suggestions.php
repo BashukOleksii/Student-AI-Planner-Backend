@@ -12,12 +12,12 @@ return new class extends Migration
         Schema::create('recovery_suggestions', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-
+            // One active review per owner, including advisory reviews. Null frees the slot on resolution.
             $table->unsignedBigInteger('active_owner_id')->nullable()->unique();
             $table->char('dedupe_key', 64)->unique();
             $table->char('source_hash', 64);
             $table->char('need_hash', 64);
-
+            // Logical immutable refresh lineage, server assigned and owner checked. No self-cascade on account purge.
             $table->uuid('refreshed_from_id')->nullable()->unique();
             $table->string('kind', 32);
             $table->string('status', 16)->default('pending');

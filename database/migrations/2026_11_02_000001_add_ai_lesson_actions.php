@@ -22,6 +22,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Forward-only: preserve reviewed Lesson history and receipts even when no current rows exist.
         throw new RuntimeException('Stage 11 is forward-only. Restore compatibility with a new forward migration.');
     }
 };

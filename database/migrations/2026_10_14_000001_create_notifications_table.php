@@ -15,7 +15,7 @@ return new class extends Migration
             $table->json('data');
             $table->timestamp('read_at')->nullable();
             $table->timestamps();
-
+            // Keep immutable inbox history if a future administrative purge removes its source.
             $table->foreignId('reminder_id')->nullable()->unique()->constrained()->nullOnDelete();
             $table->index(['notifiable_type', 'notifiable_id', 'read_at', 'created_at'], 'notifications_inbox_index');
         });

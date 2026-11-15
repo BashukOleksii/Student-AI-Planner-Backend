@@ -15,7 +15,7 @@ return new class extends Migration
             $table->char('input_hash', 64);
             $table->uuid('lease_token')->nullable();
             $table->dateTime('lease_expires_at', 6)->nullable();
-
+            // Only the safe public committed result, used for durable idempotent replay.
             $table->json('result')->nullable();
             $table->timestamps();
             $table->unique(['conversation_id', 'request_id'], 'ai_turns_conversation_request_unique');

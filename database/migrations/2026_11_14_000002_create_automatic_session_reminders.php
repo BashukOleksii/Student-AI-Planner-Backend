@@ -16,6 +16,7 @@ return new class extends Migration
         });
         DB::statement('ALTER TABLE users ADD CONSTRAINT users_positive_session_reminder_lead CHECK (session_reminder_lead_minutes > 0)');
 
+        // Separate automatic origin; manual reminders and their receipts retain their existing semantics.
         Schema::create('automatic_session_reminders', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();

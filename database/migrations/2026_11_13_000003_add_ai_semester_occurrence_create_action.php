@@ -7,6 +7,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // One atomic ALTER preserves every existing type and all pending actions/receipts.
         DB::statement(<<<'SQL'
             ALTER TABLE ai_pending_actions
                 DROP CHECK ai_actions_valid_type,
@@ -28,6 +29,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Never remove a type that may have retained pending actions or executed receipts.
         throw new RuntimeException('AI semester occurrence creation is forward-only. Restore compatibility with a new forward migration.');
     }
 };
