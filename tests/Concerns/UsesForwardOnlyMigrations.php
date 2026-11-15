@@ -5,6 +5,7 @@ namespace Tests\Concerns;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 
+/** @mixin \Tests\TestCase */
 trait UsesForwardOnlyMigrations
 {
     use DatabaseMigrations;

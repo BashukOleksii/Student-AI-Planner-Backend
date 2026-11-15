@@ -35,6 +35,7 @@ class ScheduleDateExceptionLesson extends Model
         return $this->belongsTo(ScheduleDateException::class);
     }
 
+    /** @return BelongsTo<Subject, $this> */
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);

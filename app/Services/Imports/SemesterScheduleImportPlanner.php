@@ -48,18 +48,15 @@ class SemesterScheduleImportPlanner
     }
 
     /** @return array{rows: array, operations: array, projected_rules: array, errors: array, counts: array} */
-    public function plan(array $incoming, array $existing, array $suppressions = []): array
+    public function plan(array $incoming, array $existing): array
     {
-        $byKey = $bySlot = $projected = [];
-        foreach ($existing as $rule) {
-            $bySlot[$this->key($rule)] = $rule;
-            if ($rule['import_key'] ?? null) {
-                $byKey[$rule['import_key']] = $rule;
-            }
-            $projected[$rule['id']] = ['id' => $rule['id'], ...$this->values($rule)];
-        }
-        $seen = $operations = $rows = $errors = [];
+        $seen = $operations = $rows = $errors = $projected = [];
         $counts = array_fill_keys(['create', 'update', 'delete', 'noop', 'preserve', 'duplicate'], 0);
+        foreach ($existing as $rule) {
+            $operations[] = ['operation' => 'delete', 'rule_id' => $rule['id'], 'import_key' => $this->key($rule),
+                'before' => $this->values($rule), 'after' => null];
+            $counts['delete']++;
+        }
         foreach ($incoming as $index => $row) {
             $key = $this->key($row);
             $row = [...$row, 'import_key' => $key, 'operation' => null, 'matched_rule_id' => null];
@@ -81,52 +78,22 @@ class SemesterScheduleImportPlanner
 
                 continue;
             }
-            $blocked = $this->blockingSuppressions($row, $suppressions);
-            if ($blocked !== []) {
-                $row['operation'] = 'suppressed';
-                $row['errors']['suppressed_slot'] = ['Цей повторюваний проміжок навмисно вилучено. Відновіть його окремо перед повторним імпортом.'];
-                $row['suppressed_slot_ids'] = array_values(array_column($blocked, 'id'));
-                $rows[] = $row;
-
-                continue;
-            }
-            $target = $byKey[$key] ?? $bySlot[$key] ?? null;
-            $before = $target === null ? null : $this->values($target);
-            if ($target === null) {
-                $operation = 'create';
-                $projected[-($index + 1)] = ['id' => -($index + 1), ...$candidate];
-            } elseif ($this->managed($target) && $target['import_key'] === $key) {
-                $operation = $before === $candidate ? 'noop' : 'update';
-                $projected[$target['id']] = ['id' => $target['id'], ...$candidate];
-            } else {
-                $operation = 'preserve';
-                if ($before !== $candidate) {
-                    $row['errors']['protected_rule'] = ['Проміжок містить ручне або змінене вручну заняття. Його не буде перезаписано.'];
-                }
-            }
-            $row['operation'] = $operation;
-            $row['matched_rule_id'] = $target['id'] ?? null;
-            $operations[] = ['operation' => $operation, 'rule_id' => $target['id'] ?? null,
-                'import_key' => $key, 'before' => $before, 'after' => $operation === 'preserve' ? $before : $candidate];
-            $counts[$operation]++;
+            $row['operation'] = 'create';
+            $operations[] = ['operation' => 'create', 'rule_id' => null, 'import_key' => $key, 'before' => null, 'after' => $candidate];
+            $projected[] = ['id' => -($index + 1), ...$candidate];
+            $counts['create']++;
             $rows[] = $row;
         }
-        foreach ($existing as $rule) {
-            if (! $this->managed($rule) || isset($seen[$rule['import_key']])) {
-                continue;
-            }
-            unset($projected[$rule['id']]);
-            $operations[] = ['operation' => 'delete', 'rule_id' => $rule['id'], 'import_key' => $rule['import_key'],
-                'before' => $this->values($rule), 'after' => null];
-            $counts['delete']++;
+        if ($incoming === []) {
+            $errors['file'] = ['Файл не містить занять. Порожній імпорт не може замінити семестровий розклад.'];
         }
         try {
-            $this->calculator->validateWeeklyRules(array_values($projected));
+            $this->calculator->validateWeeklyRules($projected);
         } catch (InvalidArgumentException) {
-            $errors['schedule'] = ['Тижневі заняття перетинаються або повторюють ту саму пару. Ручні заняття збережено.'];
+            $errors['schedule'] = ['Нові тижневі заняття перетинаються або повторюють ту саму пару.'];
         }
 
-        return ['rows' => $rows, 'operations' => $operations, 'projected_rules' => array_values($projected), 'errors' => $errors, 'counts' => $counts];
+        return ['rows' => $rows, 'operations' => $operations, 'projected_rules' => $projected, 'errors' => $errors, 'counts' => $counts];
     }
 
     public function blockingSuppressions(array $rule, array $suppressions): array

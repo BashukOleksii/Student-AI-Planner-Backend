@@ -7,6 +7,7 @@ use App\Models\EducationInstitution;
 use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\User;
+use App\Models\WeeklyLessonRule;
 use App\Services\Imports\ScheduleWorkbookParser;
 use App\Services\Imports\SemesterScheduleImportService;
 use Illuminate\Http\UploadedFile;
@@ -23,7 +24,7 @@ class CompactSemesterScheduleImportConcurrencyTest extends TestCase
 {
     use UsesForwardOnlyMigrations;
 
-    private function preview(): array
+    private function preview(bool $replacement = false): array
     {
         $owner = User::factory()->create(['timezone' => 'Europe/Kyiv']);
         $institution = EducationInstitution::factory()->for($owner)->create();
@@ -38,6 +39,11 @@ class CompactSemesterScheduleImportConcurrencyTest extends TestCase
         }
         $import = app(SemesterScheduleImportService::class)->create($owner, ['academic_period_id' => $period->id, 'parity_anchor_on' => '2026-09-07', 'first_week_parity' => 'numerator'], new UploadedFile($path, 'schedule.xlsx', null, null, true));
         $this->assertSame('ready', $import->status);
+        if ($replacement) {
+            app(SemesterScheduleImportService::class)->commit($owner, $import, $import->preview_token);
+            $import = app(SemesterScheduleImportService::class)->create($owner, ['academic_period_id' => $period->id], new UploadedFile($path, 'schedule.xlsx', null, null, true));
+            $this->assertSame(16, $import->review['counts']['delete']);
+        }
 
         return [$owner, $import];
     }
@@ -63,7 +69,8 @@ class CompactSemesterScheduleImportConcurrencyTest extends TestCase
 
     public function test_two_independent_confirmations_apply_once_and_replay_identical_receipt(): void
     {
-        [$owner, $import] = $this->preview();
+        [$owner, $import] = $this->preview(replacement: true);
+        $oldIds = WeeklyLessonRule::orderBy('id')->pluck('id')->all();
         $workers = [];
         DB::beginTransaction();
         User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
@@ -88,6 +95,8 @@ class CompactSemesterScheduleImportConcurrencyTest extends TestCase
             $this->assertSame($canonical($first), $canonical($second));
             $this->assertDatabaseCount('semester_schedules', 1);
             $this->assertDatabaseCount('weekly_lesson_rules', 16);
+            $this->assertSame(0, WeeklyLessonRule::whereIn('id', $oldIds)->count());
+            $this->assertSame(2, $owner->semesterSchedules()->sole()->management_revision);
             $this->assertDatabaseCount('lessons', 0);
         } finally {
             if (DB::transactionLevel() > 0) {
@@ -101,19 +110,22 @@ class CompactSemesterScheduleImportConcurrencyTest extends TestCase
 
     public function test_waiting_commit_rechecks_changes_committed_while_waiting_for_owner_lock(): void
     {
-        [$owner, $import] = $this->preview();
+        [$owner, $import] = $this->preview(replacement: true);
+        $oldIds = WeeklyLessonRule::orderBy('id')->pluck('id')->all();
         $worker = null;
         DB::beginTransaction();
         User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
         try {
             $worker = $this->worker($owner, $import);
-            $owner->subjects()->first()->update(['code' => 'AFTER PREVIEW']);
+            WeeklyLessonRule::findOrFail($oldIds[0])->update(['room' => 'AFTER PREVIEW', 'is_manually_managed' => true]);
             DB::commit();
             $result = $this->outcome($worker);
             $this->assertTrue($result['changed']);
             $this->assertNotSame($import->preview_token, $result['token']);
             $this->assertNull($result['receipt']);
-            $this->assertDatabaseCount('weekly_lesson_rules', 0);
+            $this->assertDatabaseCount('weekly_lesson_rules', 16);
+            $this->assertSame($oldIds, WeeklyLessonRule::orderBy('id')->pluck('id')->all());
+            $this->assertDatabaseHas('weekly_lesson_rules', ['id' => $oldIds[0], 'room' => 'AFTER PREVIEW']);
             $fresh = $import->fresh();
             $confirmed = app(SemesterScheduleImportService::class)->commit($owner, $fresh, $fresh->preview_token);
             $this->assertFalse($confirmed['changed']);

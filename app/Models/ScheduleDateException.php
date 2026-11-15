@@ -20,6 +20,7 @@ class ScheduleDateException extends Model
         return $this->belongsTo(SemesterSchedule::class);
     }
 
+    /** @return HasMany<ScheduleDateExceptionLesson, $this> */
     public function lessons(): HasMany
     {
         return $this->hasMany(ScheduleDateExceptionLesson::class);

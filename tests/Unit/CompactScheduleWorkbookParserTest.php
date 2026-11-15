@@ -114,6 +114,16 @@ class CompactScheduleWorkbookParserTest extends TestCase
         (new ScheduleWorkbookParser)->parse(__DIR__.'/missing-schedule.xlsx');
     }
 
+    public function test_teacher_initial_dots_are_normalized_without_combining_names(): void
+    {
+        $parser = new ScheduleWorkbookParser;
+        $this->assertSame(['Студницька Л. М.'], $parser->teacherNames('Студницька Л. М..'));
+        $this->assertSame(['Студницька Л. М.', 'Інший А. Б.'], $parser->teacherNames('Студницька Л. М.. / Інший А. Б.'));
+        $combined = 'Студницька Л. М.. Інший А. Б.';
+        $this->assertSame([$combined], $parser->teacherNames($combined));
+        $this->assertSame('Студницька.. Л. М.', ScheduleWorkbookParser::normalizeTeacherName('Студницька.. Л. М.'));
+    }
+
     private function emptyDialect(int $left = 1, int $top = 1): Spreadsheet
     {
         $workbook = new Spreadsheet;

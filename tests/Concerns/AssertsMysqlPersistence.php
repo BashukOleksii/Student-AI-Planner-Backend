@@ -7,6 +7,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
+/** @mixin \Tests\TestCase */
 trait AssertsMysqlPersistence
 {
     private function assertTableDefinition(string $table, array $expected, bool $autoIncrement = true): void

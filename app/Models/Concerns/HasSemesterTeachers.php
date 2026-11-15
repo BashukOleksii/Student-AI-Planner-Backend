@@ -2,6 +2,7 @@
 
 namespace App\Models\Concerns;
 
+/** @mixin \Illuminate\Database\Eloquent\Model */
 trait HasSemesterTeachers
 {
     public function initializeHasSemesterTeachers(): void

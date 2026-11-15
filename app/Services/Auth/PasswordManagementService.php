@@ -38,7 +38,9 @@ class PasswordManagementService
                 throw ValidationException::withMessages(['current_password' => [__('validation.current_password')]]);
             }
             $this->savePassword($user, $credentials['password']);
-            Password::broker()->deleteToken($user);
+            /** @var \Illuminate\Auth\Passwords\PasswordBroker $broker */
+            $broker = Password::broker();
+            $broker->deleteToken($user);
             $this->sessions($user)->where('id', '!=', $sessionId)->delete();
 
             return $user;

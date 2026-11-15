@@ -12,7 +12,7 @@ class SemesterScheduleStateService
 {
     public function __construct(private SemesterScheduleImportPlanner $planner, private SemesterLessonTeacherService $lessonTeachers) {}
 
-    public function load(User $owner, int $periodId, bool $lock = false): array
+    public function load(User $owner, int $periodId, bool $lock = false, bool $replacement = false): array
     {
         $period = $this->period($owner, $periodId, $lock);
         $subjects = $owner->subjects()->with(['teachers' => fn ($query) => $query->when($lock, fn ($q) => $q->lockForUpdate())])->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get();
@@ -36,7 +36,7 @@ class SemesterScheduleStateService
                 $this->invalidGraph();
             }
         }
-        $teacherAssignments = $this->lessonTeachers->catalogAssignments($owner, $subjects, $lock);
+        $teacherAssignments = $this->lessonTeachers->catalogAssignments($owner, $subjects, $lock, $replacement ? $schedule?->id : null);
         $suppressions = $schedule?->suppressedSlots()->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get() ?? collect();
         foreach ($suppressions as $slot) {
             if ($slot->user_id !== $owner->id) {
@@ -52,8 +52,8 @@ class SemesterScheduleStateService
             if ($rule->semester_schedule_import_id !== null) {
                 $source = $sources->get($rule->semester_schedule_import_id);
                 if ($source === null || $source->academic_period_id !== $period->id || $source->status !== 'committed'
-                    || ! $this->validBaseline($rule->import_baseline)
-                    || $rule->import_key !== $this->planner->key($rule->import_baseline)) {
+                    || (! $replacement && (! $this->validBaseline($rule->import_baseline)
+                        || $rule->import_key !== $this->planner->key($rule->import_baseline)))) {
                     $this->invalidGraph();
                 }
                 $provenance[$source->id] = [$source->id, $source->academic_period_id, $source->status];

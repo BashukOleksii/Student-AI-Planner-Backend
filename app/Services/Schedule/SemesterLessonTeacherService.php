@@ -2,6 +2,7 @@
 
 namespace App\Services\Schedule;
 
+use App\Models\Lesson;
 use App\Models\ScheduleDateExceptionLesson;
 use App\Models\User;
 use App\Models\WeeklyLessonRule;
@@ -30,9 +31,10 @@ class SemesterLessonTeacherService
         }
     }
 
-    public function catalogAssignments(User $owner, Collection $subjects, bool $lock = false): array
+    public function catalogAssignments(User $owner, Collection $subjects, bool $lock = false, ?int $replacingScheduleId = null): array
     {
         $assignments = [];
+        $replaced = $retained = [];
         foreach ($subjects as $subject) {
             if ($subject->teachers->contains(fn ($teacher) => $teacher->user_id !== $owner->id || $teacher->pivot->user_id !== $owner->id)) {
                 $this->repair('Предмет '.$subject->id.' посилається на викладача іншого користувача.');
@@ -40,12 +42,26 @@ class SemesterLessonTeacherService
             $assignments[$subject->id] = $subject->teachers->modelKeys();
         }
         foreach ([WeeklyLessonRule::class, ScheduleDateExceptionLesson::class] as $model) {
-            $references = $model::where('user_id', $owner->id)->whereNotNull('teacher_id')->orderBy('id')
-                ->when($lock, fn ($query) => $query->lockForUpdate())->get(['id', 'subject_id', 'teacher_id']);
+            $references = $model::with(['teachers' => fn ($query) => $query->when($lock, fn ($q) => $q->lockForUpdate())])
+                ->where('user_id', $owner->id)->orderBy('id')
+                ->when($lock, fn ($query) => $query->lockForUpdate())->get(['id', 'semester_schedule_id', 'subject_id', 'teacher_id']);
             foreach ($references as $reference) {
                 if (array_key_exists($reference->subject_id, $assignments)) {
-                    $assignments[$reference->subject_id][] = $reference->teacher_id;
+                    array_push($assignments[$reference->subject_id], ...$reference->teacher_ids);
+                    if ($replacingScheduleId !== null && $reference->semester_schedule_id === $replacingScheduleId) {
+                        $replaced[$reference->subject_id] = [...($replaced[$reference->subject_id] ?? []), ...$reference->teacher_ids];
+                    } else {
+                        $retained[$reference->subject_id] = true;
+                    }
                 }
+            }
+        }
+        if ($replacingScheduleId !== null) {
+            // Legacy lessons (including soft-deleted history) cannot be attributed to this replacement.
+            $references = Lesson::withTrashed()->where('user_id', $owner->id)->orderBy('id')
+                ->when($lock, fn ($query) => $query->lockForUpdate())->get(['id', 'subject_id']);
+            foreach ($references as $reference) {
+                $retained[$reference->subject_id] = true;
             }
         }
         foreach ($assignments as $subjectId => &$ids) {
@@ -53,14 +69,17 @@ class SemesterLessonTeacherService
             if (count($ids) > 1) {
                 $this->repair('Предмет '.$subjectId.' має кілька історичних записів викладачів.');
             }
-            $ids = $ids[0] ?? null;
+            $id = $ids[0] ?? null;
+            // A catalog-only assignment has no provenance: never silently overwrite it.
+            $hasEvidence = in_array($id, $replaced[$subjectId] ?? [], true) && ! isset($retained[$subjectId]);
+            $ids = $hasEvidence ? null : $id;
         }
         unset($ids);
 
         return $assignments;
     }
 
-    public function assignmentErrors(array $rows, array $assignments): array
+    public function assignmentErrors(array $rows, array $assignments, bool $replacement = false): array
     {
         $bySubject = [];
         foreach ($rows as $row) {
@@ -78,7 +97,11 @@ class SemesterLessonTeacherService
                 $ids[] = $assignments[$row['subject_id']];
             }
             if (count(array_unique($ids)) > 1) {
-                $errors[$index] = 'Предмет має використовувати одного призначеного викладача. Суперечливі призначення заборонено.';
+                $errors[$index] = ! $replacement
+                    ? 'Предмет має використовувати одного призначеного викладача. Суперечливі призначення заборонено.'
+                    : (count(array_unique($bySubject[$row['subject_id']])) > 1
+                    ? 'Новий файл призначає одному предмету різних викладачів. Предмет має використовувати одного викладача.'
+                    : 'Для предмета зберігається інший викладач: призначення використовується поза розкладом, що замінюється, або його походження неможливо безпечно встановити.');
             }
         }
 

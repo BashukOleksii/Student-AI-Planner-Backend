@@ -93,63 +93,59 @@ class CompactSemesterScheduleManagementImportTest extends TestCase
         return WeeklyLessonRule::where('semester_schedule_id', $this->scheduleId)->orderBy('id')->firstOrFail();
     }
 
-    public function test_manual_imported_edit_keeps_baseline_and_is_permanently_protected_even_after_restoring_values(): void
+    public function test_manual_edit_is_visible_until_confirmation_and_then_replaced(): void
     {
         $rule = $this->firstRule();
         $baseline = $rule->import_baseline;
         $this->mutate('PATCH', '/weekly-rules/'.$rule->id, ['room' => 'MANUAL'])->assertOk();
-        $changed = $rule->fresh();
-        $this->assertSame($baseline, $changed->import_baseline);
-        $this->assertSame($rule->semester_schedule_import_id, $changed->semester_schedule_import_id);
-        $this->assertTrue($changed->is_manually_managed);
-        $blocked = $this->preview()->assertJsonPath('data.status', 'invalid');
-        $this->assertNotEmpty($blocked->json('data.preview.rows.0.errors.protected_rule'));
-        $this->confirm($blocked)->assertUnprocessable();
-        $this->mutate('PATCH', '/weekly-rules/'.$rule->id, ['room' => $rule->room])->assertOk();
-        $same = $this->preview()->assertJsonPath('data.status', 'ready')->assertJsonPath('data.preview.rows.0.operation', 'preserve');
-        $this->confirm($same)->assertOk();
         $this->assertTrue($rule->fresh()->is_manually_managed);
         $this->assertSame($baseline, $rule->fresh()->import_baseline);
+        $preview = $this->preview()->assertJsonPath('data.status', 'ready')
+            ->assertJsonPath('data.preview.counts.delete', 16)->assertJsonPath('data.preview.counts.create', 16);
+        $this->assertSame('MANUAL', $rule->fresh()->room);
+        $this->confirm($preview)->assertOk();
+        $this->assertNull($rule->fresh());
+        $this->assertDatabaseMissing('weekly_lesson_rules', ['room' => 'MANUAL']);
+        $this->assertFalse($this->firstRule()->is_manually_managed);
     }
 
-    public function test_manual_deletion_blocks_same_workbook_until_explicit_release_and_new_confirmation(): void
+    public function test_manual_deletion_requires_fresh_confirmation_then_restores_slot_and_removes_snapshot(): void
     {
         $rule = $this->firstRule();
         $this->mutate('PUT', '/date-exceptions/2026-09-07', ['mode' => 'copy_base'])->assertOk();
-        $snapshot = $this->getJson($this->url('/date-exceptions/2026-09-07'))->json('data');
         $waiting = $this->preview()->assertJsonPath('data.status', 'ready');
         $this->mutate('DELETE', '/weekly-rules/'.$rule->id, ['confirmed' => true])->assertOk();
-        $stale = $this->confirm($waiting)->assertConflict()->assertJsonPath('data.status', 'invalid');
-        $stale->assertJsonPath('data.preview.rows.0.operation', 'suppressed');
-        $this->assertNotEmpty($stale->json('data.preview.rows.0.errors.suppressed_slot'));
+        $stale = $this->confirm($waiting)->assertConflict()->assertJsonPath('data.status', 'ready');
+        $this->assertNotEmpty($stale->json('data.preview.impact.deleted_suppressed_slots'));
         $this->assertDatabaseCount('weekly_lesson_rules', 15);
+        $this->assertDatabaseCount('schedule_date_exceptions', 1);
         $this->confirm($this->original)->assertOk()->assertJsonPath('data.receipt', fn ($actual) => app(SemesterScheduleStateService::class)->hash($actual) === app(SemesterScheduleStateService::class)->hash($this->receipt->json('data.receipt')));
         $this->assertDatabaseCount('weekly_lesson_rules', 15);
-        $new = $this->preview()->assertJsonPath('data.status', 'invalid');
-        $slotId = $new->json('data.preview.rows.0.suppressed_slot_ids.0');
-        $this->assertIsInt($slotId);
-        $this->confirm($new)->assertUnprocessable();
-        $this->mutate('DELETE', '/suppressed-slots/'.$slotId, ['confirmed' => true])->assertOk();
-        $review = $this->postJson('/api/semester-schedule-imports/'.$new->json('data.id').'/revalidate')->assertOk()->assertJsonPath('data.status', 'ready');
+        $review = $this->postJson('/api/semester-schedule-imports/'.$waiting->json('data.id').'/revalidate')
+            ->assertOk()->assertJsonPath('data.status', 'ready');
+        $this->assertDatabaseCount('semester_schedule_suppressed_slots', 1);
         $this->confirm($review)->assertOk();
         $this->assertDatabaseCount('weekly_lesson_rules', 16);
-        $this->getJson($this->url('/date-exceptions/2026-09-07'))->assertJsonPath('data.id', $snapshot['id'])->assertJsonPath('data.lessons.*.id', array_column($snapshot['lessons'], 'id'))->assertJsonPath('data.lessons.0.source_weekly_rule_id', null);
+        $this->assertDatabaseCount('schedule_date_exceptions', 0);
+        $this->assertDatabaseCount('schedule_date_exception_lessons', 0);
+        $this->assertDatabaseCount('semester_schedule_suppressed_slots', 0);
         $this->getJson($this->url('/week/2026-09-14'))->assertJsonCount(15, 'data');
         $this->assertDatabaseCount('lessons', 0);
     }
 
-    public function test_imported_identity_move_and_later_delete_protect_both_original_and_current_slot(): void
+    public function test_imported_identity_move_and_deletion_do_not_block_full_replacement(): void
     {
         $rule = $this->firstRule();
         $this->mutate('PATCH', '/weekly-rules/'.$rule->id, ['weekday' => 5, 'pair_number' => 255, 'starts_at_local' => '20:00:00', 'ends_at_local' => '21:00:00'])->assertOk();
         $this->assertSame($rule->import_key, $rule->fresh()->import_key);
         $this->assertSame($rule->import_baseline, $rule->fresh()->import_baseline);
-        $this->assertDatabaseHas('semester_schedule_suppressed_slots', ['semester_schedule_id' => $this->scheduleId, 'weekday' => $rule->weekday, 'pair_number' => $rule->pair_number, 'week_pattern' => $rule->week_pattern]);
-        $this->preview()->assertJsonPath('data.status', 'invalid')->assertJsonPath('data.preview.rows.0.operation', 'suppressed');
+        $this->preview()->assertJsonPath('data.status', 'ready');
         $this->mutate('DELETE', '/weekly-rules/'.$rule->id, ['confirmed' => true])->assertOk();
         $this->assertDatabaseCount('semester_schedule_suppressed_slots', 2);
-        $this->assertDatabaseHas('semester_schedule_suppressed_slots', ['weekday' => 5, 'pair_number' => 255]);
-        $this->preview()->assertJsonPath('data.status', 'invalid');
-        $this->assertDatabaseCount('weekly_lesson_rules', 15);
+        $preview = $this->preview()->assertJsonPath('data.status', 'ready');
+        $this->assertCount(2, $preview->json('data.preview.impact.deleted_suppressed_slots'));
+        $this->confirm($preview)->assertOk();
+        $this->assertDatabaseCount('semester_schedule_suppressed_slots', 0);
+        $this->assertDatabaseCount('weekly_lesson_rules', 16);
     }
 }

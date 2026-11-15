@@ -31,6 +31,7 @@ class WeeklyLessonRule extends Model
         return $this->belongsTo(SemesterSchedule::class);
     }
 
+    /** @return BelongsTo<Subject, $this> */
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);

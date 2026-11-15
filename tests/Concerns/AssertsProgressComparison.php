@@ -5,6 +5,7 @@ namespace Tests\Concerns;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
+/** @mixin \Tests\TestCase */
 trait AssertsProgressComparison
 {
     private function dates(): array

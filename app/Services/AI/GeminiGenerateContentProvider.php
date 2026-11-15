@@ -53,6 +53,7 @@ class GeminiGenerateContentProvider implements LlmProvider
             throw new AiAgentException('execution_limit_reached');
         }
         try {
+            /** @var \Illuminate\Http\Client\Response $response */
             $response = Http::withHeaders(['x-goog-api-key' => $key])->acceptJson()->withBody($json, 'application/json')
                 ->connectTimeout(min(10, $this->limits->get('request_timeout')))->timeout($this->limits->get('request_timeout'))
                 ->withOptions(['allow_redirects' => false, 'decode_content' => false,

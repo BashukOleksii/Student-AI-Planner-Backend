@@ -11,6 +11,7 @@ use App\Services\Planning\RecoverySuggestionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
+/** @mixin \Tests\TestCase */
 trait InteractsWithLearningRecovery
 {
     private function initializeRecovery(): void

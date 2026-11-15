@@ -20,11 +20,13 @@ class SemesterSchedule extends Model
         return $this->belongsTo(AcademicPeriod::class);
     }
 
+    /** @return HasMany<WeeklyLessonRule, $this> */
     public function weeklyLessonRules(): HasMany
     {
         return $this->hasMany(WeeklyLessonRule::class);
     }
 
+    /** @return HasMany<ScheduleDateException, $this> */
     public function dateExceptions(): HasMany
     {
         return $this->hasMany(ScheduleDateException::class);

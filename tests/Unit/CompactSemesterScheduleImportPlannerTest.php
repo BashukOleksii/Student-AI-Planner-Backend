@@ -46,13 +46,14 @@ class CompactSemesterScheduleImportPlannerTest extends TestCase
         $this->planner()->pairNumber('9-10');
     }
 
-    public function test_slot_identity_survives_catalog_time_and_room_changes(): void
+    public function test_new_slot_is_created_after_deleting_old_slot_regardless_of_changes(): void
     {
         $row = $this->rule(['subject_id' => 11, 'room' => 'NEW', 'starts_at_local' => '09:00:00', 'ends_at_local' => '10:00:00']);
         $plan = $this->planner()->plan([$row], [$this->managed()]);
         $this->assertSame('1:1:all', $plan['rows'][0]['import_key']);
-        $this->assertSame('update', $plan['rows'][0]['operation']);
-        $this->assertSame(1, $plan['rows'][0]['matched_rule_id']);
+        $this->assertSame('create', $plan['rows'][0]['operation']);
+        $this->assertSame(['delete', 'create'], array_column($plan['operations'], 'operation'));
+        $this->assertNull($plan['rows'][0]['matched_rule_id']);
         $this->assertSame([], $plan['errors']);
     }
 
@@ -61,28 +62,29 @@ class CompactSemesterScheduleImportPlannerTest extends TestCase
         $rule = $this->managed();
         $rule['import_baseline'] = array_reverse($rule['import_baseline'], true);
         $this->assertTrue($this->planner()->managed($rule));
-        $this->assertSame('noop', $this->planner()->plan([$this->rule()], [$rule])['rows'][0]['operation']);
+        $this->assertSame('create', $this->planner()->plan([$this->rule()], [$rule])['rows'][0]['operation']);
     }
 
-    public function test_manual_and_edited_missing_rows_are_preserved_while_removed_managed_rows_are_deleted(): void
+    public function test_all_old_rules_are_deleted_and_empty_import_is_invalid(): void
     {
         $manual = ['id' => 2, ...$this->rule(['weekday' => 2]), 'import_key' => null];
         $edited = $this->managed(['id' => 3, 'weekday' => 3, 'room' => 'Manual']);
         $plan = $this->planner()->plan([], [$this->managed(), $manual, $edited]);
-        $this->assertSame([1], array_column($plan['operations'], 'rule_id'));
+        $this->assertSame([1, 2, 3], array_column($plan['operations'], 'rule_id'));
         $this->assertSame('delete', $plan['operations'][0]['operation']);
-        $this->assertSame([2, 3], array_column($plan['projected_rules'], 'id'));
+        $this->assertSame([], $plan['projected_rules']);
+        $this->assertNotEmpty($plan['errors']['file']);
     }
 
-    public function test_identical_manual_rule_satisfies_import_without_adoption_but_difference_blocks(): void
+    public function test_manual_rule_is_replaced_even_when_identical(): void
     {
         $manual = ['id' => 2, ...$this->rule(), 'import_key' => null];
         $same = $this->planner()->plan([$this->rule()], [$manual]);
-        $this->assertSame('preserve', $same['rows'][0]['operation']);
+        $this->assertSame('create', $same['rows'][0]['operation']);
         $this->assertSame([], $same['rows'][0]['errors']);
         $different = $this->planner()->plan([$this->rule(['room' => 'NEW'])], [$manual]);
-        $this->assertArrayHasKey('protected_rule', $different['rows'][0]['errors']);
-        $this->assertSame(null, $different['projected_rules'][0]['room']);
+        $this->assertSame([], $different['rows'][0]['errors']);
+        $this->assertSame('NEW', $different['projected_rules'][0]['room']);
     }
 
     public function test_identical_duplicates_are_classified_and_contradictions_are_errors(): void
@@ -111,11 +113,11 @@ class CompactSemesterScheduleImportPlannerTest extends TestCase
         $this->assertNotEmpty($result['rows'][0]['errors']);
     }
 
-    public function test_explicit_manual_flag_keeps_an_identical_baseline_protected(): void
+    public function test_explicit_manual_flag_does_not_protect_a_rule_from_replacement(): void
     {
         $rule = $this->managed(['is_manually_managed' => true]);
         $this->assertFalse($this->planner()->managed($rule));
-        $this->assertSame('preserve', $this->planner()->plan([$this->rule()], [$rule])['rows'][0]['operation']);
-        $this->assertSame([], $this->planner()->plan([], [$rule])['operations']);
+        $this->assertSame('create', $this->planner()->plan([$this->rule()], [$rule])['rows'][0]['operation']);
+        $this->assertSame('delete', $this->planner()->plan([], [$rule])['operations'][0]['operation']);
     }
 }

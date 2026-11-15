@@ -15,6 +15,7 @@ class PasswordController extends Controller
     public function change(ChangePasswordRequest $request, PasswordManagementService $service): JsonResponse
     {
         $user = $service->change($request->user(), $request->validated(), $request->session()->getId());
+        /** @var \Illuminate\Auth\SessionGuard $guard */
         $guard = Auth::guard('web');
         $guard->setUser($user);
         $request->session()->regenerate(true);
@@ -33,10 +34,13 @@ class PasswordController extends Controller
     public function reset(ResetPasswordRequest $request, PasswordManagementService $service): JsonResponse
     {
         $user = $service->reset($request->validated());
+        /** @var \Illuminate\Auth\SessionGuard $guard */
         $guard = Auth::guard('web');
         if ($request->hasSession() && (string) $guard->id() === (string) $user->getKey()) {
             $guard->logoutCurrentDevice();
-            Auth::guard('sanctum')->forgetUser();
+            /** @var \Illuminate\Auth\RequestGuard $sanctumGuard */
+            $sanctumGuard = Auth::guard('sanctum');
+            $sanctumGuard->forgetUser();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
         }

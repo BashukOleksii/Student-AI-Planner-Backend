@@ -20,16 +20,20 @@ class AuthController extends Controller
         $user = User::create($request->validated());
         $user->refresh();
 
-        Auth::guard('web')->login($user);
+        /** @var \Illuminate\Auth\SessionGuard $guard */
+        $guard = Auth::guard('web');
+        $guard->login($user);
         $request->session()->regenerate();
-        $request->session()->put('password_hash_web', Auth::guard('web')->hashPasswordForCookie(Auth::guard('web')->user()->getAuthPassword()));
+        $request->session()->put('password_hash_web', $guard->hashPasswordForCookie($guard->user()->getAuthPassword()));
 
         return (new UserResource($user))->response()->setStatusCode(201);
     }
 
     public function login(LoginRequest $request): UserResource
     {
-        if (! Auth::guard('web')->attempt($request->validated())) {
+        /** @var \Illuminate\Auth\SessionGuard $guard */
+        $guard = Auth::guard('web');
+        if (! $guard->attempt($request->validated())) {
             $exception = ValidationException::withMessages([
                 'email' => [__('auth.failed')],
             ]);
@@ -43,9 +47,9 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
-        $request->session()->put('password_hash_web', Auth::guard('web')->hashPasswordForCookie(Auth::guard('web')->user()->getAuthPassword()));
+        $request->session()->put('password_hash_web', $guard->hashPasswordForCookie($guard->user()->getAuthPassword()));
 
-        return new UserResource(Auth::guard('web')->user());
+        return new UserResource($guard->user());
     }
 
     public function logout(Request $request): Response

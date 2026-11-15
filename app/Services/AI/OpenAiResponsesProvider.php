@@ -43,6 +43,7 @@ class OpenAiResponsesProvider implements LlmProvider
             'max_output_tokens' => $this->limits->get('max_output_tokens')];
         $this->limits->json($body);
         try {
+            /** @var \Illuminate\Http\Client\Response $response */
             $response = Http::withToken($key)->acceptJson()->asJson()->connectTimeout(min(10, $this->limits->get('request_timeout')))
                 ->timeout($this->limits->get('request_timeout'))->withOptions(['allow_redirects' => false])
                 ->post('https://api.openai.com/v1/responses', $body);

@@ -158,6 +158,27 @@ class CompactScheduleOccurrenceResolverTest extends TestCase
         }
     }
 
+    public function test_semester_teacher_initial_dot_variants_match_only_when_unambiguous(): void
+    {
+        [$user] = $this->context();
+        $teacher = Teacher::factory()->for($user)->create(['name' => 'Студницька Л. М..']);
+        $names = ['Студницька Л. М.', 'Студницька Л. М..'];
+        $resolve = fn () => app(ScheduleOccurrenceResolver::class)->resolveSemesterNames([], $names, collect(), $user->teachers()->get());
+        foreach ($resolve()['teachers'] as $entry) {
+            $this->assertSame($teacher->id, $entry['id']);
+            $this->assertSame('reuse', $entry['resolution']);
+            $this->assertSame([], $entry['errors']);
+        }
+        Teacher::factory()->for($user)->create(['name' => 'Студницька Л. М.']);
+        foreach ($resolve()['teachers'] as $entry) {
+            $this->assertSame('invalid', $entry['resolution']);
+            $this->assertStringContainsString('Кілька ваших викладачів', $entry['errors'][0]);
+        }
+        $combined = app(ScheduleOccurrenceResolver::class)->resolveSemesterNames([], ['Студницька Л. М.. Інший А. Б.'], collect(), $user->teachers()->get());
+        $this->assertSame('invalid', $combined['teachers']['Студницька Л. М.. Інший А. Б.']['resolution']);
+        $this->assertDatabaseCount('teachers', 2);
+    }
+
     private function context(): array
     {
         $user = User::factory()->create(['timezone' => 'Europe/Kyiv']);

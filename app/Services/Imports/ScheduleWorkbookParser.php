@@ -219,10 +219,10 @@ class ScheduleWorkbookParser
         }
         $names = [];
         foreach (preg_split('/\r\n|[\r\n;\x{2028}\x{2029}]/u', (string) $value) as $line) {
-            $parts = preg_split('/\s*[,\/]\s*/u', $line);
+            $parts = array_map(self::normalizeTeacherName(...), preg_split('/\s*[,\/]\s*/u', $line));
 
             if (count($parts) > 1 && count(array_filter($parts, fn ($part) => $this->clearlyNamedTeacher($part))) !== count($parts)) {
-                $parts = [$line];
+                $parts = [self::normalizeTeacherName($line)];
             }
             foreach ($parts as $part) {
                 $names[] = $this->text($part) ?? '';
@@ -230,6 +230,17 @@ class ScheduleWorkbookParser
         }
 
         return $names;
+    }
+
+    public static function normalizeTeacherName(string $name): string
+    {
+        // Only collapse repeated dots in an otherwise complete surname + initials.
+        $name = trim(preg_replace('/[\s\p{Z}]+/u', ' ', $name) ?? '');
+        if (preg_match('/^[\p{L}\p{M}’ʼ\x{0027}-]{2,}\s+(?:\p{L}\.{1,}\s*){1,3}$/u', $name) === 1) {
+            return preg_replace('/\.{2,}/u', '.', $name);
+        }
+
+        return $name;
     }
 
     private function clearlyNamedTeacher(string $name): bool

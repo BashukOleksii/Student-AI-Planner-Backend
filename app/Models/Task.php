@@ -28,6 +28,7 @@ class Task extends Model
         return $this->belongsTo(Subject::class);
     }
 
+    /** @return HasMany<Subtask, $this> */
     public function subtasks(): HasMany
     {
         return $this->hasMany(Subtask::class);

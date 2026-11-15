@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
 use Tests\Support\TestDatabase;
 
+/** @mixin \Tests\TestCase */
 trait InteractsWithMysqlWorkers
 {
     private function startMysqlWorker(string $script, array $input, array $arguments = []): Process

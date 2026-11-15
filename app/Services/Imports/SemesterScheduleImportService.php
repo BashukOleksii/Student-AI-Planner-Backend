@@ -90,11 +90,11 @@ class SemesterScheduleImportService
             if ($import->status === 'committed') {
                 return ['import' => $import, 'changed' => false];
             }
-            if ($import->status !== 'ready') {
+            if ($import->status !== 'ready' && ! ($import->status === 'invalid' && ($import->review['strategy'] ?? null) !== 'replace')) {
                 $this->invalid('Цей огляд імпорту ще не готовий до застосування.');
             }
             [$review, $context, $graph] = $this->buildReview($owner, $import);
-            if (! hash_equals($import->context_hash, $context) || $this->state->hash($import->review) !== $this->state->hash($review)) {
+            if (($import->review['strategy'] ?? null) !== 'replace' || ! is_string($import->context_hash) || ! hash_equals($import->context_hash, $context) || $this->state->hash($import->review) !== $this->state->hash($review)) {
                 $this->saveReview($import, $review, $context);
 
                 return ['import' => $import, 'changed' => true];
@@ -113,18 +113,25 @@ class SemesterScheduleImportService
                 $this->check($schedule->update($values));
             }
 
-            foreach ($review['operations'] as $operation) {
-                if ($operation['operation'] !== 'delete') {
-                    continue;
-                }
-                $rule = $graph['rules']->find($operation['rule_id']);
-                foreach ($graph['lessons']->where('source_weekly_rule_id', $rule->id) as $lesson) {
-                    $this->check($lesson->update(['source_weekly_rule_id' => null]));
-                }
+            // Frozen exception lessons reference weekly rules with a restrictive foreign key.
+            foreach ($graph['lessons'] as $lesson) {
+                $this->check($lesson->delete());
+            }
+            foreach ($graph['exceptions'] as $exception) {
+                $this->check($exception->delete());
+            }
+            foreach ($graph['rules'] as $rule) {
                 $this->check($rule->delete());
             }
+            foreach ($graph['suppressions'] as $slot) {
+                $this->check($slot->delete());
+            }
+            foreach ($review['impact']['teacher_assignment_changes'] as $change) {
+                $subject = $graph['subjects']->find($change['subject_id']);
+                $subject->teachers()->sync([$identities['teachers'][$change['teacher_id']] => ['user_id' => $owner->id]]);
+            }
             foreach ($review['operations'] as $operation) {
-                if (! in_array($operation['operation'], ['create', 'update'], true)) {
+                if ($operation['operation'] !== 'create') {
                     continue;
                 }
                 $after = $operation['after'];
@@ -134,23 +141,17 @@ class SemesterScheduleImportService
                 $after = $this->planner->values($after);
                 $fields = [...Arr::except($after, ['teacher_ids']), 'user_id' => $owner->id, 'semester_schedule_import_id' => $import->id,
                     'import_key' => $operation['import_key'], 'import_baseline' => $after];
-                if ($operation['operation'] === 'create') {
-                    $rule = $schedule->weeklyLessonRules()->create($fields);
-                    $this->check($rule->exists);
-                } else {
-                    $rule = $graph['rules']->find($operation['rule_id']);
-                    $this->check($rule->update($fields));
-                }
+                $rule = $schedule->weeklyLessonRules()->create($fields);
+                $this->check($rule->exists);
                 $this->lessonTeachers->sync($rule, $after['teacher_id']);
             }
-            if ($graph['schedule'] !== null && ($review['impact']['schedule']['before'] !== $values
-                || $review['counts']['create'] + $review['counts']['update'] + $review['counts']['delete'] > 0)) {
-                $schedule->management_revision++;
-                $this->check($schedule->save());
-            }
+            $schedule->management_revision++;
+            $this->check($schedule->save());
             $now = CarbonImmutable::now('UTC');
             $receipt = ['semester_schedule_id' => $schedule->id, 'counts' => $review['counts'], 'catalog' => $catalog,
                 'parity_anchor_on' => $values['parity_anchor_on'], 'first_week_parity' => $values['first_week_parity'],
+                'removed' => ['rule_ids' => $review['impact']['deleted_rule_ids'], 'exceptions' => $review['impact']['deleted_exceptions'],
+                    'suppressed_slot_ids' => array_column($review['impact']['deleted_suppressed_slots'], 'id')],
                 'rule_ids' => $schedule->weeklyLessonRules()->orderBy('id')->pluck('id')->all(),
                 'committed_at' => $now->format('Y-m-d\TH:i:s.u\Z')];
             $this->check($import->update(['status' => 'committed', 'receipt' => $receipt, 'committed_at' => $now]));
@@ -161,9 +162,9 @@ class SemesterScheduleImportService
 
     private function buildReview(User $owner, SemesterScheduleImport $import): array
     {
-        $graph = $this->state->load($owner, $import->academic_period_id, true);
+        $graph = $this->state->load($owner, $import->academic_period_id, true, replacement: true);
         ['period' => $period, 'subjects' => $subjects, 'teachers' => $teachers, 'schedule' => $schedule,
-            'rules' => $rules, 'exceptions' => $exceptions, 'lessons' => $lessons, 'snapshots' => $snapshots,
+            'rules' => $rules, 'exceptions' => $exceptions, 'lessons' => $lessons,
             'suppressions' => $suppressions] = $graph;
         $template = $import->template;
         if (! is_array($template) || ! is_string($template['group'] ?? null) || ! is_array($template['rules'] ?? null)) {
@@ -204,10 +205,10 @@ class SemesterScheduleImportService
                 'teacher_id' => count($raw['teacher_names']) === 1 ? $rowTeachers->first()['id'] : null, 'teacher_ids' => $rowTeachers->pluck('id')->all(),
                 'subject' => $subject, 'teacher' => count($raw['teacher_names']) === 1 ? $rowTeachers->first() : null, 'teachers' => $rowTeachers->all(), 'errors' => $errors];
         }
-        foreach ($this->lessonTeachers->assignmentErrors($incoming, $graph['teacherAssignments']) as $index => $message) {
+        foreach ($this->lessonTeachers->assignmentErrors($incoming, $graph['teacherAssignments'], replacement: true) as $index => $message) {
             $incoming[$index]['errors']['teacher_id'] = [$message];
         }
-        $plan = $this->planner->plan($incoming, $rules->map->attributesToArray()->all(), $suppressions->map->attributesToArray()->all());
+        $plan = $this->planner->plan($incoming, $rules->map->attributesToArray()->all());
         if (mb_strlen($template['group']) > 255) {
             $plan['errors']['group_name'] = ['Назва групи не може перевищувати 255 символів.'];
         }
@@ -216,24 +217,32 @@ class SemesterScheduleImportService
             'parity_anchor_on' => $schedule->parity_anchor_on->format('Y-m-d'), 'first_week_parity' => $schedule->first_week_parity];
         try {
             $this->calculator->validateSemester(['id' => $schedule?->id ?? 0, 'starts_on' => $period->starts_on->format('Y-m-d'),
-                'ends_on' => $period->ends_on->format('Y-m-d'), ...$after], $plan['projected_rules'], $snapshots, $owner->timezone);
+                'ends_on' => $period->ends_on->format('Y-m-d'), ...$after], $plan['projected_rules'], [], $owner->timezone);
         } catch (InvalidArgumentException) {
-            $plan['errors']['schedule'] = ['Майбутній розклад містить конфліктні або некоректні заняття, винятки чи місцевий час.'];
+            $plan['errors']['schedule'] = ['Новий розклад містить конфліктні або некоректні заняття чи місцевий час.'];
         }
-        $deleted = array_column(array_filter($plan['operations'], fn ($op) => $op['operation'] === 'delete'), 'rule_id');
-        $detach = $lessons->whereIn('source_weekly_rule_id', $deleted)->map(fn ($lesson) => [
-            'snapshot_lesson_id' => $lesson->id, 'source_weekly_rule_id' => $lesson->source_weekly_rule_id,
-            'occurs_on' => $exceptions->find($lesson->schedule_date_exception_id)->occurs_on->format('Y-m-d'),
-        ])->values()->all();
-        $review = ['catalog' => $catalog, 'rows' => $plan['rows'], 'operations' => $plan['operations'], 'counts' => $plan['counts'], 'errors' => $plan['errors'],
+        $assignmentChanges = [];
+        foreach ($incoming as $row) {
+            $subject = $subjects->find($row['subject_id']);
+            if ($row['errors'] === [] && $subject !== null && $subject->teachers->isNotEmpty()
+                && $graph['teacherAssignments'][$subject->id] === null && $subject->teachers->modelKeys() !== [$row['teacher_id']]) {
+                $assignmentChanges[$subject->id] = ['subject_id' => $subject->id,
+                    'previous_teacher_id' => $subject->teachers->sole()->id, 'teacher_id' => $row['teacher_id']];
+            }
+        }
+        $review = ['strategy' => 'replace', 'catalog' => $catalog, 'rows' => $plan['rows'], 'operations' => $plan['operations'], 'counts' => $plan['counts'], 'errors' => $plan['errors'],
             'impact' => ['schedule' => ['id' => $schedule?->id, 'before' => $before, 'after' => $after],
-                'preserved_rule_ids' => $rules->filter(fn ($rule) => ! $this->planner->managed($rule->attributesToArray()))->pluck('id')->values()->all(),
-                'preserved_exception_dates' => array_keys($snapshots),
-                'suppressed_slots' => $suppressions->map->only(['id', 'weekday', 'pair_number', 'week_pattern'])->all(), 'detached_snapshot_references' => $detach]];
-        $context = $this->state->hash(['template' => $template, 'options' => $after,
+                'deleted_rule_ids' => $rules->pluck('id')->all(),
+                'deleted_exceptions' => $exceptions->map(fn ($exception) => ['id' => $exception->id,
+                    'occurs_on' => $exception->occurs_on->format('Y-m-d'), 'kind' => $exception->kind,
+                    'lesson_ids' => $lessons->where('schedule_date_exception_id', $exception->id)->pluck('id')->values()->all()])->all(),
+                'deleted_suppressed_slots' => $suppressions->map->only(['id', 'weekday', 'pair_number', 'week_pattern'])->all(),
+                'teacher_assignment_changes' => array_values($assignmentChanges),
+                'preserved_rule_ids' => [], 'preserved_exception_dates' => [], 'suppressed_slots' => [], 'detached_snapshot_references' => []]];
+        $context = $this->state->hash(['strategy' => 'replace', 'template' => $template, 'options' => $after,
             'graph' => $this->state->fingerprint($owner, $graph)]);
 
-        return [$review, $context, compact('schedule', 'rules', 'lessons', 'period')];
+        return [$review, $context, $graph];
     }
 
     private function commitCatalog(User $owner, array $catalog, int $institutionId): array

@@ -48,6 +48,7 @@ class Lesson extends Model
         return $this->belongsTo(Lesson::class, 'replaces_lesson_id');
     }
 
+    /** @return HasOne<Lesson, $this> */
     public function replacement(): HasOne
     {
         return $this->hasOne(Lesson::class, 'replaces_lesson_id');

@@ -73,13 +73,14 @@ class ScheduleOccurrenceResolver
     {
         $result = ['subjects' => [], 'teachers' => []];
         foreach (['subjects' => [$subjectNames, $subjects], 'teachers' => [$teacherNames, $teachers]] as $kind => [$names, $records]) {
-            $existing = $records->groupBy(fn ($record) => $this->normalizedName($record->name));
+            $canonical = fn (string $name) => $kind === 'teachers' ? ScheduleWorkbookParser::normalizeTeacherName($name) : $name;
+            $existing = $records->groupBy(fn ($record) => $this->normalizedName($canonical($record->name)));
             $prepared = [];
             foreach ($names as $name) {
                 $name = (string) $name;
-                $normalized = $this->normalizedName($name);
+                $normalized = $this->normalizedName($canonical($name));
                 if (! isset($prepared[$normalized])) {
-                    $display = $this->displayName($name);
+                    $display = $this->displayName($canonical($name));
                     $errors = [];
                     if (! $this->validSemesterName($display, $kind === 'teachers')) {
                         $errors[] = 'Імпортоване ім’я порожнє, некоректне або неоднозначне. Розділіть імена викладачів явними роздільниками.';

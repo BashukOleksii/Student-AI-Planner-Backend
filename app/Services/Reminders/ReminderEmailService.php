@@ -109,6 +109,7 @@ class ReminderEmailService
         if (config('mail.mailers.smtp.transport') !== 'smtp') {
             throw new LogicException('Reminder email requires an SMTP transport.');
         }
+        /** @var Mailer $mailer */
         $mailer = Mail::mailer('smtp');
         if (! $mailer->getSymfonyTransport() instanceof SmtpTransport) {
             throw new LogicException('Reminder email requires an SMTP transport.');

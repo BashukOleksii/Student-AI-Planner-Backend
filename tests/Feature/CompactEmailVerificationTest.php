@@ -96,7 +96,11 @@ class CompactEmailVerificationTest extends TestCase
         Notification::swap(new ChannelManager($this->app));
         $owner = User::factory()->unverified()->create(['email' => 'student@example.test']);
         $this->actingAs($owner, 'web')->postJson(self::SEND)->assertOk();
-        $messages = Mail::mailer()->getSymfonyTransport()->messages();
+        /** @var \Illuminate\Mail\Mailer $mailer */
+        $mailer = Mail::mailer();
+        /** @var \Illuminate\Mail\Transport\ArrayTransport $transport */
+        $transport = $mailer->getSymfonyTransport();
+        $messages = $transport->messages();
         $this->assertCount(1, $messages);
         $message = $messages->sole()->getOriginalMessage();
         $this->assertSame('student@example.test', $message->getTo()[0]->getAddress());
