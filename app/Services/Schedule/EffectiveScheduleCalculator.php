@@ -8,7 +8,6 @@ use DateTimeImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
 
-/** Pure calendar/rule calculations, shared by reads and future mutation preflight. */
 class EffectiveScheduleCalculator
 {
     public function validateDate(string $date): void
@@ -16,7 +15,6 @@ class EffectiveScheduleCalculator
         $this->calendarDate($date);
     }
 
-    /** Inclusive Monday-Sunday labels, independent of locale and timezone offsets. */
     public function weekDates(string $date): array
     {
         $day = $this->calendarDate($date);
@@ -28,7 +26,6 @@ class EffectiveScheduleCalculator
         return [$start, $end];
     }
 
-    /** Calendar parity is reusable for legacy effective-day Saturday copies. */
     public function weekParity(array $schedule, string $date): string
     {
         $anchor = $this->calendarDate($schedule['parity_anchor_on']);
@@ -42,11 +39,6 @@ class EffectiveScheduleCalculator
             : ($schedule['first_week_parity'] === 'numerator' ? 'denominator' : 'numerator');
     }
 
-    /**
-     * Validate an entire semester without expanding/storing every ordinary date.
-     * Ordinary offsets need two weekly cycles; every offset transition and saved
-     * exception is checked separately through the same occurrence calculator.
-     */
     public function validateSemester(array $schedule, array $rules, array $snapshots, string $timezone): void
     {
         $start = $this->calendarDate($schedule['starts_on']);
@@ -84,10 +76,7 @@ class EffectiveScheduleCalculator
     }
 
     /**
-     * Dates are nominal calendar labels, never UTC durations. A non-null snapshot
-     * replaces the entire date, including when its lessons list is empty.
-     *
-     * @return list<array<string, mixed>> Virtual occurrences; never Lesson models.
+     * @return list<array<string, mixed>>
      */
     public function calculate(array $schedule, array $rules, ?array $snapshot, string $date, string $timezone): array
     {
@@ -159,14 +148,13 @@ class EffectiveScheduleCalculator
         return $result;
     }
 
-    /** Classify one addition using the same endpoint validation as effective reads. */
     public function validateOccurrenceAddition(array $effective, array $lesson, string $date, string $timezone): void
     {
         $this->validateLesson($lesson);
         $zone = new DateTimeZone($timezone);
         $start = $this->localInstant($date, $lesson['starts_at_local'], $zone)->getTimestamp();
         $end = $this->localInstant($date, $lesson['ends_at_local'], $zone)->getTimestamp();
-        // Pair number wins even when a different lesson also overlaps the interval.
+
         foreach ($effective as $row) {
             if ($row['pair_number'] === $lesson['pair_number']) {
                 throw new SemesterOccurrenceConflictException('pair_number_taken');
@@ -179,7 +167,6 @@ class EffectiveScheduleCalculator
         }
     }
 
-    /** Provenance, rather than a matching pair number, identifies the original rule. */
     private function changeKind(array $lesson, array $rules, ?array $snapshot, int $weekday, string $parity): ?string
     {
         if ($snapshot === null) {
@@ -187,7 +174,6 @@ class EffectiveScheduleCalculator
         }
         $sourceId = $lesson['source_weekly_rule_id'] ?? null;
         if ($sourceId === null) {
-            // Null also represents detached/deleted rules in historical snapshots.
             return ($lesson['is_added'] ?? null) === true ? 'added' : null;
         }
         $originals = array_values(array_filter($rules, fn ($rule) => (int) $rule['id'] === (int) $sourceId));
@@ -218,12 +204,11 @@ class EffectiveScheduleCalculator
             (int) $lesson['pair_number'], $text($lesson['pair_label'] ?? null),
             (int) $lesson['subject_id'], $teachers,
             $text($lesson['lesson_type'] ?? null), $text($lesson['room'] ?? null),
-            // Inputs have already passed the canonical HH:MM:SS validation.
+
             $lesson['starts_at_local'], $lesson['ends_at_local'],
         ];
     }
 
-    /** Validate both weeks, including days other than the requested date. */
     public function validateWeeklyRules(array $rules): void
     {
         foreach ($rules as $rule) {
@@ -301,7 +286,6 @@ class EffectiveScheduleCalculator
         return DateTimeImmutable::createFromFormat('!Y-m-d', $date, new DateTimeZone('UTC'));
     }
 
-    /** Reject gaps and folds instead of letting PHP silently normalize or select an offset. */
     private function localInstant(string $date, string $time, DateTimeZone $zone): DateTimeImmutable
     {
         $label = $date.' '.$time;

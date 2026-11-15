@@ -29,7 +29,6 @@ use Tests\Concerns\InteractsWithAiResponses;
 use Tests\Support\AiCapabilities;
 use Tests\TestCase;
 
-/** Deferred execution: synthetic MySQL + offline provider regression cases for semester H3 adapters. */
 #[Group('mysql')]
 #[Group('ai')]
 class AiSemesterActionsTest extends TestCase
@@ -85,7 +84,7 @@ class AiSemesterActionsTest extends TestCase
         Http::swap(new Factory);
         Http::preventStrayRequests();
         $responses = [[$this->aiCall($name, json_encode($arguments), 'semester_'.Str::uuid())], [$this->aiText('Changed everything.')]];
-        // Capture by reference because provider rounds consume distinct responses.
+
         Http::fake(function () use (&$responses) {
             return Http::response($this->aiResponse(array_shift($responses)));
         });
@@ -171,7 +170,7 @@ class AiSemesterActionsTest extends TestCase
         $f['manager']->workingSaturday($f['owner'], $f['schedule'], ['occurs_on' => '2026-10-24', 'copied_weekday' => 2,
             'source_week_parity' => 'numerator', 'selected_weekly_rule_ids' => $f['schedule']->weeklyLessonRules()->pluck('id')->all(),
             'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
-        // A saved modification must survive: the effective Saturday is not the base Tuesday.
+
         $graph = $f['manager']->read($f['owner'], $f['schedule']);
         $first = $graph['lessons']->first();
         $f['manager']->changeOccurrence($f['owner'], $f['schedule'], '2026-10-24',
@@ -296,14 +295,14 @@ class AiSemesterActionsTest extends TestCase
     public function test_addition_failure_reason_reaches_chat_replay_and_history_without_calendar_changes(string $case, ?string $reason, string $code): void
     {
         $f = $this->fixture();
-        // A saved Saturday must be checked rather than the empty Saturday base rules.
+
         $f['manager']->workingSaturday($f['owner'], $f['schedule'], ['occurs_on' => '2026-10-24', 'copied_weekday' => 2,
             'schedule_token' => $f['manager']->read($f['owner'], $f['schedule'])['meta']['schedule_token']]);
         $arguments = $this->addition($f, '2026-10-24');
         $arguments = match ($case) {
             'occupied pair' => [...$arguments, 'pair_number' => 1],
             'overlap' => [...$arguments, 'starts_at_local' => '08:30:00'],
-            // Pair 2 is later than the overlapping pair 1; pair priority is global.
+
             'occupied pair and overlap' => [...$arguments, 'pair_number' => 2, 'starts_at_local' => '08:30:00'],
             'invalid arguments' => [...$arguments, 'pair_number' => '3'],
             'invalid interval with occupied pair' => [...$arguments, 'pair_number' => 1, 'ends_at_local' => '11:00:00'],
@@ -354,7 +353,7 @@ class AiSemesterActionsTest extends TestCase
         $messages = $this->getJson($f['base'].'/messages')->assertOk()->json('data');
         $tool = collect($messages)->firstWhere('role', 'tool');
         $this->assertNull($tool['content']);
-        // The existing history code allowlist does not expose action_stale.
+
         $this->assertSame([...$summary, 'error_code' => $code === 'action_stale' ? null : $code], $tool['tool_result']);
         $stored = AiMessage::where('role', 'tool')->sole();
         $this->assertSame($expected, json_decode($stored->content, true, flags: JSON_THROW_ON_ERROR));
@@ -509,7 +508,6 @@ class AiSemesterActionsTest extends TestCase
         $this->assertDatabaseCount('ai_pending_actions', 1);
     }
 
-    /** Scripted provider verifies data flow and supplied instructions, not live-model language understanding. */
     public function test_names_are_resolved_from_catalog_before_a_single_saturday_addition_proposal(): void
     {
         $f = $this->fixture();

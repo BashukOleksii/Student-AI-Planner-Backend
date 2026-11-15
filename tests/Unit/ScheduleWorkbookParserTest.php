@@ -10,7 +10,6 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-// Deliberately uses plain PHPUnit: no Laravel boot, authentication, or database.
 class ScheduleWorkbookParserTest extends TestCase
 {
     private const FIXTURE = __DIR__.'/../Fixtures/ScheduleImports/Приклад розкладу.xlsx';
@@ -26,7 +25,6 @@ class ScheduleWorkbookParserTest extends TestCase
         $this->assertSame(['worksheet' => 'Sheet1', 'range' => 'A1:F81'], $result['source']);
         $this->assertCount(16, $result['rules']);
 
-        // Literal normalized fixture text, including Cyrillic а in room identifiers.
         $expected = [
             [1, '1-2', 'all', 'Програмування в Інтернет', 'Когут В.С.', '231а', 3, 2],
             [1, '3-4', 'all', 'Людино-машинна взаємодія', 'Кондратюк Є.С.', '231', 7, 6],
@@ -72,7 +70,7 @@ class ScheduleWorkbookParserTest extends TestCase
 
         $split = array_values(array_filter($result['rules'], fn (array $rule) => $rule['weekday'] === 2 && $rule['pair_label'] === '7-8'));
         $this->assertSame(['numerator', 'denominator'], array_column($split, 'parity'));
-        // Exact equality also excludes the empty slots, right-hand examples, type, IDs and dates.
+
         $this->assertSame($result, $parser->parse(self::FIXTURE));
     }
 
@@ -87,7 +85,7 @@ class ScheduleWorkbookParserTest extends TestCase
         $sheet->setCellValue('M8', " \u{00A0} ");
         $sheet->setCellValue('J7', ' 9:05 ');
         $sheet->setCellValue('J8', '10:25:30');
-        // Formula outside the identified schedule is irrelevant and must not be evaluated.
+
         $sheet->setCellValue('U1', '=1/0');
 
         $result = $this->parseGenerated($workbook);

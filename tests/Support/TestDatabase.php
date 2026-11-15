@@ -4,7 +4,6 @@ namespace Tests\Support;
 
 use RuntimeException;
 
-/** A deliberate separate selector; DB_DATABASE alone cannot widen the destructive-test guard. */
 class TestDatabase
 {
     public static function name(): string

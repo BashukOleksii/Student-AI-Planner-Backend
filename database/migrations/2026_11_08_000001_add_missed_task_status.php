@@ -7,7 +7,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // One atomic MySQL ALTER: no unguarded interval and no row rewriting.
         DB::statement(<<<'SQL'
             ALTER TABLE tasks
                 DROP CHECK tasks_valid_status,
@@ -22,7 +21,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        // MySQL DDL implicitly commits. Never erase or reinterpret unfinished history.
         throw new RuntimeException('Stage 16A is forward-only. Restore compatibility with a new forward migration.');
     }
 };

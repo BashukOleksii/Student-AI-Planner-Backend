@@ -253,7 +253,6 @@ class AiPlanningActionConcurrencyTest extends TestCase
             'availability' => 'availability_written', 'preferences' => 'preferences_written', default => 'task_written'
         };
         if ($operation === 'subtask_deadline') {
-            // Hold owner in the parent, commit a current child deadline while the worker waits.
             DB::beginTransaction();
             User::whereKey($f['owner']->id)->lockForUpdate()->firstOrFail();
             try {

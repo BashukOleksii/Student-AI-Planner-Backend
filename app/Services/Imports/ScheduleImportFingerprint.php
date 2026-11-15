@@ -6,7 +6,6 @@ use InvalidArgumentException;
 
 class ScheduleImportFingerprint
 {
-    /** Fixed V1 identity: resolved Subject ID and whole-second UTC interval only. */
     public function generate(int $subjectId, string $startsAtUtc, string $endsAtUtc): string
     {
         if ($subjectId <= 0) {
@@ -20,12 +19,11 @@ class ScheduleImportFingerprint
         return hash('sha256', $canonical, false);
     }
 
-    /** The same strict contract also applies to persisted rows without a resolved Subject. */
     public function validateInterval(string $startsAtUtc, string $endsAtUtc): void
     {
         $this->validateInstant($startsAtUtc);
         $this->validateInstant($endsAtUtc);
-        // Validated, fixed-width UTC strings sort in instant order.
+
         if ($startsAtUtc >= $endsAtUtc) {
             throw new InvalidArgumentException('UTC start must precede end.');
         }

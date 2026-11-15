@@ -15,7 +15,6 @@ use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use UnexpectedValueException;
 
-/** Read-only owned work selection; eligibility does not prove calendar feasibility. */
 class PlanningWorkSelectionService
 {
     public function __construct(private RemainingEffortService $effort, private TimeIntervalService $intervals) {}
@@ -23,9 +22,9 @@ class PlanningWorkSelectionService
     /**
      * @return array{as_of_utc: string, work_items: list<array>, excluded_items: list<array>, warnings: list<array>}
      *
-     * @throws InvalidArgumentException For malformed arguments, stored timestamps or effort values.
-     * @throws ModelNotFoundException For missing, foreign, deleted or incorrectly nested explicit targets.
-     * @throws UnexpectedValueException For incompatible selected session references, without private details.
+     * @throws InvalidArgumentException
+     * @throws ModelNotFoundException
+     * @throws UnexpectedValueException
      */
     public function select(User $user, mixed $taskId = null, mixed $subtaskId = null, array $excludedPlannedSessionIds = [], ?DateTimeImmutable $asOfUtc = null): array
     {
@@ -59,7 +58,7 @@ class PlanningWorkSelectionService
             return $result;
         }
         $children = $tasks->flatMap(fn ($task) => $task->subtasks)->keyBy('id');
-        // Child matching also discovers corrupted rows whose task_id points outside this owned scope.
+
         $sessions = $user->studySessions()->whereIn('status', [StudySessionStatus::Completed, StudySessionStatus::Planned])
             ->where(fn ($query) => $query->whereIn('task_id', $tasks->modelKeys())->orWhereIn('subtask_id', $children->keys()->all()))
             ->get(['id', 'user_id', 'task_id', 'subtask_id', 'status', 'starts_at', 'ends_at', 'actual_minutes']);
@@ -107,7 +106,7 @@ class PlanningWorkSelectionService
             $isCompleted = $session->status === StudySessionStatus::Completed;
             $credit = $isCompleted ? $this->effort->calculate(null, [$source], [])['completed_credit_seconds'] : $duration;
             $key = $this->unitKey($session->task_id, $session->subtask_id);
-            // Preserve source validation for siblings, but keep explicitly targeted diagnostics focused.
+
             if ($subtaskId !== null && $session->subtask_id !== null && $session->subtask_id !== $subtaskId) {
                 continue;
             }
@@ -149,7 +148,7 @@ class PlanningWorkSelectionService
 
                 continue;
             }
-            // Ongoing work stays reserved even though past-start/deadline warnings remain diagnostic.
+
             $ongoing = $start <= $now && $end > $now && $task->status->isUnfinished()
                 && ($child === null || $child->status !== TaskStatus::Completed);
             if (! $invalid || $ongoing) {

@@ -11,7 +11,6 @@ use DateTimeZone;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
-/** Read-only class occupancy. No occurrence materialization or legacy synchronization. */
 class CalendarBusyIntervalService
 {
     public function __construct(
@@ -20,11 +19,6 @@ class CalendarBusyIntervalService
         private TimeIntervalService $intervals,
     ) {}
 
-    /**
-     * UTC half-open selection. Clipping is optional for internal snapshots: full source
-     * endpoints must survive different query envelopes without identity collisions.
-     * Class identities are namespaced strings; they can never exclude study sessions.
-     */
     public function between(User $user, int $start, int $end, bool $clip = true): array
     {
         $this->intervals->durationSeconds(['start' => $start, 'end' => $end]);
@@ -35,8 +29,7 @@ class CalendarBusyIntervalService
             $lessons = $owner->lessons()->where('status', LessonStatus::Active)
                 ->where('starts_at', '<', gmdate('Y-m-d H:i:s', $end))
                 ->where('ends_at', '>', gmdate('Y-m-d H:i:s', $start))->orderBy('id')->get();
-            // Replacement rows deliberately have no import fields. Follow owned historical
-            // originals (including soft-deleted history), rather than treating them as manual.
+
             $originals = $owner->lessons()->withTrashed()->whereKey($lessons->pluck('replaces_lesson_id')->filter()->unique()->all())
                 ->get()->keyBy('id');
             $provenance = $lessons->concat($originals);
@@ -95,7 +88,7 @@ class CalendarBusyIntervalService
                     $periodId = $origin->academic_period_id;
                     if (! isset($coverage[$periodId])) {
                         $period = $byPeriod[$periodId]->academicPeriod;
-                        // Membership expansion preserves DST and historical date-line boundaries.
+
                         $coverage[$periodId] = $this->availability->expand($this->fullDayWindows(),
                             $period->starts_on->format('Y-m-d'), $period->ends_on->format('Y-m-d'), $owner->timezone);
                     }
@@ -129,7 +122,6 @@ class CalendarBusyIntervalService
         });
     }
 
-    /** Query labels include both sides of offset transitions, without assuming 24-hour local days. */
     private function localDates(int $start, int $end, string $timezone): array
     {
         if (! in_array($timezone, DateTimeZone::listIdentifiers(), true)

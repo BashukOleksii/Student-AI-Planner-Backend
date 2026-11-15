@@ -109,7 +109,6 @@ class AiAvailabilityActionsTest extends TestCase
 
     private function assertWindow(array $expected, array $actual): void
     {
-        // MySQL JSON object key order is not a wire contract; keep strict scalar equality.
         ksort($expected);
         ksort($actual);
         $this->assertSame($expected, $actual);
@@ -223,7 +222,7 @@ class AiAvailabilityActionsTest extends TestCase
         foreach (array_diff(array_keys($before), ['study_availability_windows']) as $table) {
             $this->assertSame($before[$table], $after[$table], $table);
         }
-        // Alter current state after success; replay must still return the original durable receipt.
+
         if ($receipt['window'] !== null) {
             $real->delete($f['owner'], StudyAvailabilityWindow::findOrFail($receipt['window']['id']));
         } else {

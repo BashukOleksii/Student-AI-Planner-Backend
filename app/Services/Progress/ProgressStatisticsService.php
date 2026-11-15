@@ -13,7 +13,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use UnexpectedValueException;
 
-/** Read-only current state and bounded persisted activity; no historical reconstruction. */
 class ProgressStatisticsService
 {
     public function __construct(private PlanningContextService $context, private TimeIntervalService $intervals) {}
@@ -22,7 +21,6 @@ class ProgressStatisticsService
     {
         $this->context->validateDates($startDate, $endDate);
 
-        // Nonlocking consistent reads share the existing MySQL REPEATABLE READ snapshot.
         return DB::transaction(function () use ($user, $startDate, $endDate): array {
             $owner = $user->newQuery()->whereKey($user->getKey())->firstOrFail(['id', 'timezone']);
             $now = CarbonImmutable::now('UTC');
@@ -30,7 +28,7 @@ class ProgressStatisticsService
             $tasks = $owner->tasks()->getQuery();
             $children = Subtask::query()->whereHas('task', fn ($query) => $query->where('user_id', $owner->getKey()));
             $taskCurrent = $this->currentMetrics(clone $tasks, $now, true);
-            // Round to tenths; whole values retain the existing JSON round-trip convention.
+
             $taskCurrent['completion_percent'] = $taskCurrent['total'] === 0
                 ? null : (int) round($taskCurrent['completed'] / $taskCurrent['total'] * 1000) / 10;
             $childCurrent = $this->currentMetrics(clone $children, $now);
@@ -49,7 +47,6 @@ class ProgressStatisticsService
         });
     }
 
-    /** C9 active scheduled workload, grouped by the Task's current owned Subject. */
     private function subjectWorkload(User $owner, array $sessions, array $coverage): array
     {
         $active = collect($sessions)->filter(fn ($session) => in_array($session['status'], [
@@ -59,8 +56,6 @@ class ProgressStatisticsService
             return [];
         }
 
-        // Batch current associations, retaining compatible soft-deleted Task history.
-        // Scope presentation data before loading it, even for corrupt foreign references.
         $tasks = $owner->tasks()->withTrashed()->whereKey($active->pluck('task_id')->unique()->all())
             ->with(['subject' => fn ($query) => $query->where('user_id', $owner->getKey())->select(['id', 'name'])])
             ->get(['id', 'subject_id'])->keyBy('id');
@@ -84,7 +79,7 @@ class ProgressStatisticsService
                 'session_count' => $this->add($metrics['planned']['count'], $metrics['completed']['count']),
             ];
         }
-        // Equal workloads use numeric Subject ID ascending, with unassigned last.
+
         usort($result, fn ($a, $b) => ($b['scheduled_seconds'] <=> $a['scheduled_seconds'])
             ?: (($a['subject_id'] === null) <=> ($b['subject_id'] === null))
             ?: ($a['subject_id'] <=> $b['subject_id']));
@@ -92,7 +87,6 @@ class ProgressStatisticsService
         return $result;
     }
 
-    /** Shared G1/G2a bounded sources; caller supplies the fresh owner and read transaction. */
     public function loadActivity(User $owner, array $coverage): array
     {
         $tasks = $this->completions($owner->tasks()->getQuery(), $coverage);
@@ -106,7 +100,6 @@ class ProgressStatisticsService
             'study_sessions' => $sessions->map(fn ($session) => $session->getAttributes())->all()];
     }
 
-    /** Pure shared activity definitions, without lifetime current-state counts. */
     public function activityMetrics(array $activity, array $coverage): array
     {
         return [
@@ -139,7 +132,6 @@ class ProgressStatisticsService
         return $records->map(fn ($record) => $record->getAttributes())->all();
     }
 
-    /** Pure reduction of raw UTC persistence records; parent deadlines are never substituted. */
     public function completionMetrics(iterable $records, array $coverage): array
     {
         $result = ['total' => 0, 'on_time' => 0, 'late' => 0, 'without_deadline' => 0];
@@ -166,7 +158,6 @@ class ProgressStatisticsService
             ? $this->context->utcSeconds($record['completed_at']) : null;
     }
 
-    /** Pure start-attributed full scheduled durations and explicitly known completed actual minutes. */
     public function sessionMetrics(iterable $records, array $coverage): array
     {
         $result = [];
@@ -224,8 +215,6 @@ class ProgressStatisticsService
 
     private function inPeriod(Builder $query, string $column, array $coverage): Builder
     {
-        // Dates may be real labels outside the DATETIME storage range. Intersect
-        // membership with representable instants rather than sending invalid SQL bounds.
         $minimum = $this->context->utcSeconds('1000-01-01 00:00:00');
         $maximum = $this->context->utcSeconds('9999-12-31 23:59:59');
         $coverage = array_values(array_filter($coverage, fn ($range) => $range['start'] <= $maximum && $range['end'] > $minimum));

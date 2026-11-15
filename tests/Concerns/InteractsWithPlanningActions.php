@@ -35,7 +35,6 @@ trait InteractsWithPlanningActions
             }
         }
         if (in_array($name, ['propose_session_mark_missed', 'propose_session_complete'], true)) {
-            // Create the reminder through its normal service before moving the fixture into history.
             $source->update(['starts_at' => now('UTC')->subHours(2), 'ends_at' => now('UTC')->subHour()]);
         }
         $arguments = $name === 'propose_session_reschedule'

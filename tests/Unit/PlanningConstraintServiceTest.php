@@ -98,7 +98,7 @@ class PlanningConstraintServiceTest extends TestCase
     public static function invalidInputs(): array
     {
         $candidate = ['start' => 0, 'end' => 60];
-        // Empty free intervals ensure other input errors are not hidden by containment failure.
+
         $base = [$candidate, [], [], [], 'UTC', self::preferences(), null];
         $cases = [];
         foreach ([[], [0, 60], ['start' => 0, 'end' => 0], ['start' => 1, 'end' => 0], ['start' => 0], ['start' => '0', 'end' => 60], ['start' => 0, 'end' => 60.0], ['start' => 0, 'end' => 60, 'id' => 1]] as $index => $interval) {

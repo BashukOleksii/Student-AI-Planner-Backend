@@ -31,7 +31,7 @@ class AiLessonActionMigrationTest extends TestCase
             'call_id' => 'original', 'type' => 'propose_task_create', 'arguments' => ['title' => 'Original'], 'preview' => [],
             'expires_at' => now('UTC')->addMinutes(15), 'status' => 'executed', 'resolved_at' => now('UTC'),
             'receipt' => ['task' => ['id' => 1, 'title' => 'Historical']]])->refresh();
-        // Restore the immediate predecessor on this disposable schema to exercise the real upgrade.
+
         (require database_path('migrations/2026_10_19_000002_add_ai_planning_actions.php'))->down();
         (require database_path('migrations/2026_10_19_000002_add_ai_planning_actions.php'))->up();
         $before = $action->fresh()->getRawOriginal();

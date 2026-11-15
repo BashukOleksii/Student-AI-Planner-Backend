@@ -33,7 +33,6 @@ class ProgressTrendsService
         });
     }
 
-    /** Pure grouping of the same raw, currently completed work/session sources used by G1. */
     public function summarize(array $activity, string $startDate, string $endDate, string $timezone): array
     {
         $this->context->validateDates($startDate, $endDate);
@@ -68,7 +67,6 @@ class ProgressTrendsService
         return ['days' => $days, 'totals' => $this->totals($days)];
     }
 
-    /** Exact sum of daily metric leaves; no float coercion, overflow or input mutation. */
     public function totals(iterable $days): array
     {
         $totals = $this->statistics->activityMetrics(['tasks' => [], 'subtasks' => [], 'study_sessions' => []], []);

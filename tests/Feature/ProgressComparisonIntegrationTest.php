@@ -107,7 +107,6 @@ class ProgressComparisonIntegrationTest extends TestCase
         $this->assertNotSame(DB::connection()->getPdo(), $writer->getPdo());
         $changed = false;
         DB::listen(function (QueryExecuted $event) use (&$changed, $writer, $records, $user, $afterOwner): void {
-            // Exercise commits both before activity loading and between source reads.
             $trigger = $afterOwner
                 ? str_contains($event->sql, 'from `users`') && str_contains($event->sql, '`timezone`')
                 : str_contains($event->sql, 'from `tasks`') && str_contains($event->sql, '`completed_at`');

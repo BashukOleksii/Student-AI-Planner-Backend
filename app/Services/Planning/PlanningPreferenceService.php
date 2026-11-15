@@ -31,7 +31,6 @@ class PlanningPreferenceService
         }
 
         return DB::transaction(function () use ($user, $values): PlanningPreference {
-            // Serialize first materialization as well as subsequent replacements.
             User::whereKey($user->getKey())->lockForUpdate()->firstOrFail();
 
             return $user->planningPreference()->updateOrCreate([], $values)->refresh();

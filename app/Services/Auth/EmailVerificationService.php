@@ -32,7 +32,7 @@ class EmailVerificationService
             || (app()->isProduction() && $parts['scheme'] !== 'https')) {
             throw new RuntimeException('Email verification frontend configuration is unavailable.');
         }
-        // Sign the API path, not the Vue URL or a request-supplied host.
+
         $path = URL::temporarySignedRoute('verification.verify', now()->addMinutes(config('auth.verification.expire', 60)), [
             'id' => $user->getKey(), 'hash' => sha1($user->getEmailForVerification()),
         ], absolute: false);
@@ -44,7 +44,7 @@ class EmailVerificationService
     {
         return $owner->getConnection()->transaction(function () use ($owner, $request): User {
             $user = User::whereKey($owner->getKey())->lockForUpdate()->firstOrFail();
-            // Revalidate after acquiring the same lock used by profile email changes.
+
             abort_unless(URL::hasValidSignature($request, absolute: false)
                 && hash_equals((string) $user->getKey(), (string) $request->route('id'))
                 && hash_equals(sha1($user->getEmailForVerification()), (string) $request->route('hash')), 403);

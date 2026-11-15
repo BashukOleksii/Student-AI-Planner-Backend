@@ -15,13 +15,6 @@ class ScheduleImportCandidateClassifier
 
     private const SCHEDULE_CONFLICT = 'Це імпортоване заняття конфліктує з майбутнім розкладом.';
 
-    /**
-     * Read-only classification of the B2 contract, preserving input order and fields.
-     * Adds status (ScheduleImportRowStatus), operation (?string), validation_errors
-     * (array<string, list<string>>) and matched_lesson_id (?int) to each occurrence.
-     * Operations: create/update/restore/preserve/noop. Existing Lesson types are
-     * never source-authoritative; future update/restore must retain the stored type.
-     */
     public function classify(User $user, AcademicPeriod $academicPeriod, array $resolved): array
     {
         $period = $user->academicPeriods()->whereKey($academicPeriod->getKey())->first();
@@ -87,8 +80,7 @@ class ScheduleImportCandidateClassifier
         if ($projected !== []) {
             $start = min(array_column($projected, 'starts_at'));
             $end = max(array_column($projected, 'ends_at'));
-            // All projected active histories are excluded together, before any conflict result.
-            // Atomic preview checks target positions, never an arbitrary partial commit.
+
             $blockers = $user->lessons()->where('status', LessonStatus::Active)
                 ->where('starts_at', '<', $end)->where('ends_at', '>', $start)
                 ->whereNotIn('id', $excludedIds)->get(['id', 'starts_at', 'ends_at']);
@@ -160,7 +152,7 @@ class ScheduleImportCandidateClassifier
         return [
             'subject_id' => (int) $lesson->subject_id, 'academic_period_id' => (int) $lesson->academic_period_id,
             'teacher_id' => $lesson->teacher_id === null ? null : (int) $lesson->teacher_id, 'room' => $lesson->room,
-            // Persisted DATETIME values already represent UTC; do not cast through server timezone.
+
             'starts_at' => $lesson->getRawOriginal('starts_at'), 'ends_at' => $lesson->getRawOriginal('ends_at'),
         ];
     }

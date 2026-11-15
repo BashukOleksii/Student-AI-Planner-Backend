@@ -14,7 +14,6 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Throwable;
 
-/** Thin Lesson adapters. Proposal preparation never calls any domain writer. */
 class LessonActionService
 {
     public function __construct(private LessonActionArgumentValidator $validator, private LessonService $lessons,
@@ -47,7 +46,6 @@ class LessonActionService
         }
     }
 
-    /** H3 holds conversation/action/owner locks before its first consistent read. */
     public function execute(User $owner, AiPendingAction $action): array
     {
         if (DB::transactionLevel() === 0) {
@@ -67,7 +65,6 @@ class LessonActionService
             throw new AiAgentException('action_stale');
         }
         try {
-            // Re-run domain preflight and compare the complete material review, including labels/links.
             if ($this->preview($owner, $action->type, $arguments, $records) != $action->preview) {
                 throw new AiAgentException('action_stale');
             }
@@ -90,7 +87,7 @@ class LessonActionService
             'original' => $action->type === 'propose_lesson_replacement' ? $this->presenter->lesson($owner, $lesson->refresh()) : null];
         $expected = $action->preview['after'];
         $expected['id'] ??= $result->id;
-        // Model event cancellation must never become a successful receipt for an unwritten change.
+
         if ($receipt['lesson'] != $expected || ($receipt['original'] !== null
             && ($receipt['original']['status'] !== 'replaced' || $receipt['original']['replacement_id'] !== $result->id))) {
             throw new AiAgentException('persistence_error');
@@ -113,7 +110,7 @@ class LessonActionService
             throw new ModelNotFoundException;
         }
         $records = compact('lesson', 'original', 'replacement');
-        // Bind all reviewed association identities and labels, including old and proposed values.
+
         foreach (['subject_id' => 'subjects', 'teacher_id' => 'teachers', 'academic_period_id' => 'academicPeriods'] as $field => $relation) {
             $ids = array_filter([$arguments[$field] ?? null, $lesson?->$field, $original?->$field, $replacement?->$field], fn ($id) => $id !== null);
             $ids = array_unique($ids);

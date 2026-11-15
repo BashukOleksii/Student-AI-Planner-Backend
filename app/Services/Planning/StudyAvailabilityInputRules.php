@@ -2,7 +2,6 @@
 
 namespace App\Services\Planning;
 
-/** Shared field rules for REST, read-only preparation and confirmed availability writes. */
 class StudyAvailabilityInputRules
 {
     public const START_TIME_PATTERN = '(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]';

@@ -20,7 +20,6 @@ use InvalidArgumentException;
 use Throwable;
 use UnexpectedValueException;
 
-/** Seven fixed domain adapters. All state/receipt/lease decisions remain in H3a's confirmation service. */
 class SubtaskReminderActionService
 {
     public function __construct(private SubtaskReminderArgumentValidator $validator, private SubtaskService $subtasks,
@@ -62,7 +61,6 @@ class SubtaskReminderActionService
         }
     }
 
-    /** Caller already holds conversation/action/owner, before its first consistent read. Never commits independently. */
     public function execute(User $owner, AiPendingAction $action): array
     {
         if (DB::transactionLevel() === 0) {
@@ -79,7 +77,6 @@ class SubtaskReminderActionService
             throw new AiAgentException('action_stale');
         }
         try {
-            // Revalidate current eligibility and the effective trigger using shared domain preparation.
             $this->preview($owner, $name, $arguments, $records);
             if (str_starts_with($name, 'propose_subtask_')) {
                 $task = $records['task'];

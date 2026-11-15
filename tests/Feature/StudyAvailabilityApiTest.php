@@ -41,7 +41,7 @@ class StudyAvailabilityApiTest extends TestCase
         $last = StudyAvailabilityWindow::factory()->for($user)->create(['day_of_week' => 7]);
         $late = StudyAvailabilityWindow::factory()->for($user)->create(['starts_at' => '15:00:00', 'ends_at' => '16:00:00']);
         $early = StudyAvailabilityWindow::factory()->for($user)->create();
-        // Legacy persistence may contain overlaps: listing must still have a stable tie-breaker.
+
         $tie = StudyAvailabilityWindow::factory()->for($user)->create(['ends_at' => '11:00:00']);
         $other = StudyAvailabilityWindow::factory()->create();
         $response = $this->actingAs($user, 'web')->getJson('/api/study-availability-windows?user_id='.$other->user_id)->assertOk();
@@ -154,7 +154,7 @@ class StudyAvailabilityApiTest extends TestCase
         ] as $override) {
             $this->postJson('/api/study-availability-windows', $this->values($override))->assertCreated();
         }
-        // Reset Sanctum's cached request guard when switching accounts in one test.
+
         Auth::forgetGuards();
         $other = User::factory()->create();
         $this->actingAs($other, 'web')->postJson('/api/study-availability-windows', $this->values())->assertCreated();

@@ -4,7 +4,6 @@ namespace App\Services\AI;
 
 use Illuminate\Support\Str;
 
-/** Optional public provenance for code-generated proposal summaries, never inferred from text. */
 final class AiServerMessage
 {
     public static function read(mixed $value): ?array

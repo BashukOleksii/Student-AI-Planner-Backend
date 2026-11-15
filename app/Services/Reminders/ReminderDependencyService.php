@@ -13,7 +13,6 @@ use UnexpectedValueException;
 
 class ReminderDependencyService
 {
-    /** Shared with work-deletion preflight; target existence is checked by the caller. */
     public function compatible(Reminder $reminder, User $owner): bool
     {
         $targets = array_filter($reminder->only(['task_id', 'subtask_id', 'study_session_id']), fn ($id) => $id !== null);
@@ -26,7 +25,6 @@ class ReminderDependencyService
             || ($reminder->anchor === $expected && is_int($reminder->offset_minutes));
     }
 
-    /** Called only after owner/work/session locks. All preflight precedes cancellation. */
     public function scheduledForSession(User $owner, StudySession $session): Collection
     {
         if (DB::transactionLevel() === 0) {
@@ -43,7 +41,6 @@ class ReminderDependencyService
         return $reminders;
     }
 
-    /** Read-only proposal snapshot; the confirmation path performs the locked preflight. */
     public function scheduledForSessionReadOnly(User $owner, StudySession $session): Collection
     {
         $reminders = Reminder::where('study_session_id', $session->id)->where('status', ReminderStatus::Scheduled)

@@ -77,7 +77,6 @@ class ReminderApiTest extends TestCase
     {
         $this->actingAs(User::factory()->create());
         if (($change['message'] ?? null) === "\xff") {
-            // Invalid UTF-8 is exercised through the direct Service because it is not valid JSON.
             try {
                 app(ReminderService::class)->create(auth()->user(), array_replace($this->body(), $change));
                 $this->fail('Malformed UTF-8 accepted.');
@@ -382,7 +381,7 @@ class ReminderApiTest extends TestCase
         $id = $this->postJson('/api/reminders', [...$this->body(), 'study_session_id' => $session->id])->assertCreated()->json('data.id');
         $general = $this->postJson('/api/reminders', $this->body())->assertCreated()->json('data.id');
         Lesson::factory()->for($owner)->create(['starts_at' => '2026-10-19 09:00:00', 'ends_at' => '2026-10-19 10:00:00']);
-        // Exclude the 08:00:00.5-to-09:00 fragment so E2 can propose a full hour.
+
         $owner->studyAvailabilityWindows()->update(['starts_at' => '09:00:00']);
         $preview = $this->postJson('/api/planning/replanning/preview', ['start_date' => '2026-10-19', 'end_date' => '2026-10-19'])->assertOk()->json('data');
         $before = Reminder::findOrFail($id)->getAttributes();

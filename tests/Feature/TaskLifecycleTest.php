@@ -314,7 +314,6 @@ class TaskLifecycleTest extends TestCase
         $this->assertStringStartsWith('update `tasks`', $writes[0]['sql']);
         $this->assertStringContainsString('`status` =', $writes[0]['sql']);
         if ($operation === 'miss') {
-            // Pending already has NULL: Eloquent must not dirty its completion time.
             $this->assertStringNotContainsString('`completed_at` =', $writes[0]['sql']);
         } else {
             $this->assertStringContainsString('`completed_at` =', $writes[0]['sql']);

@@ -84,7 +84,7 @@ class AiStudyAvailabilityToolTest extends TestCase
         $owner = User::factory()->create(['timezone' => 'UTC']);
         $last = $this->window($owner, ['day_of_week' => 7]);
         $later = $this->window($owner, ['day_of_week' => 2, 'starts_at' => '18:00:00']);
-        // Existing persisted rows can tie on starts_at; reads retain both identities deterministically.
+
         $first = $this->window($owner, ['day_of_week' => 2, 'starts_at' => '08:00:00', 'ends_at' => '09:00:00']);
         $second = $this->window($owner, ['day_of_week' => 2, 'starts_at' => '08:00:00', 'ends_at' => '10:00:00']);
         $expected = [$first->id, $second->id, $later->id, $last->id];

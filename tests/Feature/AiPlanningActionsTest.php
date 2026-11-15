@@ -117,7 +117,7 @@ class AiPlanningActionsTest extends TestCase
         $this->confirmPlanning($f, $id, operation: 'reject')->assertConflict()->assertJsonPath('code', 'action_executed');
         $this->assertSame($after, $this->planningSnapshot());
         $this->assertSame(1, $f['conversation']->messages()->where('tool_calls->version', 2)->count());
-        // A receipt is the committed result, even after later legitimate domain changes.
+
         $createdId = $receipt['sessions'][0]['id'] ?? $receipt['replacement_sessions'][0]['id'] ?? $receipt['replacement']['id'] ?? $receipt['session']['id'];
         StudySession::findOrFail($createdId)->update(['status' => 'cancelled', 'completed_at' => null, 'actual_minutes' => null]);
         $later = $this->planningSnapshot();
@@ -575,7 +575,6 @@ class AiPlanningActionsTest extends TestCase
 
     public static function calendars(): array
     {
-        // Keep protected reviews future-dated relative to both application and MySQL clocks.
         $year = (int) gmdate('Y') + 1;
         $spring = new \DateTimeImmutable("last Sunday of March $year", new \DateTimeZone('UTC'));
         $autumn = new \DateTimeImmutable("last Sunday of October $year", new \DateTimeZone('UTC'));

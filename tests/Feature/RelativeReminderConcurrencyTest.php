@@ -140,7 +140,7 @@ class RelativeReminderConcurrencyTest extends TestCase
     public function test_relative_creation_serializes_with_actual_completion_or_deletion(bool $childUnit, bool $targetFirst, string $operation): void
     {
         [$owner, $task, $child] = $this->fixture($childUnit);
-        Reminder::query()->delete(); // Remove only the test's initial fixture record before contention.
+        Reminder::query()->delete();
         $field = $childUnit ? 'subtask_id' : 'task_id';
         $targetId = $childUnit ? $child->id : $task->id;
         $worker = null;

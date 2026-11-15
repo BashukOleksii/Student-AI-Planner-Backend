@@ -284,7 +284,7 @@ class AiWorkCompletionPrivacyTest extends TestCase
         [$action] = $this->propose($f);
         $token = $action->protected_payload['completion_token'];
         $review = [...$action->preview['completion_review'], 'completion_token' => $token];
-        // Exercise the existing v2 envelope with a nested review in its opaque receipt data.
+
         $event = $f['conversation']->messages()->create(['role' => 'assistant', 'content' => 'Historical structured outcome.',
             'tool_calls' => ['version' => 2, 'action_event' => ['action_id' => $action->id, 'status' => 'executed',
                 'receipt' => ['type' => $type, 'completion_review' => $review]]]]);

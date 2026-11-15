@@ -375,7 +375,7 @@ class PlanningWorkSelectionServiceTest extends TestCase
         $this->studySession($first, StudySessionStatus::Completed);
         $this->studySession($second, StudySessionStatus::Completed, ['actual_minutes' => 15]);
         $expected = $this->select($user);
-        // Alter only SELECT retrieval order, retaining real Eloquent/MySQL sources.
+
         Task::addGlobalScope('reverse_selection_test', fn ($query) => $query->orderByDesc('tasks.id'));
         Subtask::addGlobalScope('reverse_selection_test', fn ($query) => $query->orderByDesc('subtasks.id'));
         StudySession::addGlobalScope('reverse_selection_test', fn ($query) => $query->orderByDesc('study_sessions.id'));

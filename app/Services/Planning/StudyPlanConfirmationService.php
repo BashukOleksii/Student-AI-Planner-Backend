@@ -8,7 +8,6 @@ use Illuminate\Contracts\Encryption\Encrypter;
 use InvalidArgumentException;
 use JsonException;
 
-/** Protected review contract and pure confirmation checks; no persistence or clock reads. */
 class StudyPlanConfirmationService
 {
     public const TOKEN_LIFETIME_SECONDS = 900;
@@ -33,7 +32,6 @@ class StudyPlanConfirmationService
         ], JSON_THROW_ON_ERROR), false);
     }
 
-    /** Decrypt JSON without PHP object unserialization; every failure has the same public meaning. */
     public function decode(string $token, int $ownerId, int $now): array
     {
         try {
@@ -69,7 +67,6 @@ class StudyPlanConfirmationService
         return $payload;
     }
 
-    /** Object key order is immaterial; scalar types, list order and every outcome field matter. */
     public function matches(array $reviewed, array $current): bool
     {
         unset($reviewed['as_of_utc'], $current['as_of_utc']);
@@ -77,7 +74,6 @@ class StudyPlanConfirmationService
         return $this->canonical($reviewed) === $this->canonical($current);
     }
 
-    /** Return a validation field requiring correction, or null when the exact plan can be accepted. */
     public function acceptanceError(array $plan, bool $acceptPartial): ?string
     {
         if ($plan['sessions'] === []) {

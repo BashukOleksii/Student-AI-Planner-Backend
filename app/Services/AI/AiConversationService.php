@@ -47,7 +47,7 @@ class AiConversationService
     {
         $conversation = $this->find($owner, $id);
         $query = $conversation->messages()->whereIn('role', [AiMessageRole::User, AiMessageRole::Assistant, AiMessageRole::Tool]);
-        // Cursor boundary keeps subsequent pages stable as new completed turns are appended.
+
         $through = $filters['through_id'] ?? (clone $query)->max('id') ?? 0;
         $page = $query->where('id', '<=', $through)->orderBy('id')
             ->paginate($filters['per_page'] ?? 20, ['*'], 'page', $filters['page'] ?? 1);
@@ -58,7 +58,6 @@ class AiConversationService
 
     public function send(User $owner, string $id, string $content, string $requestId): array
     {
-        // A caller-owned transaction would retain locks throughout provider I/O and invalidate durability.
         if (DB::transactionLevel() !== 0) {
             throw new AiAgentException('persistence_error');
         }
@@ -73,12 +72,10 @@ class AiConversationService
 
             return $this->finish($owner, $id, $claim, $turn);
         } finally {
-            // Conditional token match cannot release a successor worker's claim or a committed replay.
             try {
                 DB::table('ai_conversation_turns')->where('id', $claim['id'])->where('lease_token', $claim['token'])
                     ->whereNull('result')->update(['lease_token' => null, 'lease_expires_at' => null]);
             } catch (Throwable) {
-                // A database outage leaves an expiring lease, never a permanent conversation lock.
             }
         }
     }
@@ -99,7 +96,6 @@ class AiConversationService
             if ($existing?->result !== null) {
                 $stored = CompletionReviewPrivacy::structured(json_decode($existing->result, true, 64, JSON_THROW_ON_ERROR));
 
-                // MySQL JSON normalizes object key order; replay the same public field order.
                 return ['result' => ['conversation_id' => $stored['conversation_id'], 'user_message_id' => $stored['user_message_id'],
                     'assistant_message_id' => $stored['assistant_message_id'], 'content' => $stored['content'],
                     'tools' => array_map(fn ($tool) => ['call_id' => $tool['call_id'], 'name' => $tool['name'], 'ok' => $tool['ok'],
@@ -206,7 +202,7 @@ class AiConversationService
     {
         $messages = $this->find($owner, $id)->messages()->whereIn('role', [AiMessageRole::User, AiMessageRole::Assistant, AiMessageRole::Tool])
             ->orderByDesc('id')->limit($this->limits->get('max_history_messages'))->get()->reverse()->values();
-        // Drop a leading partial turn instead of replaying orphaned function outputs.
+
         $messages = $messages->skipUntil(fn ($message) => $message->role === AiMessageRole::User);
 
         $history = $messages->map(fn ($message) => ['role' => $message->role->value, 'content' => ($message->tool_calls['version'] ?? null) === 2
@@ -215,7 +211,7 @@ class AiConversationService
             'calls' => ($message->tool_calls['version'] ?? null) === 1 ? $message->tool_calls['calls'] : [],
             'state' => ($message->tool_calls['version'] ?? null) === 1 ? $message->tool_calls['state'] : [],
             'call_id' => $message->tool_call_id])->values()->all();
-        // A compact authoritative projection survives bounded transcript trimming and lazy expiry.
+
         $actions = AiPendingAction::where('conversation_id', $id)->orderByDesc('created_at')->orderByDesc('id')->limit(10)
             ->select(['id', 'type', 'status', 'receipt'])->selectRaw('expires_at <= UTC_TIMESTAMP(6) AS elapsed')->get();
         if ($actions->isNotEmpty()) {

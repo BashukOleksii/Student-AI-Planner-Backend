@@ -28,7 +28,7 @@ class ManagementActionPresenter
             if (count((new ReminderRules)->targets($reminder->getAttributes())) > 1) {
                 throw new UnexpectedValueException;
             }
-            // Historical reads retain stored times; only disclosure of target identity is checked.
+
             $this->targets->resolve($owner, $reminder->getAttributes(), false, false);
         } catch (UnexpectedValueException) {
             foreach (ReminderRules::TARGETS as $field) {

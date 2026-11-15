@@ -52,7 +52,7 @@ class FreeTimeServiceTest extends TestCase
         } finally {
             DB::disableQueryLog();
         }
-        $this->assertCount(2, $queries); // Trusted owner timezone + availability, no calendar/blocker expansion.
+        $this->assertCount(2, $queries);
         $this->assertStringContainsString('from `users`', $queries[0]['query']);
         $this->assertStringContainsString('from `study_availability_windows`', $queries[1]['query']);
         foreach ($queries as $query) {
@@ -331,8 +331,7 @@ class FreeTimeServiceTest extends TestCase
         } finally {
             DB::disableQueryLog();
         }
-        // Calendar reads now include semester metadata and batched legacy provenance.
-        // Every invocation still has the same bounded, SELECT-only query shape.
+
         $this->assertCount(27, $queries);
         $perRead = intdiv(count($queries), 3);
         $this->assertSame(array_column(array_slice($queries, 0, $perRead), 'query'),
@@ -411,7 +410,7 @@ class FreeTimeServiceTest extends TestCase
             ['2026-11-07T22:00:00Z', '2026-11-08T22:00:00Z'], ['2026-11-14T22:00:00Z', '2026-11-15T22:00:00Z'],
             ['2026-11-21T22:00:00Z', '2026-11-22T22:00:00Z'],
         ];
-        // This 31-date range contains more than 31 * 86400 real seconds due to the fold.
+
         $this->assertSame($this->utcIntervals($expected), app(FreeTimeService::class)->calculate($user, '2026-10-25', '2026-11-24'));
         $this->expectException(InvalidArgumentException::class);
         app(FreeTimeService::class)->calculate($user, '2026-10-25', '2026-11-25');

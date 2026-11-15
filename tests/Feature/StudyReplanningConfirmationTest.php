@@ -141,11 +141,11 @@ class StudyReplanningConfirmationTest extends TestCase
         $this->assertSame(3600, $effort['future_reserved_seconds']);
         $this->assertSame(1800, $effort['unallocated_work_seconds']);
         $workload = app(PlanningContextService::class)->load($user, '2026-10-19', '2026-10-19')['workload_sessions'];
-        $this->assertCount(2, $workload); // completed scheduled hour plus replacement hour
+        $this->assertCount(2, $workload);
         $snapshot = $this->snapshot();
         $this->confirm($preview)->assertConflict();
         $this->assertSame($snapshot, $this->snapshot());
-        // The immediate successor continues to support Stage D manual transfer.
+
         app(StudySessionReschedulingService::class)->reschedule($user, (string) $replacement['id'], '2026-10-19T13:00:00Z', '2026-10-19T14:00:00Z');
         $this->assertSame(1, StudySession::where('rescheduled_from_session_id', $replacement['id'])->count());
     }

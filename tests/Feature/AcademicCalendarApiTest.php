@@ -19,7 +19,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
-/** Unified academic reads exclude self-study; fixtures clean up before transaction-based API suites. */
 #[Group('mysql')]
 class AcademicCalendarApiTest extends TestCase
 {

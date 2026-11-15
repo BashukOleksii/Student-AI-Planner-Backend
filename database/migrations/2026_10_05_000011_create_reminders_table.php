@@ -27,8 +27,6 @@ return new class extends Migration
             $table->index(['user_id', 'status', 'trigger_at']);
         });
 
-        // MySQL rejects CHECKs involving SET NULL target FKs (3823). Target count,
-        // anchor compatibility, ownership, and purge reconciliation belong to Services.
         DB::statement(<<<'SQL'
             ALTER TABLE reminders
                 ADD CONSTRAINT reminders_valid_status

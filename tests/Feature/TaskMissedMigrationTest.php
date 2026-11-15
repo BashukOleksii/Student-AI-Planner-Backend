@@ -20,7 +20,6 @@ class TaskMissedMigrationTest extends TestCase
 
     public function test_upgrade_preserves_rows_enforces_all_three_states_and_refuses_lossy_rollback(): void
     {
-        // Rebuild the immediate predecessor CHECKs only on the guarded disposable schema.
         DB::statement("ALTER TABLE tasks DROP CHECK tasks_valid_status, DROP CHECK tasks_completion_consistency,
             ADD CONSTRAINT tasks_valid_status CHECK (status IN ('pending', 'completed')),
             ADD CONSTRAINT tasks_completion_consistency CHECK ((status = 'completed' AND completed_at IS NOT NULL)

@@ -142,7 +142,7 @@ class StudyPlanConfirmationServiceTest extends TestCase
         $current = $original;
         $current['sessions'] = array_reverse($current['sessions']);
         $this->assertFalse($this->service()->matches($original, $current));
-        // A persisted reservation removes eligible new proposals on replay.
+
         $current = $original;
         $current['sessions'] = [];
         $current['work_results'] = [];

@@ -68,7 +68,7 @@ class PasswordManagementTest extends TestCase
         $owner->forceFill(['remember_token' => 'old-remember-token'])->save();
         $oldReset = Password::createToken($owner);
         $current = $this->browserCookies;
-        $other = $this->secondLogin($owner); // Intentionally never prime this session with GET /profile.
+        $other = $this->secondLogin($owner);
         $foreign = User::factory()->create();
         DB::table('sessions')->insert(['id' => 'foreign-session', 'user_id' => $foreign->id, 'payload' => '', 'last_activity' => time()]);
         $this->switchBrowser($current);

@@ -4,7 +4,6 @@ namespace App\Services\AI\Actions;
 
 use Illuminate\Database\Eloquent\Model;
 
-/** Canonical persisted attributes, including actual values rather than second-resolution timestamps alone. */
 class ActionTargetFingerprint
 {
     public function hash(array $records): string

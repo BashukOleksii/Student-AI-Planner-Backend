@@ -17,13 +17,10 @@ class FreeTimeService
     ) {}
 
     /**
-     * Read owned allowed study time; no preferences, clock-based policy or persistence.
-     * Dates are inclusive local labels; the range contains at most 31 calendar dates.
-     *
-     * @param  ?int  $minimumSeconds  A positive integer when supplied; checked explicitly to prevent coercion.
+     * @param  ?int  $minimumSeconds
      * @return list<array{start: int, end: int}>
      *
-     * @throws InvalidArgumentException For invalid range/minimum inputs or malformed UTC source values.
+     * @throws InvalidArgumentException
      */
     public function calculate(User $user, string $startDate, string $endDate, mixed $minimumSeconds = null): array
     {
@@ -38,7 +35,6 @@ class FreeTimeService
         return $minimumSeconds === null ? $free : $this->intervals->filterByMinimumSeconds($free, $minimumSeconds);
     }
 
-    /** The same PF1 source policy, retaining identities for trusted read-only projections. */
     public function sources(User $user, string $startDate, string $endDate): array
     {
         $start = $this->calendarDate($startDate);
@@ -55,7 +51,6 @@ class FreeTimeService
             return ['allowed_intervals' => [], 'blocking_lessons' => [], 'blocking_sessions' => []];
         }
 
-        // C2's normalized union provides a safe envelope without resolving ambiguous local boundaries.
         $rangeStart = gmdate('Y-m-d H:i:s', $allowed[0]['start']);
         $rangeEnd = gmdate('Y-m-d H:i:s', $allowed[count($allowed) - 1]['end']);
         $lessons = $this->calendarSources($user, $allowed[0]['start'], $allowed[count($allowed) - 1]['end']);
@@ -64,7 +59,6 @@ class FreeTimeService
             ->get(['id', 'starts_at', 'ends_at']);
         $records = function ($events): array {
             return $events->map(function ($event): array {
-                // DATETIME is UTC wall-clock storage; model presentation casts can use a different timezone.
                 return ['id' => $event->id,
                     'start' => $this->utcSeconds($event->getRawOriginal('starts_at')),
                     'end' => $this->utcSeconds($event->getRawOriginal('ends_at')),
@@ -75,7 +69,6 @@ class FreeTimeService
         return ['allowed_intervals' => $allowed, 'blocking_lessons' => $lessons, 'blocking_sessions' => $records($sessions)];
     }
 
-    /** Full source endpoints keep identities consistent across replanning chunks and break envelopes. */
     public function calendarSources(User $user, int $start, int $end): array
     {
         return ($this->calendar ??= app(CalendarBusyIntervalService::class))->between($user, $start, $end, false);

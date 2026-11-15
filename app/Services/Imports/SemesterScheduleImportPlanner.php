@@ -5,7 +5,6 @@ namespace App\Services\Imports;
 use App\Services\Schedule\EffectiveScheduleCalculator;
 use InvalidArgumentException;
 
-/** Pure reconciliation; catalogs/ownership/locking belong to the import service. */
 class SemesterScheduleImportPlanner
 {
     public const FIELDS = ['weekday', 'pair_number', 'pair_label', 'week_pattern', 'starts_at_local', 'ends_at_local', 'subject_id', 'teacher_id', 'room', 'teacher_ids'];

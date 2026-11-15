@@ -193,8 +193,6 @@ class SemesterScheduleManagementImportTest extends TestCase
             $this->mutate('PUT', '/date-exceptions/2026-09-07', ['mode' => 'copy_base'])->assertOk();
         }
         if ($change === 'release_suppression') {
-            // A protected slot not present in the workbook still participates in
-            // the graph fingerprint, without invalidating the ready preview.
             $slot = SemesterSchedule::find($this->scheduleId)->suppressedSlots()->create(['user_id' => $this->owner->id,
                 'weekday' => 5, 'pair_number' => 255, 'week_pattern' => 'all']);
         }

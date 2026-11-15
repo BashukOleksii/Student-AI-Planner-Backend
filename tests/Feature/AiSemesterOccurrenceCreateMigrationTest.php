@@ -26,7 +26,7 @@ class AiSemesterOccurrenceCreateMigrationTest extends TestCase
     public function test_clean_migration_chain_accepts_current_and_historical_types_and_rejects_unknown_types(): void
     {
         $conversation = AiConversation::factory()->create();
-        // Retired tools may still have historical pending actions and receipts.
+
         $types = [...array_filter(AiCapabilities::names(), fn ($name) => str_starts_with($name, 'propose_')), 'propose_lesson_replacement'];
         $this->assertEqualsCanonicalizing($types, $this->allowedTypes());
         foreach ($types as $type) {
@@ -105,7 +105,6 @@ class AiSemesterOccurrenceCreateMigrationTest extends TestCase
 
     private function allowedTypes(): array
     {
-        // These identifiers contain no escapes; normalize MySQL metadata's escaped quotes.
         $clause = str_replace('\\', '', $this->checks()['ai_actions_valid_type']['clause']);
         preg_match_all("/'([^']+)'/", $clause, $matches);
         $this->assertNotEmpty($matches[1]);

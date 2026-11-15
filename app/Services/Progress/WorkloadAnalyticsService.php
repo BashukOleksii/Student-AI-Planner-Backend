@@ -6,7 +6,6 @@ use App\Enums\StudySessionStatus;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
-/** Presentation aggregates only; allocation and planning constraints stay in the planner. */
 class WorkloadAnalyticsService
 {
     public function __construct(private ProgressStatisticsService $statistics, private ProgressTrendsService $trends) {}
@@ -24,7 +23,7 @@ class WorkloadAnalyticsService
                 'as_of_utc' => $progress['as_of_utc'],
                 'timezone' => $progress['timezone'],
                 'period' => ['start_date' => $startDate, 'end_date' => $endDate],
-                // Match statistics: full scheduled duration attributed to the local start date.
+
                 'days' => array_map(fn ($day) => [
                     'date' => $day['date'],
                     'planned_seconds' => $day['study_sessions']['planned']['scheduled_seconds'],

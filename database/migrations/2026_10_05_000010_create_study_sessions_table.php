@@ -28,8 +28,6 @@ return new class extends Migration
             $table->unique('rescheduled_from_session_id');
         });
 
-        // Self-rescheduling is a future Service invariant: CHECK cannot reference
-        // AUTO_INCREMENT id (3818) or the self SET NULL FK (3823).
         DB::statement(<<<'SQL'
             ALTER TABLE study_sessions
                 ADD CONSTRAINT study_sessions_valid_interval

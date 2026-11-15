@@ -177,7 +177,7 @@ class ProgressTrendsApiTest extends TestCase
         $this->postJson($base.'/complete')->assertOk();
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.days.14.tasks_completed.on_time', 3)
             ->assertJsonPath('data.days.14.subtasks_completed.without_deadline', 2);
-        // Clear the child's 12:00:01 bound before narrowing the parent deadline.
+
         Subtask::where('task_id', $task->id)->update(['deadline_at' => null]);
         $this->patchJson('/api/tasks/'.$task->id, ['deadline_at' => '2026-10-15T12:00:00Z'])->assertOk();
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.days.14.tasks_completed.on_time', 3);
@@ -202,7 +202,7 @@ class ProgressTrendsApiTest extends TestCase
         $active = Task::factory()->for($task->user)->create();
         $deleted = Subtask::factory()->for($active)->create(['status' => 'completed', 'completed_at' => '2026-10-15 12:00:00']);
         $deleted->delete();
-        $task->delete(); // An active child under a deleted parent is excluded too.
+        $task->delete();
         $this->actingAs($task->user, 'web');
         $data = $this->getJson($this->url())->assertOk()->assertJsonPath('data.totals.tasks_completed.total', 0)
             ->assertJsonPath('data.totals.subtasks_completed.total', 0)->assertJsonPath('data.days.4.study_sessions.completed_actual_minutes', 25)->json('data');

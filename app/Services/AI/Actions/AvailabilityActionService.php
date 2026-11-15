@@ -17,7 +17,6 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Throwable;
 
-/** Thin proposals and confirmed adapters over the single authoritative availability writer. */
 class AvailabilityActionService
 {
     public function __construct(private AvailabilityActionArgumentValidator $validator,
@@ -50,7 +49,6 @@ class AvailabilityActionService
         }
     }
 
-    /** Existing H3 confirmation owns conversation/action/owner locks and the outer commit. */
     public function execute(User $owner, AiPendingAction $action): array
     {
         if (DB::transactionLevel() === 0) {
@@ -96,7 +94,7 @@ class AvailabilityActionService
             if (! $result instanceof StudyAvailabilityWindow || ! $result->exists || $result->getKey() === null) {
                 throw new AiAgentException('persistence_error');
             }
-            // Verify database state, not the potentially modified in-memory result of a model event.
+
             $persisted = $currentOwner->studyAvailabilityWindows()->find($result->getKey());
             $saved = $persisted === null ? null : $this->window($persisted);
             $expected = $preview['after'];
@@ -112,7 +110,6 @@ class AvailabilityActionService
 
     private function load(User $owner, string $name, array $arguments, bool $lock = false): array
     {
-        // Fresh profile and complete owned configuration form one conservative review fingerprint.
         $owner = User::whereKey($owner->getKey())->when($lock, fn ($q) => $q->lockForUpdate())->firstOrFail(['id', 'timezone']);
         $records = ['owner' => $owner];
         foreach ($owner->studyAvailabilityWindows()->orderBy('id')->when($lock, fn ($q) => $q->lockForUpdate())->get() as $window) {

@@ -7,12 +7,10 @@ use Carbon\CarbonImmutable;
 use DateTimeZone;
 use Throwable;
 
-/** Presentation only: never selects, recalculates or changes calendar data. */
 class ScheduleAnswerPresenter
 {
     private const FAILURE = 'Не вдалося отримати розклад на цю дату. Спробуйте ще раз пізніше.';
 
-    /** Deliberately narrow, self-contained intents; no inference from model prose or history. */
     public function requestedDate(string $content, string $timezone, ?CarbonImmutable $asOfUtc = null): ?string
     {
         $text = mb_strtolower(trim($content));
@@ -71,7 +69,7 @@ class ScheduleAnswerPresenter
                 }
                 $start = $this->instant($lesson['starts_at'])->setTimezone($timezone);
                 $end = $this->instant($lesson['ends_at'])->setTimezone($timezone);
-                // The authoritative read includes lessons overlapping this local date.
+
                 $day = CarbonImmutable::createFromFormat('!Y-m-d', $date, $timezone);
                 if ($end <= $start || $start >= $day->addDay() || $end <= $day) {
                     return self::FAILURE;

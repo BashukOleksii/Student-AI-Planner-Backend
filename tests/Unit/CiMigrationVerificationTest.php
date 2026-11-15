@@ -34,7 +34,7 @@ class CiMigrationVerificationTest extends TestCase
             'DISPOSABLE_CI_MYSQL_CONTAINER_ID' => str_repeat('a', 64),
             $field => $value,
         ];
-        // A fake PHP bootstrap makes any attempted Laravel/database access a test failure.
+
         $bootstrap = tempnam(sys_get_temp_dir(), 'ci-migration-guard-');
         file_put_contents($bootstrap, '<?php spl_autoload_register(static function () { throw new RuntimeException("UNEXPECTED_BOOTSTRAP"); });');
         try {

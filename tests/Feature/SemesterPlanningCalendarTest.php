@@ -143,7 +143,7 @@ class SemesterPlanningCalendarTest extends TestCase
             'schedule_import_batch_id' => $batch->id, 'status' => LessonStatus::Replaced]);
         $replacement = Lesson::factory()->for($owner)->create(['replaces_lesson_id' => $original->id,
             'starts_at' => '2026-09-08 09:00:00', 'ends_at' => '2026-09-08 10:00:00']);
-        $original->delete(); // Historical lineage must still be found.
+        $original->delete();
         $manual = Lesson::factory()->for($owner)->create(['academic_period_id' => $schedule->academic_period_id,
             'starts_at' => '2026-09-08 08:00:00', 'ends_at' => '2026-09-08 09:00:00']);
         $otherPeriod = AcademicPeriod::factory()->for($owner)->create(['starts_on' => '2026-09-01', 'ends_on' => '2026-10-01']);
@@ -154,7 +154,7 @@ class SemesterPlanningCalendarTest extends TestCase
         $ids = array_column($this->busy($owner, '2026-09-08T00:00:00Z', '2026-09-09T00:00:00Z'), 'lesson_id');
         $this->assertSame([$manual->id, $otherImport->id], $ids);
         $this->assertSame($before, [$import->fresh()->getAttributes(), $replacement->fresh()->getAttributes()]);
-        // Imported occupancy outside its semester survives, even a boundary-spanning lesson.
+
         $import->update(['starts_at' => '2026-09-06 20:00:00', 'ends_at' => '2026-09-07 00:00:00']);
         $outside = $this->busy($owner, '2026-09-06T19:00:00Z', '2026-09-07T01:00:00Z');
         $this->assertSame(strtotime('2026-09-06T21:00:00Z'), $outside[0]['end']);

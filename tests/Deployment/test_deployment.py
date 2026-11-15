@@ -47,7 +47,6 @@ class DeploymentTest(unittest.TestCase):
         self.sha = self.commit('tested target')
         self.git('update-ref', 'refs/remotes/origin/main', self.sha)
         self.git('checkout', '-q', self.old, '--', 'app')
-        # Move fixture main back without any destructive production command.
         self.git('update-ref', 'refs/heads/main', self.old)
         self.git('read-tree', self.old)
         (self.repo / 'app/New.php').unlink()
@@ -133,7 +132,6 @@ esac''')
         return result
 
     def use_installed_control_fixture(self):
-        # Exercise the actual helper through deploy's sudo adapter; no host services.
         self.mock('systemctl', '''echo "systemctl $*" >> "$FIXTURE/commands"
 if [[ $* == "${SYSTEMCTL_FAIL_CALL:-}" ]]; then
   if [[ ${SYSTEMCTL_FAIL_AFTER_MUTATION:-0} == 0 || -f app/New.php ]]; then exit 1; fi
@@ -296,7 +294,6 @@ exec /bin/bash "$FIXTURE/control" "${*: -1}"''')
         (self.repo / 'app/Later.php').write_text('later code-only commit')
         migration_sha = self.commit('code after migration')
         self.git('update-ref', 'refs/remotes/origin/main', migration_sha)
-        # The server stays at its old code, target contains a new migration.
         self.git('update-ref', 'refs/heads/main', self.old)
         self.git('read-tree', self.old)
         (self.repo / 'database/migrations/new.php').unlink()
@@ -353,7 +350,6 @@ exec /bin/bash "$FIXTURE/control" "${*: -1}"''')
                         'config:cache', 'route:cache', 'view:cache', 'start-fpm', 'start-queue', 'start-scheduler',
                         'health', 'final-health', 'unreadable', 'interrupt', 'profile-smoke', 'csrf-smoke', 'transport', 'env-change'):
             with self.subTest(failure=failure):
-                # health fails preflight; all others happen after mutation.
                 result = self.deploy(fail=failure)
                 self.assertNotEqual(0, result.returncode)
                 self.assertIn('DEPLOYMENT FAILURE', self.output)
@@ -367,7 +363,6 @@ exec /bin/bash "$FIXTURE/control" "${*: -1}"''')
                 self.setUpFreshFixture()
 
     def setUpFreshFixture(self):
-        # Each subcase needs independent Git/runtime state; cleanup remains registered.
         self.setUp()
 
     def test_failed_migration_keeps_maintenance_and_marker_without_starting_services(self):
@@ -456,7 +451,6 @@ class RunnerGuardTest(unittest.TestCase):
                         LIGHTSAIL_BACKEND_SSH_PRIVATE_KEY='PRIVATE_TEST_VALUE',
                         LIGHTSAIL_BACKEND_KNOWN_HOSTS='PINNED_TEST_VALUE')
         self.log = self.base / 'ssh-args'
-        # All SSH commands are mocked, even tests that expect early refusal.
         for name, content in {
             'ssh': f'printf "%s\\n" "$@" > "{self.log}"; exit "${{SSH_RESULT:-0}}"',
             'ssh-keygen': 'exit "${KEY_RESULT:-0}"',
@@ -487,7 +481,6 @@ class RunnerGuardTest(unittest.TestCase):
             self.assertNotEqual(0, result.returncode)
             self.assertFalse(self.log.exists())
             self.assertNotIn('PRIVATE_TEST_VALUE', result.stdout + result.stderr)
-        # Valid private key, but ssh-keygen cannot find the pinned host.
         (self.bin / 'ssh-keygen').write_text('#!/bin/bash\n[[ $1 != -F ]]\n')
         self.assertNotEqual(0, self.invoke().returncode)
         self.assertFalse(self.log.exists())
@@ -542,7 +535,6 @@ class PermissionAuditTest(unittest.TestCase):
             code.write_text('code')
             code.chmod(0o600)
             actual_access = os.access
-            # Model the non-owner PHP-FPM identity, even if CI owns the temporary file.
             with patch.object(module.os, 'access', side_effect=lambda path, mode: False if Path(path) == code else actual_access(path, mode)):
                 with self.assertRaises(RuntimeError):
                     module.audit(root)
@@ -583,7 +575,6 @@ class InstalledHelperTest(unittest.TestCase):
             target.write_text(f'#!/bin/bash\nprintf "%s" "$1" > "{log}"\n')
             target.chmod(0o755)
             source = (ROOT / 'scripts/deploy/ssh-dispatch').read_text()
-            # Preserve the production command regex; replace only the exec target.
             source = source.replace('exec /usr/local/libexec/student-planner-backend-deploy', 'exec ' + str(target))
             dispatch = base / 'dispatch'
             dispatch.write_text(source)

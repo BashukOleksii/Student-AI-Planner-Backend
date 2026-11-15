@@ -93,7 +93,7 @@ class AiChatConcurrencyTest extends TestCase
         [$first, $gate] = $this->worker($owner, $conversation, $key, true);
         $connection = $this->ready($first);
         $this->assertNotSame((int) DB::selectOne('SELECT CONNECTION_ID() AS id')->id, $connection);
-        // The first request waits for the provider while another connection can lock its conversation.
+
         DB::transaction(function () use ($conversation): void {
             $this->assertNotNull(AiConversation::whereKey($conversation->id)->lockForUpdate()->first());
         });

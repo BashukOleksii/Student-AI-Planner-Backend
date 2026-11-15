@@ -23,7 +23,7 @@ class PasswordManagementService
     public function sendResetLink(#[\SensitiveParameter] string $email): void
     {
         $this->assertDeliveryConfiguration();
-        // Broker owns token hashing, expiry and per-account resend throttling.
+
         Password::broker()->sendResetLink(['email' => $email]);
     }
 
@@ -33,7 +33,7 @@ class PasswordManagementService
 
         return (new User)->getConnection()->transaction(function () use ($owner, $credentials, $sessionId): User {
             $user = User::whereKey($owner->getKey())->lockForUpdate()->firstOrFail();
-            // Repeat under the owner lock: Form Request validation may have preceded another change.
+
             if (! Hash::check($credentials['current_password'], $user->password)) {
                 throw ValidationException::withMessages(['current_password' => [__('validation.current_password')]]);
             }
@@ -50,7 +50,6 @@ class PasswordManagementService
         $this->assertSessionConfiguration();
 
         return (new User)->getConnection()->transaction(function () use ($credentials): User {
-            // Serialize changes/resets before Broker validation, so a consumed token cannot win twice.
             User::where('email', $credentials['email'])->lockForUpdate()->first();
             $updated = null;
             $status = Password::broker()->reset($credentials, function (User $user, string $password) use (&$updated): void {
@@ -69,7 +68,6 @@ class PasswordManagementService
 
     public function resetUrl(User $user, #[\SensitiveParameter] string $token): string
     {
-        // Also protect native Broker notifications invoked outside the recovery job.
         $this->assertDeliveryConfiguration();
 
         return $this->frontendOrigin().'/reset-password?'.http_build_query([
@@ -94,7 +92,7 @@ class PasswordManagementService
     {
         $connection = (new User)->getConnection()->getName();
         $broker = config('auth.passwords.'.config('auth.defaults.passwords'));
-        // Atomic revocation uses the existing database sessions and token table on this connection.
+
         if (config('session.driver') !== 'database' || (config('session.connection') ?? $connection) !== $connection
             || ! is_array($broker) || ($broker['driver'] ?? 'database') !== 'database'
             || ($broker['provider'] ?? null) !== 'users' || ($broker['connection'] ?? $connection) !== $connection) {

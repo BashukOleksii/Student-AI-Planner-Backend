@@ -159,7 +159,7 @@ class TaskPersistenceTest extends TestCase
         $subtask = Subtask::factory()->create();
         $task = $subtask->task;
         $task->delete();
-        // Future Task Service must orchestrate subtask/session/reminder cleanup.
+
         $this->assertNull($subtask->refresh()->deleted_at);
         $this->assertDatabaseHas('tasks', ['id' => $task->id]);
         $task->forceDelete();
@@ -195,7 +195,7 @@ class TaskPersistenceTest extends TestCase
     {
         $task = Task::factory()->create(['deadline_at' => '2026-10-05 12:00:00']);
         $subject = Subject::factory()->create();
-        // Invalid domain associations/deadline: future Services must reject these.
+
         $task->update(['subject_id' => $subject->id]);
         $subtask = Subtask::factory()->for($task)->create(['deadline_at' => '2026-10-06 12:00:00']);
         $this->assertNotSame($task->user_id, $subject->user_id);

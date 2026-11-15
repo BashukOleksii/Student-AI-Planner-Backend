@@ -1,6 +1,6 @@
 <?php
 
-// Destructive verification is restricted to this workflow's new hosted MySQL service.
+
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +38,7 @@ if (! $app->environment('testing') || config('database.default') !== 'mysql'
 $row = $db->selectOne('SELECT DATABASE() AS database_name, @@hostname AS server_hostname, VERSION() AS version, @@transaction_isolation AS isolation_level, @@performance_schema AS instrumentation');
 if ($db->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'mysql'
     || $row->database_name !== 'student_planner_testing'
-    // Docker's default hostname binds the live connection to this job's service ID.
+
     || $row->server_hostname !== substr($container, 0, 12)
     || ! str_starts_with($row->version, '8.4.') || $row->isolation_level !== 'REPEATABLE-READ'
     || (int) $row->instrumentation !== 1) {
@@ -52,7 +52,6 @@ if ($db->select('SHOW TABLES') !== []) {
 }
 echo json_encode($row, JSON_THROW_ON_ERROR).PHP_EOL;
 
-// Stay on the validated Laravel connection; never invoke a production downgrade.
 foreach (['migrate', 'migrate:fresh', 'migrate'] as $command) {
     $exitCode = Artisan::call($command, ['--force' => true, '--no-interaction' => true]);
     echo Artisan::output();

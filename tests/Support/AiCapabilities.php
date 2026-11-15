@@ -11,7 +11,6 @@ use App\Services\AI\Actions\TaskActionRegistry;
 use App\Services\AI\Tools\RecoveryReadTools;
 use App\Services\AI\Tools\ToolRegistry;
 
-/** Current registry contracts; no historical numeric discovery snapshots. */
 final class AiCapabilities
 {
     public static function definitions(): array

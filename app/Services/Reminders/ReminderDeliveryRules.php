@@ -6,7 +6,6 @@ use DateTimeImmutable;
 use InvalidArgumentException;
 use UnexpectedValueException;
 
-/** Pure due comparisons and immutable safe inbox snapshots. */
 class ReminderDeliveryRules
 {
     public const TYPE = 'reminder';
@@ -45,7 +44,6 @@ class ReminderDeliveryRules
         return ['reminder_id' => $id, 'message' => $display, ...$ids, 'trigger_at' => $trigger];
     }
 
-    /** Validate stored history without consulting mutable target or Reminder rows. */
     public function stored(mixed $data, mixed $reference): array
     {
         $fields = ['reminder_id', 'message', ...ReminderRules::TARGETS, 'trigger_at'];

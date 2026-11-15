@@ -9,7 +9,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Candidate keys let new composite FKs enforce ownership without changing legacy FKs.
         foreach (['academic_periods', 'subjects', 'teachers', 'schedule_import_batches'] as $name) {
             Schema::table($name, fn (Blueprint $table) => $table->unique(['id', 'user_id'], $name.'_schedule_owner_unique'));
         }
@@ -111,7 +110,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Never silently drop a semester or a frozen day snapshot.
         if (DB::table('semester_schedules')->exists()) {
             throw new RuntimeException('Semester schedules exist; use a forward migration.');
         }

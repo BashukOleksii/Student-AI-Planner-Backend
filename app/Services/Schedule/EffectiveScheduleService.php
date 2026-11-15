@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
-/** Owned effective semester reads shared by schedule presentation and planning. */
 class EffectiveScheduleService
 {
     public function __construct(private EffectiveScheduleCalculator $calculator, private SemesterLessonTeacherService $lessonTeachers) {}
@@ -29,7 +28,6 @@ class EffectiveScheduleService
         });
     }
 
-    /** Date-bounded metadata, plus exact periods needed to classify selected legacy history. */
     public function schedulesInRange(User $user, string $start, string $end, array $periodIds = []): Collection
     {
         $this->validateRange($start, $end);
@@ -53,7 +51,6 @@ class EffectiveScheduleService
         return DB::transaction(fn () => $this->ownedSchedule($user, $schedule));
     }
 
-    // Preserve the foundation's internal list contract.
     public function date(User $user, SemesterSchedule $schedule, string $date): array
     {
         return $this->forDate($user, $schedule, $date)['lessons'];
@@ -78,7 +75,6 @@ class EffectiveScheduleService
         return $this->range($user, $schedule, $start, $end);
     }
 
-    /** Bounded inclusive calendar read; load the graph once, never once per day. */
     public function forRange(User $user, SemesterSchedule $schedule, string $start, string $end): array
     {
         $this->validateRange($start, $end);
@@ -92,7 +88,7 @@ class EffectiveScheduleService
         $this->calculator->validateDate($end);
         $first = new DateTimeImmutable($start.' UTC');
         $last = new DateTimeImmutable($end.' UTC');
-        // Planning's 31 dates plus the maximum configured break on both sides.
+
         if ($last < $first || $first->diff($last)->days >= 128) {
             throw new InvalidArgumentException('Expected an inclusive range of at most 128 calendar dates.');
         }
@@ -100,7 +96,6 @@ class EffectiveScheduleService
 
     private function range(User $user, SemesterSchedule $schedule, string $start, string $end): array
     {
-        // Load the entire interval and its catalogs once, in one consistent snapshot.
         return DB::transaction(function () use ($user, $schedule, $start, $end): array {
             $owner = User::query()->findOrFail($user->getKey());
             $schedule = $this->ownedSchedule($owner, $schedule);
@@ -158,7 +153,7 @@ class EffectiveScheduleService
             ];
             $rules = $rules->map->attributesToArray()->all();
             $lessons = [];
-            // Nominal dates in UTC encode calendar labels, not fixed-duration local days.
+
             for ($day = new DateTimeImmutable($start.' UTC'); $day->format('Y-m-d') <= $end; $day = $day->modify('+1 day')) {
                 $date = $day->format('Y-m-d');
                 foreach ($this->calculator->calculate($config, $rules, $snapshots[$date] ?? null, $date, $owner->timezone) as $row) {

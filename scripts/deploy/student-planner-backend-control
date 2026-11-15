@@ -1,5 +1,4 @@
 #!/bin/bash
-# Reviewed copy must be root:root 0755, outside the ubuntu-writable checkout.
 set -euo pipefail
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 [[ $# == 1 ]] || exit 2
@@ -7,7 +6,6 @@ case "$1" in
     stop-fpm) /usr/bin/systemctl stop php8.4-fpm.service ;;
     start-fpm) /usr/bin/systemctl start php8.4-fpm.service ;;
     stop-queue)
-        # Attempt both stops even if one fails, including during deploy containment.
         result=0
         /usr/bin/systemctl stop student-ai-planner-queue.service || result=1
         /usr/bin/systemctl stop student-ai-planner-reminder-email.service || result=1

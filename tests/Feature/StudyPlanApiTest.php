@@ -36,7 +36,7 @@ class StudyPlanApiTest extends TestCase
     {
         parent::setUp();
         $this->travelTo(CarbonImmutable::parse('2026-10-19T08:00:00.500000Z'));
-        // These tests commit real outermost transactions, so remove committed fixtures too.
+
         $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
     }
 
@@ -333,7 +333,7 @@ class StudyPlanApiTest extends TestCase
         $task->update(['estimated_minutes' => 90]);
         $this->postJson('/api/planning/study-plans/confirm', ['preview_token' => $data['preview_token']])->assertConflict();
         $task->update(['estimated_minutes' => 60, 'title' => 'New presentation title']);
-        // A compatible configured minimum changes no reviewed proposal or outcome.
+
         PlanningPreference::factory()->for($user)->create(['min_session_minutes' => 30]);
         $this->postJson('/api/planning/study-plans/confirm', ['preview_token' => $data['preview_token']])->assertCreated();
         $this->assertDatabaseCount('study_sessions', 1);
@@ -368,8 +368,7 @@ class StudyPlanApiTest extends TestCase
         } elseif ($violation === 'foreign attribution') {
             $plan['sessions'][0]['task_id'] = Task::factory()->create()->id;
         }
-        // A faulty adapter/planner returning a matching review must still fail the independent
-        // current Stage A/context and complete-batch PF2 checks. Production uses the real planner.
+
         $mock = $this->createMock(StudyPlanningService::class);
         $mock->method('plan')->willReturn($plan);
         $this->app->instance(StudyPlanningService::class, $mock);

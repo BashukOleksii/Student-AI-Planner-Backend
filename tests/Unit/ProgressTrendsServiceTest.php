@@ -64,7 +64,7 @@ class ProgressTrendsServiceTest extends TestCase
             $this->completion('2026-10-14 22:00:00', '2026-10-14 22:00:00'),
             $this->completion('2026-10-15 20:59:59', '2026-10-15 20:59:58'),
             $this->completion('2026-10-15 21:00:00'),
-            $this->completion('2026-10-16 21:00:00'), // exclusive end
+            $this->completion('2026-10-16 21:00:00'),
             ['status' => 'pending', 'completed_at' => null, 'deadline_at' => null],
             ['status' => 'pending', 'completed_at' => '2026-10-15 00:00:00', 'deadline_at' => null],
         ];

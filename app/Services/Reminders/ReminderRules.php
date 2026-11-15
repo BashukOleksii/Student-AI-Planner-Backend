@@ -10,7 +10,6 @@ use DateTimeImmutable;
 use InvalidArgumentException;
 use OverflowException;
 
-/** Pure input and lifecycle rules; persisted relationship validation stays in the Service. */
 class ReminderRules
 {
     public const TARGETS = ['task_id', 'subtask_id', 'study_session_id'];
@@ -38,7 +37,6 @@ class ReminderRules
             && preg_match('/[^\p{Z}\p{C}\s]/u', $message) === 1;
     }
 
-    /** Exact body validation shared by Requests and direct application callers. */
     public function errors(array $data, bool $create, ?bool $relative = null): array
     {
         $errors = [];
@@ -147,7 +145,6 @@ class ReminderRules
         return gmdate('Y-m-d\TH:i:s\Z', $seconds);
     }
 
-    /** Empty changes for history; cancellation never supplies a replacement trigger. */
     public function reconcile(ReminderStatus $status, ?string $anchor, mixed $offset, DateTimeImmutable $now): array
     {
         if ($status !== ReminderStatus::Scheduled) {
@@ -161,7 +158,6 @@ class ReminderRules
                     return ['trigger_at' => $this->databaseTime($trigger)];
                 }
             } catch (OverflowException) {
-                // A legitimate deadline edit may leave no representable notification instant.
             }
         }
 

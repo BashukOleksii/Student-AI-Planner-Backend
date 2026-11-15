@@ -219,7 +219,6 @@ class LessonApiTest extends TestCase
         config(['app.timezone' => 'America/New_York']);
         date_default_timezone_set('America/New_York');
         try {
-            // This UTC wall time lies in New York's nonexistent local DST hour.
             $response = $this->actingAs($subject->user, 'web')->postJson('/api/lessons', $this->values($subject, [
                 'starts_at' => '2026-03-08T02:30:00Z', 'ends_at' => '2026-03-08T03:30:00Z',
             ]))->assertCreated()->assertJsonPath('data.starts_at', '2026-03-08T02:30:00Z');

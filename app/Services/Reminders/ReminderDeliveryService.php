@@ -38,7 +38,6 @@ class ReminderDeliveryService
             try {
                 $counts[$this->process($candidate->user_id, $candidate->id)['status']]++;
             } catch (Throwable) {
-                // Each transaction has rolled back; no source contents/SQL are emitted by the command.
                 $counts['failed']++;
             }
         }
@@ -56,13 +55,12 @@ class ReminderDeliveryService
         }
     }
 
-    /** Same database-only delivery core, for atomic owner-first application composition. */
     public function processWithinTransaction(int $ownerId, int $reminderId): array
     {
         if (DB::transactionLevel() === 0) {
             throw new LogicException('Reminder delivery core requires an existing owner-first transaction.');
         }
-        // A current owner read precedes every RR snapshot and observes prior writers after a wait.
+
         $owner = User::whereKey($ownerId)->lockForUpdate()->first();
         $source = $owner?->reminders()->whereKey($reminderId)->first();
         if ($source === null || $source->status !== ReminderStatus::Scheduled) {
@@ -81,7 +79,7 @@ class ReminderDeliveryService
         if (! $this->delivery->due($trigger, $now)) {
             return ['status' => 'skipped'];
         }
-        // A scheduled row with any existing receipt is corruption, never a reason to repair status.
+
         if (DatabaseNotification::where('reminder_id', $reminderId)->exists()) {
             throw new ReminderIntegrityException;
         }
@@ -99,7 +97,7 @@ class ReminderDeliveryService
             }
         }
         $payload = $this->delivery->payload($reminder->id, $reminder->only(ReminderRules::TARGETS), $reminder->message, $trigger);
-        // Native Notifiable relation + DatabaseNotification model on this same connection/transaction.
+
         $timestamp = $now->format('Y-m-d H:i:s');
         $notification = $owner->notifications()->create(['id' => (string) Str::uuid(), 'type' => ReminderDeliveryRules::TYPE,
             'data' => $payload, 'read_at' => null, 'reminder_id' => $reminder->id,

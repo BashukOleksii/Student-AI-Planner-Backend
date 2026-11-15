@@ -11,10 +11,6 @@ use DateTimeZone;
 class ScheduleOccurrenceMaterializer
 {
     /**
-     * Expand the ScheduleWorkbookParser contract without querying or persisting.
-     * The caller supplies an owned period and the user's persisted IANA timezone.
-     * Source metadata and rule parity are preserved; type is a technical fallback.
-     *
      * @param  array{group: string, source: array, rules: list<array>}  $template
      * @return array{
      *   group: string, source: array,
@@ -46,8 +42,8 @@ class ScheduleOccurrenceMaterializer
         }
 
         $occurrences = [];
-        // UTC here represents calendar labels only, so date arithmetic cannot skip a local day.
         $week = $start->startOfWeek(CarbonImmutable::MONDAY);
+
         for ($offset = 0; $week->lessThanOrEqualTo($end); $offset++, $week = $week->addWeek()) {
             $parity = $offset % 2 === 0 ? 'numerator' : 'denominator';
             foreach ($template['rules'] as $rule) {
@@ -86,7 +82,6 @@ class ScheduleOccurrenceMaterializer
 
     private function periodDate(AcademicPeriod $period, string $field): CarbonImmutable
     {
-        // Read DATE attributes directly: Eloquent date casts otherwise use the server timezone.
         $value = $period->getAttributes()[$field] ?? null;
         if (! is_string($value) || ! preg_match('/^[0-9]{4}-[0-9]{2}-[0-9]{2}(?: 00:00:00)?$/D', $value)) {
             throw new ScheduleOccurrenceMaterializationException('Дата навчального періоду, поле '.$field.' має бути календарною датою.');
@@ -135,8 +130,7 @@ class ScheduleOccurrenceMaterializer
     {
         $label = $date.' '.$time;
         $wallClock = CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $label, 'UTC');
-        // Test nearby IANA offsets rather than accepting PHP's automatic gap/fold choice.
-        // Two days cover even date-line shifts; each endpoint gets its own transition window.
+
         $transitions = $zone->getTransitions($wallClock->getTimestamp() - 172800, $wallClock->getTimestamp() + 172800);
         $matches = [];
         foreach (array_unique(array_column($transitions, 'offset')) as $offset) {

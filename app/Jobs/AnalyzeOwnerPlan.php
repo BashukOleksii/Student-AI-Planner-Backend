@@ -14,7 +14,6 @@ class AnalyzeOwnerPlan implements ShouldQueue
 {
     use Queueable;
 
-    // Releases during a sustained edit burst do not consume a finite attempts budget.
     public int $tries = 0;
 
     public int $timeout = 60;
@@ -45,7 +44,6 @@ class AnalyzeOwnerPlan implements ShouldQueue
             return;
         }
         try {
-            // Same owner-first detector and source/need deduplication as Scheduler. Never a writer of sessions.
             $suggestions->detect($this->ownerId, 7);
         } catch (Throwable $exception) {
             $code = $exception instanceof RecoverySuggestionException && $exception->errorCode === 'analysis_limit_exceeded'

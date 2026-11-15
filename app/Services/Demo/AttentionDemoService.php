@@ -17,7 +17,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
-/** Local fixtures only. Capacity probes reuse the real allocator; reviews come only from the real detector. */
 class AttentionDemoService
 {
     private const PREFIX = '[DEMO-ATTENTION]';
@@ -62,7 +61,7 @@ class AttentionDemoService
             $now = CarbonImmutable::now('UTC');
             $local = $now->setTimezone($owner->timezone);
             $period = [$local->toDateString(), $local->addDays(6)->toDateString()];
-            // This is a SELECT-only assessment, never a persisted suggestion or token supplied by the demo.
+
             $baseline = $this->analysis->analyze($owner, ...$period);
             $out = ['database' => $identity, 'owner' => $owner->only('id', 'name', 'email', 'timezone'),
                 'scenario' => $key, 'step' => $step, 'dry_run' => $dryRun, 'written' => false,
@@ -82,7 +81,6 @@ class AttentionDemoService
                     'description' => $marker.json_encode($blueprint, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
                     'estimated_minutes' => $blueprint['estimated_minutes'], 'deadline_at' => $blueprint['initial_deadline'], 'priority' => 2]);
                 if (in_array($key, ['A', 'G'], true)) {
-                    // Historical outcomes cannot be seeded by a future-only planner. Only these marked new records are inserted.
                     $source = $owner->studySessions()->create(['task_id' => $task->id,
                         'starts_at' => $blueprint['source']['starts_at'], 'ends_at' => $blueprint['source']['ends_at'],
                         'status' => 'planned', 'actual_minutes' => null, 'completed_at' => null]);
@@ -153,7 +151,6 @@ class AttentionDemoService
             return $out;
         });
         if (! $dryRun && ($result['written'] || $step === 'check') && $result['task_id'] !== null) {
-            // Only the real detector writes reviews/scan state. A repeated prepare never replaces test results.
             try {
                 $detected = DB::transaction(function () use ($user, $email): array {
                     $verified = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
@@ -225,7 +222,6 @@ class AttentionDemoService
                         continue;
                     }
                     if ($key === 'C') {
-                        // No valid single placement can cover the original duration before this deadline.
                         $singleExists = false;
                         foreach ($context['free_intervals'] as $free) {
                             $one = [...$context, 'range' => $free, 'free_intervals' => [$free]];
@@ -254,7 +250,6 @@ class AttentionDemoService
 
     private function probe(array $context, int $seconds, ?int $deadline, int $cutoff, bool $single = false): array
     {
-        // Private synthetic identity is never persisted, exposed as a real ID or used for authorization.
         return $this->allocator->allocate([['task_id' => PHP_INT_MAX, 'subtask_id' => null,
             'effective_deadline_utc' => $deadline, 'effort' => ['unallocated_work_seconds' => $seconds]]], $context, $cutoff, $single);
     }

@@ -73,7 +73,6 @@ class LessonPersistenceTest extends TestCase
             $this->assertNull($lesson->$relation);
         }
 
-        // Omit status/type entirely to verify MySQL defaults, independently of the factory.
         $minimal = Lesson::create($lesson->only(['user_id', 'subject_id', 'starts_at', 'ends_at']))->refresh();
         $this->assertSame(LessonStatus::Active, $minimal->status);
         $this->assertSame(LessonType::Lecture, $minimal->type);
@@ -256,7 +255,7 @@ class LessonPersistenceTest extends TestCase
         $replacement = Lesson::factory()->for($original->user)->for($original->subject)->create(['replaces_lesson_id' => $original->id]);
         $this->assertTrue($replacement->replacedLesson->is($original));
         $this->assertTrue($original->replacement->is($replacement));
-        // Persisting the reference does not implement the future replacement lifecycle workflow.
+
         $this->assertSame(LessonStatus::Active, $original->refresh()->status);
 
         $values = $replacement->getAttributes();
@@ -288,7 +287,6 @@ class LessonPersistenceTest extends TestCase
         $lesson = Lesson::factory()->create();
         $this->assertNotSame($parent->user_id, $lesson->user_id);
 
-        // Invalid domain operation: future deterministic Services must enforce same-owner compatibility.
         DB::table('lessons')->where('id', $lesson->id)->update([$column => $parent->id]);
         $this->assertSame($parent->id, $lesson->refresh()->$column);
     }
@@ -304,8 +302,7 @@ class LessonPersistenceTest extends TestCase
     public function test_mysql_permits_self_reference_which_the_future_service_must_reject(): void
     {
         $lesson = Lesson::factory()->create();
-        // Invalid domain state, demonstrated only to document the physical-schema limitation.
-        // MySQL errors 3818 (AUTO_INCREMENT id) and 3823 (SET NULL FK) prevent the intended CHECK.
+
         DB::table('lessons')->where('id', $lesson->id)->update(['replaces_lesson_id' => $lesson->id]);
 
         $this->assertSame($lesson->id, $lesson->refresh()->replaces_lesson_id);
@@ -374,7 +371,7 @@ class LessonPersistenceTest extends TestCase
         $this->assertTrue(Lesson::withTrashed()->find($lesson->id)->is($lesson));
         $this->assertInstanceOf(Carbon::class, $lesson->deleted_at);
         $this->assertDatabaseHas('lessons', ['id' => $lesson->id, 'import_fingerprint' => self::EXAMPLE_FINGERPRINT]);
-        // Future import commit must restore/update this row instead of inserting its reserved identity.
+
         $this->assertMysqlRejects(fn () => DB::table('lessons')->insert($values), 1062, 'lessons_user_id_academic_period_id_import_fingerprint_unique');
     }
 
@@ -401,8 +398,6 @@ class LessonPersistenceTest extends TestCase
         $lesson = Lesson::factory()->for($user)->for($period)->for($batch)->create();
         $subject = $lesson->subject;
 
-        // RESTRICT history paths can block a User CASCADE. This is administrative hard purge,
-        // distinct from normal Lesson soft deletion; approved FK actions are retained.
         $this->assertMysqlRejects(fn () => DB::table('users')->where('id', $user->id)->delete(), 1451);
         foreach ([$user, $period, $batch, $row, $subject, $lesson] as $record) {
             $this->assertModelExists($record);

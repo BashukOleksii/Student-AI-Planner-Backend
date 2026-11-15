@@ -28,7 +28,6 @@ class ScheduleImportPreviewRevalidator
         private ScheduleImportCandidateClassifier $classifier,
     ) {}
 
-    /** Refresh existing occurrence rows in place; raw source and calendar instants are immutable. */
     public function revalidate(User $user, ScheduleImportBatch $batch): ScheduleImportBatch
     {
         return DB::transaction(function () use ($user, $batch): ScheduleImportBatch {
@@ -47,10 +46,6 @@ class ScheduleImportPreviewRevalidator
         });
     }
 
-    /**
-     * Shared C2a/C2b refresh. Caller holds User, owned Batch/Period and ordered Row
-     * locks in the current transaction; this method never commits that transaction.
-     */
     public function refreshLocked(User $owner, ScheduleImportBatch $batch, AcademicPeriod $period, Collection $rows): ScheduleImportBatch
     {
         if (DB::transactionLevel() === 0) {
@@ -58,7 +53,6 @@ class ScheduleImportPreviewRevalidator
         }
         $this->validateStructure($batch, $rows);
 
-        // Preserve valid owned mappings, including renamed catalog entries.
         $subjectIds = $this->ownedIds($owner, $rows, 'subject_id', 'subjects');
         $teacherIds = $this->ownedIds($owner, $rows, 'teacher_id', 'teachers');
         $subjectNames = [];
@@ -94,7 +88,6 @@ class ScheduleImportPreviewRevalidator
             }
             $fingerprint = null;
             try {
-                // Validate even unresolved Subjects; no invalid interval reaches B3 projection.
                 $this->fingerprint->validateInterval($raw['starts_at_utc'], $raw['ends_at_utc']);
                 if ($subjectId !== null) {
                     $fingerprint = $this->fingerprint->generate($subjectId, $raw['starts_at_utc'], $raw['ends_at_utc']);
@@ -187,7 +180,7 @@ class ScheduleImportPreviewRevalidator
             if ($validator->fails() || ! checkdate((int) substr($raw['local_date'], 5, 2), (int) substr($raw['local_date'], 8, 2), (int) substr($raw['local_date'], 0, 4))) {
                 $this->invalidStructure();
             }
-            // Calendar-label validation must not reinterpret dates in the server timezone.
+
             if (CarbonImmutable::createFromFormat('!Y-m-d', $raw['local_date'], 'UTC')->isoWeekday() !== $raw['weekday']
                 || $raw['starts_at_local'] >= $raw['ends_at_local']
                 || $raw['source']['rows'][0] > $raw['source']['rows'][1]

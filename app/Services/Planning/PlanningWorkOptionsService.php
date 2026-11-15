@@ -17,7 +17,6 @@ class PlanningWorkOptionsService
         $selection = $this->selection->select($owner, $taskId, isset($values['subtask_id']) ? (int) $values['subtask_id'] : null);
         $units = collect($selection['work_items']);
         if (($values['mode'] ?? 'planning') === 'replanning') {
-            // A fully reserved/expired unit may still need review of its existing plan.
             $units = $units->merge($selection['excluded_items']);
         }
         $ids = $units->pluck($taskId === null ? 'task_id' : 'subtask_id')->filter()->unique();
@@ -35,7 +34,7 @@ class PlanningWorkOptionsService
                 $query->whereRaw('1 = 0');
             }
         }
-        // Escape LIKE metacharacters: search terms are literal, not patterns.
+
         $literal = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search);
         $result = $query->when($search !== '', fn ($q) => $q->whereRaw("title LIKE ? ESCAPE '!'", ['%'.$literal.'%']))
             ->orderBy('title')->orderBy('id')->paginate(20, ['id', 'title'], 'page', $page);

@@ -13,7 +13,6 @@ class ToolExecutor
 {
     public function __construct(private ToolRegistry $registry, private ToolArgumentValidator $validator, private ReadOnlyTools $tools) {}
 
-    /** The caller must supply the User from trusted Laravel authentication, never from model arguments. */
     public function execute(User $authenticatedUser, string $toolName, array $arguments): array
     {
         try {
@@ -40,7 +39,6 @@ class ToolExecutor
                 ? $this->error($toolName, 'not_found', 'Resource not found.')
                 : $this->error($toolName, 'access_denied', 'Access denied.');
         } catch (Throwable) {
-            // In particular, malformed persisted source relationships are not argument-validation failures.
             return $this->error($toolName, 'execution_failed', 'Tool execution failed.');
         }
     }

@@ -4,7 +4,6 @@ namespace App\Services\Planning;
 
 use InvalidArgumentException;
 
-/** Pure candidate validation against explicit caller-selected planning inputs. */
 class PlanningConstraintService
 {
     private const PREFERENCE_KEYS = [
@@ -25,10 +24,10 @@ class PlanningConstraintService
      * @param  list<array{start: int, end: int}>  $breakAnchors
      * @param  list<array{start: int, end: int}>  $existingWorkloadSessions
      * @param  array{min_session_minutes: ?int, max_session_minutes: ?int, preferred_break_minutes: ?int, max_daily_study_minutes: ?int, max_weekly_study_minutes: ?int}  $preferences
-     * @param  ?int  $deadlineUtc  Checked without scalar coercion.
-     * @return list<string> Unique violations in duration, containment, break, workload, deadline order.
+     * @param  ?int  $deadlineUtc
+     * @return list<string>
      *
-     * @throws InvalidArgumentException For malformed inputs or unrepresentable arithmetic.
+     * @throws InvalidArgumentException
      */
     public function evaluate(
         array $candidate,

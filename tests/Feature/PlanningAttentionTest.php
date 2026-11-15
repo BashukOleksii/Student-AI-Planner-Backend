@@ -173,9 +173,9 @@ class PlanningAttentionTest extends TestCase
         $trigger = app(RecoveryCheckTriggerService::class);
         $token = DB::table('recovery_scan_states')->where('user_id', $owner->id)->value('queued_token');
         $this->assertSame(0, $trigger->start($owner->id, $token));
-        $this->assertNull($trigger->start($owner->id, $token)); // duplicate delivery cannot run concurrently
+        $this->assertNull($trigger->start($owner->id, $token));
         app(StudyAvailabilityService::class)->update($owner, $window, ['starts_at' => '12:00:00']);
-        app(RecoverySuggestionService::class)->detect($owner->id); // analysis captures the latest owner-locked inputs
+        app(RecoverySuggestionService::class)->detect($owner->id);
         $this->getJson('/api/planning/attention-status')->assertOk()->assertJsonPath('data.attention_count', 1);
         app(StudyAvailabilityService::class)->update($owner, $window, ['starts_at' => '09:00:00']);
         Queue::assertPushed(AnalyzeOwnerPlan::class, 2);

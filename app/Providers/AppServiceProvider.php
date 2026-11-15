@@ -38,9 +38,6 @@ use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
         $this->app->singleton(RecoveryCheckTriggerService::class);
@@ -52,12 +49,10 @@ class AppServiceProvider extends ServiceProvider
         });
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
         StudySession::observe(StudySessionReminderObserver::class);
+
         foreach ([StudyAvailabilityWindow::class, PlanningPreference::class,
             SemesterSchedule::class, WeeklyLessonRule::class,
             ScheduleDateException::class, ScheduleDateExceptionLesson::class,
@@ -66,10 +61,12 @@ class AppServiceProvider extends ServiceProvider
             StudySession::class, User::class] as $source) {
             $source::observe(PlanningSourceObserver::class);
         }
+
         ResetPassword::createUrlUsing(fn ($user, $token) => app(PasswordManagementService::class)->resetUrl($user, $token));
         VerifyEmail::createUrlUsing(fn ($user) => app(EmailVerificationService::class)->verificationUrl($user));
         VerifyEmail::toMailUsing(fn ($user, $url) => (new MailMessage)->subject('Підтвердження email-адреси')
             ->view(['html' => 'mail.verify-email', 'text' => 'mail.verify-email-text'], ['verificationUrl' => $url]));
+
         $verificationThrottle = fn ($request, $headers) => response()->json([
             'message' => 'Забагато спроб. Спробуйте ще раз пізніше.',
         ], 429, $headers);
@@ -79,6 +76,7 @@ class AppServiceProvider extends ServiceProvider
         ]);
         RateLimiter::for('email-verification-confirm', fn (Request $request) => Limit::perMinute(6)
             ->by('email:confirm:'.$request->user()->id)->response($verificationThrottle));
+
         RateLimiter::for('auth-login', function (Request $request): array {
             $email = $request->input('email');
             $identity = hash('sha256', is_string($email) ? mb_strtolower(trim($email)) : '');
@@ -92,7 +90,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('password-forgot', fn (Request $request) => Limit::perMinute(5)->by('forgot:'.$request->ip()));
         RateLimiter::for('password-reset', fn (Request $request) => Limit::perMinute(10)->by('reset:'.$request->ip()));
         RateLimiter::for('password-change', fn (Request $request) => Limit::perMinute(5)->by('change:'.$request->user()->id));
+
         Gate::policy(DatabaseNotification::class, DatabaseNotificationPolicy::class);
+
         RateLimiter::for('ai-messages', fn (Request $request) => Limit::perMinute(app(AgentLimits::class)->get('requests_per_minute'))
             ->by((string) $request->user()->id));
     }

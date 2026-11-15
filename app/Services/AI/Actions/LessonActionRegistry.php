@@ -4,7 +4,6 @@ namespace App\Services\AI\Actions;
 
 use App\Enums\LessonType;
 
-/** Proposal-only allowlist. No model-selected method names or execution capability. */
 class LessonActionRegistry
 {
     public const NAMES = ['propose_lesson_create', 'propose_lesson_update', 'propose_lesson_cancel', 'propose_lesson_replacement'];
@@ -28,7 +27,6 @@ class LessonActionRegistry
             $this->definition(self::NAMES[3], 'Retired historical Lesson replacement schema, retained for stored actions and receipts only. New replacement proposals are unavailable and this tool is not advertised to the provider.', [...$target, ...$fields], ['lesson_id', ...$required]),
         ];
 
-        // Retain dispatch for existing pending actions/history, but do not offer new replacements.
         return $includeRetired ? $definitions : array_slice($definitions, 0, 3);
     }
 

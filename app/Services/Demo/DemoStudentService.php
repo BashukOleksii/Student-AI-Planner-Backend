@@ -29,7 +29,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use LogicException;
 
-/** Synthetic bootstrap only. Existing Services/rules remain authoritative; no LLM, bulk dispatcher or cleanup. */
 class DemoStudentService
 {
     public function __construct(private DemoDatabaseGuard $guard) {}
@@ -63,7 +62,7 @@ class DemoStudentService
             if ($source === null) {
                 throw new LogicException('Demo availability did not produce a study plan.');
             }
-            // A real academic edit after planning: retain the source session until explicit recovery confirmation.
+
             app(LessonService::class)->create($owner, ['subject_id' => $subjects[7]->id, 'teacher_id' => $subjects[7]->teachers()->sole()->id,
                 'type' => 'consultation', 'room' => 'Консультація після зміни розкладу',
                 'starts_at' => $source->starts_at->utc()->format('Y-m-d\TH:i:s\Z'),
@@ -208,7 +207,7 @@ class DemoStudentService
                 ['start' => $from->getTimestamp(), 'end' => $from->addMinutes(45)->getTimestamp()], $from->addMinutes(50),
                 $action === 'complete' ? [40, 50, 35][$daysAgo % 3] : null));
         }
-        // Explicit synthetic one-to-one rescheduling history, using the same pure lifecycle rules and chain validator.
+
         $from = $today->subDays(5)->setHour(17);
         $old = $this->session($owner, $tasks[11], $from);
         $old->update(app(StudySessionLifecycleRules::class)->transition('reschedule', $old->status,

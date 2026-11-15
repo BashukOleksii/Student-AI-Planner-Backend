@@ -5,7 +5,6 @@ namespace App\Services\Planning;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
-/** On-demand advice from the authoritative greedy result, never a persistence preview. */
 class WorkloadAdviceService
 {
     private const ALLOCATION_CODES = [
@@ -48,7 +47,6 @@ class WorkloadAdviceService
                 }
             }
             if ($excluded !== []) {
-                // Excluded work can have an unknown estimate; never invent a duration.
                 $alerts[] = $this->alert('excluded_work', 'selection', null, count($excluded));
             }
             foreach (['daily_study_limit_exceeded', 'weekly_study_limit_exceeded'] as $code) {
@@ -72,7 +70,6 @@ class WorkloadAdviceService
         foreach ($this->context->dateIntervals($startDate, $endDate, $owner->timezone) as $range) {
             foreach ($this->workload->existingViolations($range, $context['workload_sessions'], $owner->timezone,
                 $context['preferences']['max_daily_study_minutes'], $context['preferences']['max_weekly_study_minutes']) as $item) {
-                // Repeated local dates or disjoint date membership must not duplicate a period.
                 $result[$item['code'].':'.$item['period']] = $item;
             }
         }

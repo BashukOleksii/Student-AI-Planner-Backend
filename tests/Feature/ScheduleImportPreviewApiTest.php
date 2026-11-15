@@ -230,7 +230,7 @@ class ScheduleImportPreviewApiTest extends TestCase
     {
         [$user, $period] = $this->context();
         $user->update(['timezone' => 'Pacific/Apia']);
-        // This Friday never existed locally when Apia moved across the date line.
+
         $period->update(['starts_on' => '2011-12-30', 'ends_on' => '2011-12-30']);
         $response = $this->upload($user, $period);
         $this->assertFailedAttempt($response);

@@ -11,19 +11,17 @@ use Illuminate\Support\Str;
 use Tests\Concerns\InteractsWithSpaBrowser;
 use Tests\TestCase;
 
-/** Deliberately outside both default PHPUnit directories. Explicit paid opt-in only. */
 class OpenAiLiveSmokeTest extends TestCase
 {
     use InteractsWithSpaBrowser;
 
     public function createApplication()
     {
-        // Check before Laravel bootstrap, database connection, fixtures or provider work.
         if (getenv('AI_LIVE_SMOKE') !== '1' || getenv('AI_LIVE_ALLOW_PAID') !== '1') {
             throw new \RuntimeException('Live smoke NOT RUN: AI_LIVE_SMOKE=1 and AI_LIVE_ALLOW_PAID=1 are required.');
         }
 
-        return parent::createApplication(); // Existing MySQL/testing/database-name safety guard.
+        return parent::createApplication();
     }
 
     public function test_bounded_disposable_live_observations_never_confirm_business_changes(): void
@@ -66,7 +64,7 @@ class OpenAiLiveSmokeTest extends TestCase
                 $unchanged = DB::table('tasks')->where('user_id', $id)->count() === 2
                     && DB::table('study_sessions')->where('user_id', $id)->count() === 0
                     && DB::table('reminders')->where('user_id', $id)->count() === 0;
-                // No raw prompts, answers, IDs, tokens, credentials or continuation in operator output.
+
                 fwrite(STDOUT, json_encode(['scenario' => $scenario, 'http_status' => $response->status(),
                     'tools' => array_column($data['tools'] ?? [], 'name'), 'pending_proposal' => isset($data['action']),
                     'business_unchanged' => $unchanged, 'provider_requests_total' => $requests], JSON_THROW_ON_ERROR)."\n");
@@ -80,7 +78,6 @@ class OpenAiLiveSmokeTest extends TestCase
                 $this->assertStringNotContainsString('preview_token', $response->getContent());
             }
         } finally {
-            // Delete only this newly registered disposable student, never truncate a database.
             User::whereKey($id)->delete();
             DB::table('sessions')->where('user_id', $id)->delete();
         }

@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Model;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-// Plain PHPUnit with in-memory period attributes; no Laravel boot or database.
 class ScheduleOccurrenceMaterializerTest extends TestCase
 {
     public function test_real_workbook_materializes_thirty_occurrences_with_correct_parity_and_provenance(): void
@@ -130,7 +129,6 @@ class ScheduleOccurrenceMaterializerTest extends TestCase
 
     public function test_parity_alternates_across_a_fifty_three_week_year(): void
     {
-        // ISO weeks 53, 1, 2, 3: their numeric odd/even values cannot define parity.
         $occurrences = $this->materialize([
             $this->rule(parity: 'numerator'), $this->rule(parity: 'denominator'),
         ], '2020-12-28', '2021-01-18')['occurrences'];
@@ -159,7 +157,6 @@ class ScheduleOccurrenceMaterializerTest extends TestCase
     {
         $originalTimezone = date_default_timezone_get();
         try {
-            // This DATE was skipped in Apia; casting it in the server timezone would alter it.
             date_default_timezone_set('Pacific/Apia');
             $result = $this->materialize([$this->rule(weekday: 5)], '2011-12-30', '2011-12-30', 'Europe/Kyiv');
             date_default_timezone_set('America/Los_Angeles');

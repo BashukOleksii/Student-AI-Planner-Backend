@@ -42,7 +42,7 @@ class ReminderEmailIntentService
                         || config('queue.connections.reminder-email.after_commit') !== false) {
                         throw new LogicException('Email intent handoff requires the domain MySQL queue.');
                     }
-                    // Check actual engines, not just configuration: both writes must roll back together.
+
                     $tables = array_map(fn ($table) => DB::connection()->getTablePrefix().$table, ['jobs', 'reminder_email_intents']);
                     $engines = DB::table('information_schema.TABLES')->where('TABLE_SCHEMA', DB::connection()->getDatabaseName())
                         ->whereIn('TABLE_NAME', $tables)->pluck('ENGINE');
@@ -63,7 +63,6 @@ class ReminderEmailIntentService
                 });
                 $counts[$result]++;
             } catch (Throwable) {
-                // The job INSERT and queued marker have rolled back. Do not expose SQL/payloads.
                 $counts['failed']++;
                 try {
                     DB::transaction(function () use ($id): void {

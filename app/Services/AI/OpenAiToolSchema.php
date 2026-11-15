@@ -2,7 +2,6 @@
 
 namespace App\Services\AI;
 
-/** Provider-only adaptation; the original H1 definitions and validator remain unchanged. */
 class OpenAiToolSchema
 {
     public function definitions(array $definitions): array

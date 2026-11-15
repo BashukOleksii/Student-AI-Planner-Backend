@@ -1,6 +1,5 @@
 <?php
 
-// Independent guarded test worker. Never contacts a real provider.
 use App\Models\User;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Http\Kernel as HttpKernel;

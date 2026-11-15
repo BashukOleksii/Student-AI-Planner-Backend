@@ -73,7 +73,6 @@ class StudySessionLifecycleTest extends TestCase
         $this->travelTo(CarbonImmutable::parse('2026-10-19T10:30:00.987654Z'));
         $snapshot = $this->snapshot(['study_sessions', 'recovery_scan_states', 'jobs']);
         if ($actual === null) {
-            // Historical completed data retains null and scheduled-second credit; no new completion writer is used.
             $source->update(['status' => StudySessionStatus::Completed, 'completed_at' => '2026-10-19 10:30:00', 'actual_minutes' => null]);
         }
         $response = $actual === null ? $this->getJson('/api/study-sessions/'.$source->id)
@@ -336,7 +335,7 @@ class StudySessionLifecycleTest extends TestCase
         Lesson::factory()->for($user)->create(['starts_at' => '2026-10-19 10:00:00', 'ends_at' => '2026-10-19 10:45:00']);
         StudySession::factory()->for($task)->create(['starts_at' => '2026-10-18 22:00:00', 'ends_at' => '2026-10-18 23:00:00',
             'status' => StudySessionStatus::Completed, 'completed_at' => '2026-10-18 23:00:00', 'actual_minutes' => 1]);
-        // Completed scheduled hour is on the same local Monday: daily limit must reject despite one actual minute.
+
         $this->postJson($this->url($source, 'reschedule'), $this->replacement())->assertConflict();
         $user->planningPreference()->update(['max_daily_study_minutes' => 120]);
         $this->postJson($this->url($source, 'reschedule'), $this->replacement())->assertCreated();

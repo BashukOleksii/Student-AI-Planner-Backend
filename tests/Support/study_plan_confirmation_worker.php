@@ -1,6 +1,5 @@
 <?php
 
-// Separate process/PDO connection for real MySQL contention; no migrations or config secrets in output.
 use App\Exceptions\StudyPlanConflictException;
 use App\Models\User;
 use App\Services\Planning\StudyPlanPersistenceService;

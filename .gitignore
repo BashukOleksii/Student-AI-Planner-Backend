@@ -28,5 +28,4 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 
-# Offline deployment safety tests
 __pycache__/

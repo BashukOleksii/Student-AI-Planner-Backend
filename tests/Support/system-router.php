@@ -6,7 +6,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\Support\SystemTestProvider;
 
-// This entry is never registered in production/bootstrap or public/. Fail before Laravel boot.
 if (PHP_SAPI !== 'cli-server' || getenv('PLANNER_SYSTEM_TEST') !== '1' || ! is_file(getenv('PLANNER_SYSTEM_RUN').'/isolation.json')) {
     http_response_code(503);
     exit;

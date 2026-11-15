@@ -15,7 +15,6 @@ use Illuminate\Support\Facades\DB;
 use LogicException;
 use Throwable;
 
-/** Invoked only inside the caller's owner/work transaction; never opens a transaction. */
 class ReminderSynchronizationService
 {
     public function __construct(
@@ -35,7 +34,6 @@ class ReminderSynchronizationService
                 ->orderBy('id')->lockForUpdate()->get();
             $batch = [];
             foreach ($reminders as $reminder) {
-                // Include absolute/foreign dependencies in preflight, but only relative rows change.
                 $context = $this->preflight($owner, $reminder);
                 if ($reminder->anchor !== null) {
                     $changes = $this->targets->eligible($context)
@@ -47,7 +45,7 @@ class ReminderSynchronizationService
             foreach ($batch as [$reminder, $changes]) {
                 $this->save($reminder, $changes);
             }
-            // A slow batch/event may advance time. Retain the prior committed trigger on cancellation.
+
             foreach ($batch as [$reminder, , $context, $originalTrigger]) {
                 if ($reminder->status === ReminderStatus::Scheduled) {
                     $changes = $this->rules->reconcile($reminder->status, $this->targets->anchor($context), $reminder->offset_minutes, CarbonImmutable::now('UTC'));
@@ -68,7 +66,7 @@ class ReminderSynchronizationService
             $children = $child === null ? $task->subtasks()->withTrashed()->orderBy('id')->lockForUpdate()->get()->keyBy('id')
                 : collect([$child->id => $child]);
             $childIds = $children->keys()->all();
-            // Discover every owner and both attribution directions, but only sessions with live reminders.
+
             $query = StudySession::where(function ($query) use ($task, $childIds, $child): void {
                 $query->whereIn('subtask_id', $childIds);
                 if ($child === null) {
@@ -93,7 +91,7 @@ class ReminderSynchronizationService
             foreach ($reminders as $reminder) {
                 $this->preflight($owner, $reminder);
             }
-            // Parent completion invalidates every selected target; child completion selects only that unit.
+
             $this->dependencies->cancel($reminders);
         });
     }
@@ -104,7 +102,6 @@ class ReminderSynchronizationService
             throw new ReminderIntegrityException;
         }
 
-        // Work/session locks are already held; do not acquire earlier locks after Reminder locks.
         return $this->targets->resolve($owner, $reminder->getAttributes(), false, false);
     }
 

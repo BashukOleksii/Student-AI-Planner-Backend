@@ -33,7 +33,6 @@ class AvailabilityActionArgumentValidator
             throw new InvalidArgumentException;
         }
 
-        // Canonical immutable field order, preserving omission exactly.
         return array_replace(array_intersect_key($schema['properties'], $arguments), $arguments);
     }
 }

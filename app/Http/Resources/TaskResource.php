@@ -30,7 +30,6 @@ class TaskResource extends JsonResource
     {
         $value = $this->resource->getRawOriginal($field);
 
-        // DATETIME stores UTC wall-clock values, independent of server/user timezone.
         return $value === null ? null : CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $value, 'UTC')
             ->format('Y-m-d\TH:i:s\Z');
     }

@@ -53,7 +53,7 @@ class TaskService
             'task_id' => $task->getKey(),
             'total_subtasks' => $total,
             'completed_subtasks' => $completed,
-            // Positive integer arithmetic implements nearest-integer, half-up rounding.
+
             'progress_percent' => $total === 0 ? null : intdiv($completed * 100 + intdiv($total, 2), $total),
         ];
     }
@@ -186,7 +186,6 @@ class TaskService
         });
     }
 
-    /** Read-only complete-candidate validation, also used by the authoritative writers. */
     public function prepare(User $user, array $values, ?Task $task = null, bool $lock = false): array
     {
         $candidate = $task === null

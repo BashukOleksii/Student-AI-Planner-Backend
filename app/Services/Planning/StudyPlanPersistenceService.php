@@ -22,7 +22,6 @@ class StudyPlanPersistenceService
         private PlanningConstraintService $constraints,
     ) {}
 
-    /** Capture once per new review; confirmation reuses the cutoff protected by its token. */
     public function previewNotBeforeUtc(): int
     {
         return CarbonImmutable::now('UTC')->addMinutes(5)->ceilSecond()->getTimestamp();
@@ -42,7 +41,6 @@ class StudyPlanPersistenceService
             'expires_at' => CarbonImmutable::createFromTimestampUTC($issued + StudyPlanConfirmationService::TOKEN_LIFETIME_SECONDS)->format('Y-m-d\TH:i:s\Z')];
     }
 
-    /** Owns a fresh outermost transaction; never inherits an earlier consistent-read snapshot. */
     public function confirm(User $user, string $previewToken, mixed $acceptPartial = false): array
     {
         if (! is_bool($acceptPartial)) {
@@ -56,7 +54,6 @@ class StudyPlanPersistenceService
         return DB::transaction(fn () => $this->confirmWithinTransaction($user, $previewToken, $acceptPartial));
     }
 
-    /** Trusted caller owns atomic commit and must lock owner before any consistent read. */
     public function confirmWithinTransaction(User $user, string $previewToken, mixed $acceptPartial = false): array
     {
         if (DB::transactionLevel() === 0) {
@@ -66,17 +63,15 @@ class StudyPlanPersistenceService
             throw ValidationException::withMessages(['accept_partial' => ['Згода на частковий результат має бути true або false.']]);
         }
         $review = $this->decode($previewToken, $user);
-        // First database read in this transaction is a current locking read.
-        // Cooperating mutations hold this same owner lock before touching planning data.
+
         $owner = User::whereKey($user->getKey())->lockForUpdate()->firstOrFail(['id', 'timezone']);
-        $this->decode($previewToken, $owner); // A lock wait can outlive the token.
+        $this->decode($previewToken, $owner);
         $parameters = $review['parameters'];
         try {
             $current = isset($parameters['not_before_utc'])
                 ? $this->planner->plan($owner, $parameters['start_date'], $parameters['end_date'], $parameters['task_id'], $parameters['subtask_id'], $parameters['not_before_utc'])
                 : $this->planner->plan($owner, $parameters['start_date'], $parameters['end_date'], $parameters['task_id'], $parameters['subtask_id']);
         } catch (ModelNotFoundException) {
-            // Targets were owned at issue time; disappearing/reparented targets make this review stale.
             throw new StudyPlanConflictException;
         }
         if (! $this->confirmation->matches($review['plan'], $current)) {
@@ -96,7 +91,7 @@ class StudyPlanPersistenceService
             }
             $created->push($session);
         }
-        // Time can advance during a large batch or model event: fail and roll back all inserts.
+
         $this->decode($previewToken, $owner);
         if (! $this->confirmation->startsAreFuture($current['sessions'], CarbonImmutable::now('UTC'))) {
             throw new StudyPlanConflictException;

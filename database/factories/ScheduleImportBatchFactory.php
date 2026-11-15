@@ -14,7 +14,7 @@ class ScheduleImportBatchFactory extends Factory
     {
         return [
             'academic_period_id' => AcademicPeriod::factory(),
-            // Reuse the period's owner, including when an existing period is supplied.
+
             'user_id' => fn (array $attributes) => AcademicPeriod::findOrFail($attributes['academic_period_id'])->user_id,
             'status' => ScheduleImportBatchStatus::Uploaded,
             'original_filename' => 'test-schedule.xlsx',

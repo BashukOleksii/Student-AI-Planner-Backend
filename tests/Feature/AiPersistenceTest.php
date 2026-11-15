@@ -91,7 +91,6 @@ class AiPersistenceTest extends TestCase
 
     public function test_nullable_content_json_and_tool_call_metadata_round_trip(): void
     {
-        // Representative JSON only; this fixture does not define the future AI tool protocol.
         $calls = [['test_name' => 'Example', 'metadata' => ['text' => 'Українська', 'flags' => [true, false], 'optional' => null]]];
         $message = AiMessage::factory()->create(['content' => null, 'tool_calls' => $calls, 'tool_call_id' => 'test-call'])->refresh();
         $this->assertNull($message->content);
@@ -115,7 +114,7 @@ class AiPersistenceTest extends TestCase
         $this->assertNull($message->getUpdatedAtColumn());
         $this->assertArrayNotHasKey('updated_at', $message->getAttributes());
         $this->travel(1)->hour();
-        // Append-oriented is a usage convention; Eloquent updates remain compatible with this schema.
+
         $message->content = 'Changed test content';
         $this->assertTrue($message->save());
         $this->assertSame('Changed test content', $message->refresh()->content);

@@ -13,7 +13,6 @@ class StoreScheduleImportRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        // Multipart form fields arrive as strings; accept only canonical integer text.
         $value = $this->input('academic_period_id');
         if (is_string($value) && preg_match('/^[1-9][0-9]*$/D', $value) === 1) {
             $integer = filter_var($value, FILTER_VALIDATE_INT);

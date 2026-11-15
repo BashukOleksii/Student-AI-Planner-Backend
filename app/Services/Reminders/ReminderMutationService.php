@@ -13,7 +13,6 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use LogicException;
 
-/** Internal shared writer: caller owns the outermost transaction and acquires owner before any snapshot. */
 class ReminderMutationService
 {
     public function __construct(private ReminderRules $rules, private ReminderTargetService $targets) {}
@@ -63,7 +62,6 @@ class ReminderMutationService
         });
     }
 
-    /** Read-only creation preparation, shared with the writer. No record is saved or identity allocated. */
     public function prepareCreate(User $owner, array $data, bool $lock = false): array
     {
         $this->validate($data, true);
@@ -74,7 +72,6 @@ class ReminderMutationService
         return compact('context', 'trigger');
     }
 
-    /** Context is structurally validated through ReminderTargetService before this read-only candidate check. */
     public function prepareUpdate(Reminder $reminder, array $data, ?array $context): string
     {
         $this->rules->editable($reminder->status);
@@ -100,7 +97,6 @@ class ReminderMutationService
     private function mutate(User $user, string $id, Closure $action): Reminder
     {
         return $this->transaction($user, function (User $owner) use ($id, $action): Reminder {
-            // Read only after the owner wait. Work must be locked before the Reminder.
             $source = $owner->reminders()->whereKey($id)->firstOrFail();
             Gate::forUser($owner)->authorize('update', $source);
             $context = $source->status === ReminderStatus::Scheduled ? $this->integrity($owner, $source, true) : null;
@@ -124,7 +120,7 @@ class ReminderMutationService
     private function integrity(User $owner, Reminder $reminder, bool $lock = false): ?array
     {
         if ($reminder->status !== ReminderStatus::Scheduled) {
-            return null; // Historical targets are preserved without repair or eligibility checks.
+            return null;
         }
 
         return $this->targets->forReminder($owner, $reminder, $lock);

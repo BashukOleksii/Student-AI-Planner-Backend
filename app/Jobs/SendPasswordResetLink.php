@@ -9,7 +9,6 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-/** Queue the same encrypted work for every address; look up accounts only in the worker. */
 class SendPasswordResetLink implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
@@ -25,11 +24,9 @@ class SendPasswordResetLink implements ShouldBeEncrypted, ShouldQueue
         try {
             $service->sendResetLink($this->email);
         } catch (Throwable) {
-            // SMTP/SQL exceptions can contain credentials, addresses and tokens. Never report them.
             try {
                 Log::warning('password.delivery_failed');
             } catch (Throwable) {
-                // Delivery diagnostics must not expose the original exception through the worker.
             }
         }
     }

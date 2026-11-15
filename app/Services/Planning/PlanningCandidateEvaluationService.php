@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use InvalidArgumentException;
 use UnexpectedValueException;
 
-/** Read-only assembly of trusted persisted inputs for C8 candidate diagnostics. */
 class PlanningCandidateEvaluationService
 {
     public function __construct(
@@ -19,12 +18,12 @@ class PlanningCandidateEvaluationService
     ) {}
 
     /**
-     * @param  array{start: int, end: int}  $candidate  Whole-second half-open UTC interval.
-     * @return list<string> Unchanged ordered C8 violation codes.
+     * @param  array{start: int, end: int}  $candidate
+     * @return list<string>
      *
-     * @throws InvalidArgumentException For malformed arguments/configuration/timestamps or unsafe query bounds.
-     * @throws ModelNotFoundException For missing, foreign or deleted work targets.
-     * @throws UnexpectedValueException For incompatible selected session work references (without identifying details).
+     * @throws InvalidArgumentException
+     * @throws ModelNotFoundException
+     * @throws UnexpectedValueException
      */
     public function evaluate(User $user, array $candidate, mixed $taskId = null, mixed $subtaskId = null): array
     {
@@ -39,7 +38,7 @@ class PlanningCandidateEvaluationService
         if ($subtaskId !== null && $taskId === null) {
             throw new InvalidArgumentException('A subtask requires its parent task identifier.');
         }
-        // Reload the trusted identity's persisted timezone; ignore cached attributes/relationships.
+
         $user = $user->newQuery()->whereKey($user->getKey())->firstOrFail(['id', 'timezone']);
         [$startDate, $endDate] = $this->candidateDates($candidate, $user->timezone);
         $deadline = $this->deadline($user, $taskId, $subtaskId);
@@ -60,7 +59,7 @@ class PlanningCandidateEvaluationService
         }
         $zone = new DateTimeZone($timezone);
         $points = [$candidate['start'], $candidate['end'] - 1];
-        // Include labels on both sides of offset changes, even historical date-line reversals.
+
         foreach ($zone->getTransitions($candidate['start'], $candidate['end']) ?: [] as $transition) {
             $points[] = $transition['ts'];
             if ($transition['ts'] > $candidate['start']) {

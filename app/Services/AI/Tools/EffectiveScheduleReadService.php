@@ -10,7 +10,6 @@ use App\Services\Schedule\EffectiveScheduleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
-/** Read-only presentation adapter over planning's authoritative calendar selection. */
 class EffectiveScheduleReadService
 {
     public const LIMIT = 100;

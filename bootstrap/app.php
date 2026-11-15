@@ -35,7 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
         );
         $middleware->statefulApi();
         $middleware->api(prepend: [ObserveAiRequest::class]);
-        // Validate exact UTC wire formats instead of silently trimming timestamps.
+
         $middleware->trimStrings(except: [
             fn (Request $request) => $request->is('api/ai/*'),
             fn (Request $request) => $request->is('api/statistics/progress', 'api/statistics/trends', 'api/statistics/reports/comparison'),
@@ -46,7 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->isMethod('GET') && $request->is('api/planning/free-slots', 'api/planning/workload-advice'),
             fn (Request $request) => $request->is('api/planning/study-plans/*', 'api/planning/replanning/*', 'api/planning/recovery/*', 'api/planning/recovery-suggestions', 'api/planning/recovery-suggestions/*', 'api/study-sessions', 'api/study-sessions/*'),
         ]);
-        // Subject color and Task deadlines distinguish null from an invalid empty string.
+
         $middleware->convertEmptyStringsToNull(except: [
             fn (Request $request) => $request->is('api/ai/*'),
             fn (Request $request) => $request->is('api/reminders', 'api/reminders/*', 'api/notifications', 'api/notifications/*'),
@@ -57,7 +57,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->dontFlash(['token']);
-        // Password/SMTP/SQL exceptions may contain secrets; only fixed diagnostics are allowed.
+
         $exceptions->report(function (Throwable $exception) {
             if (request()->is('api/profile/email/*')) {
                 try {
@@ -76,7 +76,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 return false;
             }
         });
-        // Never let default exception reporting persist AI prompts, SQL bindings or private payloads.
+
         $exceptions->report(function (Throwable $exception) {
             if (request()->is('api/ai/*')) {
                 $code = match ($exception instanceof AiAgentException ? $exception->status() : 500) {
@@ -86,7 +86,6 @@ return Application::configure(basePath: dirname(__DIR__))
                 try {
                     Log::warning('ai.failure', ['code' => $code]);
                 } catch (Throwable) {
-                    // A logging outage must not replace the original safe response.
                 }
 
                 return false;
@@ -188,7 +187,6 @@ return Application::configure(basePath: dirname(__DIR__))
                     return response()->json(['message' => $exception->getMessage(), 'code' => $exception->errorCode], $exception->status());
                 }
                 if ($exception instanceof ValidationException) {
-                    // Only AI HTTP presentation is localized; field keys, validators and manual REST stay unchanged.
                     $labels = [
                         'content' => 'Введіть змістовне повідомлення до 4000 символів.',
                         'idempotency_key' => 'Надішліть запит із чинним ключем повторення.',
@@ -281,11 +279,9 @@ return Application::configure(basePath: dirname(__DIR__))
                 return $exception->getStatusCode() === 404 ? response()->json(['message' => 'Не знайдено.'], 404) : null;
             }
 
-            // Source corruption, SQL failures and internal bugs never expose details, even with APP_DEBUG.
             return response()->json(['message' => 'Не вдалося опрацювати навчальний план.'], 500);
         });
-        // Remaining API routes get localized framework errors and a safe unexpected-error body,
-        // including with APP_DEBUG=true. Earlier domain renderers keep their codes and shapes.
+
         $exceptions->render(function (Throwable $exception, Request $request) {
             if (! $request->is('api/*', 'sanctum/*') && ! $request->expectsJson()) {
                 return null;
@@ -314,7 +310,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 503 => 'Сервіс тимчасово недоступний. Спробуйте пізніше.',
                 default => 'Не вдалося виконати запит. Спробуйте пізніше.',
             };
-            // These are reviewed, fixed domain diagnostics; arbitrary HTTP exception text is never echoed.
+
             if (in_array($exception->getMessage(), [
                 'Для цієї дати вже є виняток. Відредагуйте або видаліть його окремо.',
                 'Семестровий розклад змінився.',

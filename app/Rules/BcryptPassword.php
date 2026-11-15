@@ -6,7 +6,6 @@ use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Facades\Hash;
 
-/** Reject values bcrypt would truncate or cannot hash, including multibyte passwords. */
 class BcryptPassword implements ValidationRule
 {
     public function validate(string $attribute, mixed $value, Closure $fail): void

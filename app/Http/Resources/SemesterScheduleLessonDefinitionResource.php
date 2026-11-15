@@ -21,7 +21,7 @@ class SemesterScheduleLessonDefinitionResource extends JsonResource
             'starts_at_local' => $this->starts_at_local, 'ends_at_local' => $this->ends_at_local,
             'subject' => $this->subject->only(['id', 'name', 'code', 'color']),
             'teacher_id' => $this->teacher_id, 'teacher' => $this->teacher?->only(['id', 'name']),
-            // Historical multi-teacher graphs are rejected before reaching this Resource.
+
             'teacher_ids' => $this->teacher_id === null ? [] : [$this->teacher_id],
             'teachers' => $this->teacher === null ? [] : [$this->teacher->only(['id', 'name'])],
             'room' => $this->room,

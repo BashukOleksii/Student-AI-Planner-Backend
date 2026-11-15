@@ -2,7 +2,6 @@
 
 namespace App\Services\AI\Actions;
 
-/** Fixed planning and study-session lifecycle proposal adapters. */
 class PlanningActionRegistry
 {
     public const NAMES = ['propose_study_plan_create', 'propose_adaptive_replanning', 'propose_session_reschedule',

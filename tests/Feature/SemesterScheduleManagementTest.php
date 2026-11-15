@@ -409,8 +409,7 @@ class SemesterScheduleManagementTest extends TestCase
         ]])->assertOk();
         $this->getJson($this->url('/date/2026-03-29'))->assertOk()
             ->assertJsonPath('data.0.starts_at', '2026-03-29T02:30:00+02:00')->assertJsonPath('data.0.ends_at', '2026-03-29T04:30:00+03:00');
-        // A profile change can invalidate a saved snapshot; management definitions
-        // remain readable with a token, and only a valid full repair may commit.
+
         $this->owner->update(['timezone' => 'UTC']);
         $this->mutate('PUT', '/date-exceptions/2026-03-29', ['mode' => 'replace', 'lessons' => [
             $this->lesson(['starts_at_local' => '03:30:00', 'ends_at_local' => '05:00:00']),
@@ -481,8 +480,7 @@ class SemesterScheduleManagementTest extends TestCase
         $this->period->update(['starts_on' => '2011-01-01', 'ends_on' => '2011-12-31']);
         $this->owner->update(['timezone' => 'Pacific/Apia']);
         $this->mutate('PATCH', '', ['parity_anchor_on' => '2011-01-03'])->assertOk();
-        // Friday 2011-12-30 was skipped. This parity avoids that date until
-        // changing the anchor parity, months beyond the representative cycles.
+
         $id = $this->rule(['weekday' => 5, 'week_pattern' => 'numerator']);
         $before = $this->state()->json();
         $this->mutate('PATCH', '', ['first_week_parity' => 'denominator'])->assertUnprocessable();

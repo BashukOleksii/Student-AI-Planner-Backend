@@ -1,6 +1,5 @@
 <?php
 
-// Guarded independent HTTP worker. Test-only provider, no upstream or migration calls.
 use App\Models\AiMessage;
 use App\Models\AiPendingAction;
 use App\Models\PlanningPreference;

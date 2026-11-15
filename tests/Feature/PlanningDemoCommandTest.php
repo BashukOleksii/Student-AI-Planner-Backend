@@ -20,7 +20,7 @@ class PlanningDemoCommandTest extends TestCase
 
     protected function setUp(): void
     {
-        parent::setUp(); // verifies disposable MySQL before switching the app environment
+        parent::setUp();
         $this->app['env'] = 'local';
         $this->travelTo(CarbonImmutable::parse('2026-11-13T06:00:00Z'));
         $this->beforeApplicationDestroyed(function (): void {

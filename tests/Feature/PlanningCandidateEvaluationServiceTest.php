@@ -92,7 +92,7 @@ class PlanningCandidateEvaluationServiceTest extends TestCase
             $this->studySession($user, '2026-10-05 08:00:00', '2026-10-05 09:00:00', $status);
         }
         $preference = PlanningPreference::factory()->for($user)->create(['max_daily_study_minutes' => 180, 'max_weekly_study_minutes' => 180]);
-        // Two eligible equal intervals + candidate = exactly 180 minutes. No accidental duplicate.
+
         $this->assertSame([], $this->evaluate($user));
         $preference->update(['max_daily_study_minutes' => 179, 'max_weekly_study_minutes' => 179]);
         $this->assertSame(['daily_study_limit_exceeded', 'weekly_study_limit_exceeded'], $this->evaluate($user));
@@ -405,7 +405,7 @@ class PlanningCandidateEvaluationServiceTest extends TestCase
         $task = Task::factory()->for($user)->create();
         $child = Subtask::factory()->for($task)->create();
         $mode = DB::selectOne('SELECT @@SESSION.sql_mode AS mode')->mode;
-        // MySQL can contain incomplete legacy dates when these strict checks were disabled.
+
         $relaxed = implode(',', array_diff(explode(',', $mode), ['NO_ZERO_IN_DATE', 'NO_ZERO_DATE']));
         try {
             DB::statement('SET SESSION sql_mode = ?', [$relaxed]);
@@ -565,7 +565,7 @@ class PlanningCandidateEvaluationServiceTest extends TestCase
         $child = Subtask::factory()->for($task)->create();
         $this->studySession($user, '2026-10-05 07:00:00', '2026-10-05 08:00:00', StudySessionStatus::Completed, ['task_id' => $task->id, 'subtask_id' => $child->id]);
         $small = $this->evaluationQueries($user);
-        // Different parents/children make a lazy per-record validation visibly grow.
+
         for ($i = 0; $i < 40; $i++) {
             $other = Task::factory()->for($user)->create();
             $otherChild = Subtask::factory()->for($other)->create();
@@ -579,10 +579,10 @@ class PlanningCandidateEvaluationServiceTest extends TestCase
         foreach ($large as $query) {
             if (! preg_match('/from `(lessons|schedule_import_batches|academic_periods)`/', $query['query'])) {
                 $this->assertStringNotContainsString('select *', $query['query']);
-            } // Calendar graph validation deliberately loads complete owned Lesson sources.
+            }
             if (str_contains($query['query'], 'from `study_sessions`') || str_contains($query['query'], 'from `lessons`')) {
                 if (str_contains($query['query'], '0 = 1')) {
-                    $this->assertStringContainsString('from `lessons`', $query['query']); // Empty owned replacement ID batch.
+                    $this->assertStringContainsString('from `lessons`', $query['query']);
                 } else {
                     $this->assertStringContainsString('`starts_at` < ?', $query['query']);
                     $this->assertStringContainsString('`ends_at` > ?', $query['query']);

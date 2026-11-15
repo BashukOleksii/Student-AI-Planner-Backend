@@ -2,7 +2,6 @@
 
 namespace Tests\Concerns;
 
-/** Compare sparse/dense source families rather than historical legacy-only query totals. */
 trait AssertsBatchedReads
 {
     private function assertSameReadShape(array $sparse, array $dense): void

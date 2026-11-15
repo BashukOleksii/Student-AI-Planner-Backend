@@ -5,7 +5,6 @@ namespace Tests\Support;
 use App\Services\AI\LlmProvider;
 use RuntimeException;
 
-/** Deterministic model boundary only; actual Tools, Services and persistence execute. */
 final class SystemTestProvider implements LlmProvider
 {
     public function respond(string $instructions, array $history, array $definitions): array

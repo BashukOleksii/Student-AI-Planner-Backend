@@ -74,7 +74,7 @@ class ReminderService
     private function integrity(User $owner, Reminder $reminder, bool $lock = false): ?array
     {
         if ($reminder->status !== ReminderStatus::Scheduled) {
-            return null; // Historical targets are preserved without repair or eligibility checks.
+            return null;
         }
 
         return $this->targets->forReminder($owner, $reminder, $lock);

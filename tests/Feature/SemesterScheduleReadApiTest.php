@@ -361,7 +361,7 @@ class SemesterScheduleReadApiTest extends TestCase
         $rule = $this->rule($schedule);
         $foreign = $field === 'subject_id' ? Subject::factory()->create(['name' => 'PRIVATE FOREIGN SUBJECT'])
             : Teacher::factory()->create(['name' => 'PRIVATE FOREIGN TEACHER']);
-        // Deliberately simulate corrupted persisted data only in the guarded test schema.
+
         DB::statement('SET FOREIGN_KEY_CHECKS = 0');
         try {
             DB::table('weekly_lesson_rules')->where('id', $rule->id)->update([$field => $foreign->id]);

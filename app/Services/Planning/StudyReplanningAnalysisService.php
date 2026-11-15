@@ -6,7 +6,6 @@ use DateTimeImmutable;
 use InvalidArgumentException;
 use LogicException;
 
-/** Pure classification and capped multi-session allocation; persistence belongs to the confirmation writer. */
 class StudyReplanningAnalysisService
 {
     public function __construct(
@@ -125,7 +124,7 @@ class StudyReplanningAnalysisService
         if ($cutoff === PHP_INT_MAX) {
             throw new InvalidArgumentException('Unrepresentable future planning clock.');
         }
-        $cutoff++; // Strictly future, also at exact clock equality.
+        $cutoff++;
         if ($notBeforeUtc !== null && (! is_int($notBeforeUtc) || $notBeforeUtc < 0 || $notBeforeUtc > 253402300799)) {
             throw new InvalidArgumentException('Invalid server allocation cutoff.');
         }
@@ -210,7 +209,7 @@ class StudyReplanningAnalysisService
             $row['untransferred_seconds'] = $duration - $seconds;
         }
         unset($row);
-        // Independently validate each proposal against every other proposed replacement once.
+
         foreach ($proposals as $index => $proposal) {
             $others = array_column(array_filter($proposals, fn ($key) => $key !== $index, ARRAY_FILTER_USE_KEY), 'interval');
             if ($this->constraints->evaluate($proposal['interval'], $base['free_intervals'], [...$base['break_anchors'], ...$others],

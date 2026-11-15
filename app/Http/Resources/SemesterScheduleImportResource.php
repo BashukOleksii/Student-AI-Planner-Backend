@@ -24,7 +24,6 @@ class SemesterScheduleImportResource extends JsonResource
         ];
     }
 
-    /** Prepared references have no database identity until commit. */
     private function publicPreview(array $value): array
     {
         foreach ($value as $key => &$item) {

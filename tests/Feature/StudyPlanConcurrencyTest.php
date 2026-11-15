@@ -79,8 +79,7 @@ class StudyPlanConcurrencyTest extends TestCase
         try {
             $worker = $this->worker($user, $preview['preview_token']);
             $this->assertWaitingOnOwner($this->readyConnection($worker));
-            // Actual application Services cooperate with the owner-first lock. A session insert
-            // follows the same protocol to model another reservation writer.
+
             match ($mutation) {
                 'task' => app(TaskService::class)->update($user, $task, ['estimated_minutes' => 90]),
                 'lesson' => app(LessonService::class)->update($user, $lesson,

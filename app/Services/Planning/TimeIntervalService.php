@@ -4,7 +4,6 @@ namespace App\Services\Planning;
 
 use InvalidArgumentException;
 
-/** Pure operations on half-open UTC intervals; endpoints are integer Unix seconds. */
 class TimeIntervalService
 {
     /**
@@ -59,7 +58,6 @@ class TimeIntervalService
                 }
                 $cursor = max($cursor, $blocker['end']);
                 if ($cursor >= $base['end']) {
-                    // Keep this blocker for the next base: it may span several bases.
                     break;
                 }
                 $index++;
@@ -80,7 +78,6 @@ class TimeIntervalService
      */
     public function clip(array $intervals, mixed $rangeStart, mixed $rangeEnd): array
     {
-        // Explicit checks prevent scalar coercion even when called from non-strict PHP code.
         $this->validateInterval(['start' => $rangeStart, 'end' => $rangeEnd]);
         $result = [];
         foreach ($this->merge($intervals) as $interval) {
@@ -106,7 +103,6 @@ class TimeIntervalService
         }
 
         return array_values(array_filter($this->merge($intervals), function (array $interval) use ($minimumSeconds): bool {
-            // Compare without overflowing the duration of extreme integer endpoints.
             return $interval['end'] >= PHP_INT_MIN + $minimumSeconds
                 && $interval['start'] <= $interval['end'] - $minimumSeconds;
         }));
@@ -115,7 +111,7 @@ class TimeIntervalService
     /**
      * @param  array{start: int, end: int}  $interval
      *
-     * @throws InvalidArgumentException If the interval is invalid or its duration cannot fit in a PHP integer.
+     * @throws InvalidArgumentException
      */
     public function durationSeconds(array $interval): int
     {

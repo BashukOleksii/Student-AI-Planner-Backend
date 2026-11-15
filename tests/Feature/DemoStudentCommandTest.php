@@ -31,7 +31,7 @@ class DemoStudentCommandTest extends TestCase
     {
         parent::setUp();
         $this->travelTo(CarbonImmutable::parse('2026-11-12T08:00:00Z'));
-        // The parent guard already verified a disposable testing DB before any migrations.
+
         $this->app['env'] = 'local';
         config(['demo.enabled' => true, 'demo.database' => DB::getDatabaseName(),
             'demo.server_uuid' => DB::selectOne('SELECT @@server_uuid AS id')->id,
@@ -60,7 +60,6 @@ class DemoStudentCommandTest extends TestCase
             }
         }
 
-        // Successful credentials stay only in memory. Never include this buffer in assertion messages/artifacts.
         return [$status, $tester->getDisplay()];
     }
 
@@ -87,7 +86,7 @@ class DemoStudentCommandTest extends TestCase
         $this->assertSame(1, $status);
         $this->assertFalse(str_contains($output, 'Password:'));
         $this->assertFalse(str_contains($output, 'DEMO STUDENT CREATED'));
-        // Query the still-verified connection directly when the default selector is deliberately invalid.
+
         $this->assertSame(0, DB::connection('mysql')->table('users')->count());
     }
 
@@ -129,7 +128,7 @@ class DemoStudentCommandTest extends TestCase
     public function test_successful_command_prints_credentials_once_only_after_valid_atomic_creation(): void
     {
         [$status, $output] = $this->command();
-        $this->assertSame(0, $status); // Do not print the output on a failed assertion.
+        $this->assertSame(0, $status);
         $this->assertSame(1, preg_match('/^Email: (\S+@example\.test)$/m', $output, $emails));
         $this->assertSame(1, preg_match('/^Password: ([a-zA-Z0-9]{32})$/m', $output, $passwords));
         $this->assertSame(1, substr_count($output, 'Password:'));
@@ -228,7 +227,6 @@ class DemoStudentCommandTest extends TestCase
     {
         $service = $this->partialMock(RecoverySuggestionService::class);
         $service->shouldReceive('detectWithinTransaction')->once()->andReturnUsing(function ($ownerId, $days = 7) {
-            // Delegate to the actual core before simulating a late failure.
             $real = app()->build(RecoverySuggestionService::class);
             $real->detectWithinTransaction($ownerId, $days);
             throw new \RuntimeException('private SQL and credential details');

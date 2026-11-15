@@ -6,7 +6,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Arr;
 
-/** Explicit academic-only presentation; no model attributes or self-study sessions escape. */
 class AcademicCalendarLessonResource extends JsonResource
 {
     public function toArray(Request $request): array

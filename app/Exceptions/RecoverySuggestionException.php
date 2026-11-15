@@ -4,7 +4,6 @@ namespace App\Exceptions;
 
 use RuntimeException;
 
-/** Fixed public diagnostics, never source contents, SQL or encrypted tokens. */
 class RecoverySuggestionException extends RuntimeException
 {
     public function __construct(public readonly string $errorCode)

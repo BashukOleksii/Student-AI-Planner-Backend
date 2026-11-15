@@ -12,7 +12,6 @@ use RuntimeException;
 
 class StudyAvailabilityService
 {
-    /** Read-only preflight. Never acquires row locks or calls a writer. */
     public function prepare(User $user, array $values, ?StudyAvailabilityWindow $window = null): array
     {
         if ($window !== null) {
@@ -40,7 +39,7 @@ class StudyAvailabilityService
     {
         return DB::transaction(function () use ($user, $window, $values): StudyAvailabilityWindow {
             $this->lockOwner($user);
-            // Re-read after locking so PATCH merges with the latest owned state.
+
             $window = $user->studyAvailabilityWindows()->lockForUpdate()->findOrFail($window->getKey());
             $candidate = $this->candidate($user, $values, $window, true);
             if (! $window->update($candidate)) {
@@ -63,7 +62,6 @@ class StudyAvailabilityService
 
     private function lockOwner(User $user): void
     {
-        // Even an empty collection needs a common lock to prevent concurrent overlaps.
         User::whereKey($user->getKey())->lockForUpdate()->firstOrFail();
     }
 

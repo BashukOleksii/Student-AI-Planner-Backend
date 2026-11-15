@@ -9,7 +9,6 @@ use Illuminate\Contracts\Encryption\Encrypter;
 use InvalidArgumentException;
 use JsonException;
 
-/** Protected E2 review and independent pure batch validation; no persistence or clock reads. */
 class StudyReplanningConfirmationService
 {
     public const TOKEN_LIFETIME_SECONDS = 900;
@@ -87,7 +86,6 @@ class StudyReplanningConfirmationService
         $this->affected($payload['review']);
     }
 
-    /** Legacy one-to-one aliases remain readable; new previews always supply the complete list. */
     public static function replacements(array $row): array
     {
         $items = $row['replacements'] ?? (($row['replacement'] ?? null) === null ? [] : [$row['replacement']]);
@@ -103,7 +101,6 @@ class StudyReplanningConfirmationService
         return $this->fields->matches($reviewed, $current);
     }
 
-    /** Validate the exact ordered release set and all replacements per source. */
     public function affected(array $review): array
     {
         if (! is_array($review['session_results'] ?? null) || ! array_is_list($review['session_results'])
@@ -175,7 +172,6 @@ class StudyReplanningConfirmationService
         return null;
     }
 
-    /** Context and effort are independently loaded after transactional retirement of ALL sources. */
     public function validateBatch(int $ownerId, array $review, array $workItems, array $context, DateTimeImmutable $now): void
     {
         $affected = $this->affected($review);

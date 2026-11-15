@@ -5,7 +5,6 @@ namespace App\Services\AI\Tools;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 
-/** Server-owned discovery contract. No caller-supplied registrations or dispatch targets. */
 class ToolRegistry
 {
     public function definitions(): array

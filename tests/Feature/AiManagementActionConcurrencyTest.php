@@ -379,7 +379,6 @@ class AiManagementActionConcurrencyTest extends TestCase
     #[DataProvider('creationDomains')]
     public function test_expiration_while_waiting_for_a_domain_lock_rolls_back_without_a_receipt(string $name, string $table, string $gateOn): void
     {
-        // Hold only the domain row: the confirmer acquires its owner lock before blocking here.
         $f = $this->fixture($name, relative: $name === 'propose_reminder_create');
         $count = DB::table($table)->count();
         $this->expireSoon($f);

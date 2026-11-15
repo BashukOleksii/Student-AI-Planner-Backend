@@ -2,7 +2,6 @@
 
 namespace App\Services\Planning;
 
-/** Presentation only: translates authoritative results without recalculating planning rules. */
 class PlanningExplanationPresenter
 {
     private const REASONS = [

@@ -28,7 +28,6 @@ class StudySessionLifecycleService
         return $this->mutation->run($user, $id, $this->action('complete', $actualMinutes, null, $completeWork, $completionToken));
     }
 
-    /** Read-only capability and consequence review; work identity comes exclusively from the session. */
     public function completionReview(User $user, string $id): array
     {
         return $this->mutation->read($user, $id, function ($owner, $source, $task, $child): array {
@@ -61,7 +60,6 @@ class StudySessionLifecycleService
         return $this->mutation->run($user, $id, $this->action($action, $actualMinutes));
     }
 
-    /** AI confirmation entry point; requires the existing owner-first transaction and lock order. */
     public function completeWithinTransaction(User $user, string $id, mixed $actualMinutes, Closure $beforeTransition): StudySession
     {
         $this->rules->actualMinutes($actualMinutes, true);

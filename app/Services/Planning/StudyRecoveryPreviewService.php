@@ -8,7 +8,6 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
-/** New remaining-work allocation with historical diagnostics, never source retirement. */
 class StudyRecoveryPreviewService
 {
     public function __construct(
@@ -20,7 +19,6 @@ class StudyRecoveryPreviewService
 
     public function preview(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null, mixed $notBeforeUtc = null, ?CarbonImmutable $asOfUtc = null): array
     {
-        // One nonlocking MySQL snapshot covers the authoritative proposal and its diagnostics.
         return DB::transaction(function () use ($user, $startDate, $endDate, $taskId, $subtaskId, $notBeforeUtc, $asOfUtc): array {
             $preview = $notBeforeUtc === null ? $this->plans->preview($user, $startDate, $endDate, $taskId, $subtaskId)
                 : $this->plans->preview($user, $startDate, $endDate, $taskId, $subtaskId, $notBeforeUtc);
@@ -31,7 +29,7 @@ class StudyRecoveryPreviewService
                 $units[$item['task_id'].':'.($item['subtask_id'] ?? 'task')] = $item['reason_codes'];
             }
             $taskIds = array_values(array_unique(array_column([...$plan['work_results'], ...$plan['excluded_items']], 'task_id')));
-            // History is for the selected work across all dates, not just the new allocation horizon.
+
             $sessions = $user->studySessions()->whereIn('task_id', $taskIds)
                 ->when($subtaskId !== null, fn ($query) => $query->where('subtask_id', $subtaskId))
                 ->where(fn ($query) => $query->where('status', StudySessionStatus::Missed)
@@ -52,7 +50,6 @@ class StudyRecoveryPreviewService
                             $this->lifecycle->assertAllowed($action, $session->status, $interval, $now);
                             $actions[] = $action;
                         } catch (StudySessionConflictException) {
-                            // In-progress plans cannot be marked missed until their end.
                         }
                     }
                 }

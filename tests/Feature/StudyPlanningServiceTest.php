@@ -636,7 +636,7 @@ class StudyPlanningServiceTest extends TestCase
             $this->assertStringNotContainsString('for update', $query['query']);
             if (! preg_match('/from `(lessons|schedule_import_batches|academic_periods)`/', $query['query'])) {
                 $this->assertStringNotContainsString('select *', $query['query']);
-            } // Calendar graph validation deliberately loads complete owned Lesson sources.
+            }
             if (str_contains($query['query'], 'from `lessons`') || str_contains($query['query'], 'from `study_sessions`') || str_contains($query['query'], 'from `tasks`')) {
                 $this->assertStringContainsString('`user_id` = ?', $query['query']);
                 $this->assertSame($user->id, $query['bindings'][0]);

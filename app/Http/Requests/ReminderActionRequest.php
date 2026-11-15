@@ -42,7 +42,7 @@ class ReminderActionRequest extends FormRequest
     {
         if ($this->isJson() && $this->getContent() !== '') {
             $body = json_decode($this->getContent());
-            // Accept the conventional empty action payload [] as well as {}.
+
             if (json_last_error() !== JSON_ERROR_NONE || (! $body instanceof \stdClass && $body !== [])) {
                 $validator->errors()->add('reminder', 'Потрібен JSON-об’єкт.');
             }

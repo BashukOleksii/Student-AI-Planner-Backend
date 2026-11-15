@@ -5,7 +5,6 @@ namespace App\Services\Planning;
 use InvalidArgumentException;
 use LogicException;
 
-/** Pure earliest-feasible greedy allocation against a projected, in-memory C9 context. */
 class StudySessionAllocationService
 {
     public function __construct(
@@ -15,9 +14,8 @@ class StudySessionAllocationService
     ) {}
 
     /**
-     * @param  list<array>  $workItems  Stage A eligible units in their authoritative order.
-     * @param  array  $context  PlanningContextService's range/timezone/preferences/free/anchor/workload arrays.
-     * @param  int  $notBeforeUtc  First whole second at or after Stage A's full-precision clock.
+     * @param  list<array>  $workItems
+     * @param  int  $notBeforeUtc
      * @return array{sessions: list<array>, work_results: list<array>, summary: array}
      */
     public function allocate(array $workItems, array $context, mixed $notBeforeUtc, bool $singlePlacement = false): array
@@ -47,14 +45,14 @@ class StudySessionAllocationService
         } elseif ($context['free_intervals'] !== []) {
             throw new InvalidArgumentException('An empty calendar range cannot contain free intervals.');
         }
-        // Reuse C8 to validate all configuration/source inputs even when there is no eligible work.
+
         $probeStart = $range['start'] ?? 0;
         $this->constraints->evaluate(['start' => $probeStart, 'end' => $probeStart + 1],
             $context['free_intervals'], $context['break_anchors'], $context['workload_sessions'],
             $context['timezone'], $context['preferences']);
+
         $preferences = $context['preferences'];
         $minimum = ($preferences['min_session_minutes'] ?? 0) * 60;
-        // One second is interval validity, not a product session-length default.
         $minimum = max(1, $minimum);
         $maximum = $preferences['max_session_minutes'] === null ? null : $preferences['max_session_minutes'] * 60;
         $totalRequested = 0;
@@ -86,7 +84,7 @@ class StudySessionAllocationService
             while ($remaining >= $minimum && ($candidate = $this->placement($remaining, $deadline, $state, $context, $minimum, $maximum)) !== null) {
                 $duration = $this->intervals->durationSeconds($candidate);
                 $tail = $remaining - $duration;
-                // Reduce only when a valid second minimum-sized session can actually be placed.
+
                 if (! $singlePlacement && $tail > 0 && $tail < $minimum && $remaining >= 2 * $minimum && $remaining - $minimum >= $minimum) {
                     $balanced = ['start' => $candidate['start'], 'end' => $candidate['start'] + $remaining - $minimum];
                     $preview = $this->project($state, $balanced);
@@ -146,7 +144,6 @@ class StudySessionAllocationService
         return null;
     }
 
-    /** UTC break padding yields search boundaries; C6/C8 remain the acceptance authority. */
     private function separatedFree(array $state, ?int $breakMinutes): array
     {
         $seconds = ($breakMinutes ?? 0) * 60;
@@ -161,10 +158,6 @@ class StudySessionAllocationService
         return $this->intervals->subtract($state['free'], $blocked);
     }
 
-    /**
-     * Sliding a minimum-length interval is affine between calendar boundaries and their minimum-shifted counterparts.
-     * Each period's contribution changes by -1, 0 or +1 per elapsed second. Solve those integer bounds directly.
-     */
     private function earliestStart(int $first, int $last, int $minimum, array $budget): ?int
     {
         $points = [$first, $last + 1];
@@ -266,12 +259,10 @@ class StudySessionAllocationService
         return $state;
     }
 
-    /** Reasons describe evidence encountered during this greedy search, not a global impossibility proof. */
     private function reasons(int $remaining, ?int $deadline, array $state, array $context, int $minimum, ?int $maximum): array
     {
         $observed = [];
         if ($remaining < $minimum) {
-            // No slot search was necessary: neither horizon nor workload caused this stop.
             return ['below_minimum_session_duration'];
         }
         $hasCapacity = false;
@@ -299,8 +290,7 @@ class StudySessionAllocationService
         if ($deadlineClipped) {
             $reasons[] = 'deadline_capacity_exhausted';
         }
-        // This records exhausted greedy search within the bounded horizon, not consumed
-        // calendar time or a proof that rearranging the complete plan cannot help.
+
         $reasons[] = 'planning_horizon_exhausted';
 
         return $reasons;

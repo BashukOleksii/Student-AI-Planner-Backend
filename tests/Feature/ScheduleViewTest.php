@@ -98,7 +98,7 @@ class ScheduleViewTest extends TestCase
     public function test_date_uses_overlap_boundaries_and_only_effective_owned_lessons(): void
     {
         $user = User::factory()->create(['timezone' => 'Europe/Kyiv']);
-        // October 6 local day spans October 5 21:00 UTC to October 6 21:00 UTC.
+
         $this->lesson($user, '2026-10-05 20:00:00', '2026-10-05 21:00:00');
         $into = $this->lesson($user, '2026-10-05 20:59:59', '2026-10-05 21:00:01');
         $inside = $this->lesson($user, '2026-10-06 08:00:00', '2026-10-06 09:00:00');
@@ -294,7 +294,7 @@ class ScheduleViewTest extends TestCase
     public function test_timezone_skipped_calendar_date_has_no_instant_membership(): void
     {
         $user = User::factory()->create(['timezone' => 'Pacific/Apia']);
-        // The 2011 date-line change skipped December 30 entirely, giving a zero-length range.
+
         $this->lesson($user, '2011-12-30 09:00:00', '2011-12-30 11:00:00');
         $this->actingAs($user, 'web')->getJson('/api/schedule/date/2011-12-30')->assertOk()->assertExactJson([
             'data' => [], 'meta' => ['timezone' => 'Pacific/Apia', 'start_date' => '2011-12-30', 'end_date' => '2011-12-30'],

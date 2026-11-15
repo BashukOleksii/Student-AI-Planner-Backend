@@ -41,7 +41,6 @@ class TaskActionArgumentValidator
             throw new InvalidArgumentException;
         }
 
-        // Fixed field order survives model key ordering; no caller-owned arrays or models are retained.
         return array_replace(array_intersect_key($schema['properties'], $arguments), $arguments);
     }
 }

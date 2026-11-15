@@ -6,7 +6,6 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
-/** Read-only diagnostics reuse the allocator's acceptance rules; no task feasibility is inferred. */
 class PlanningDiagnosticsService
 {
     public function __construct(private PlanningContextService $context, private StudySessionAllocationService $allocator) {}
@@ -24,7 +23,7 @@ class PlanningDiagnosticsService
                 $probe = $context;
                 $probe['range'] = $slot;
                 $probe['free_intervals'] = [$slot];
-                // A private synthetic work unit exercises the pure allocator; no model/ID is exposed or written.
+
                 $allocation = $this->allocator->allocate([['task_id' => 1, 'subtask_id' => null,
                     'effective_deadline_utc' => null, 'effort' => ['unallocated_work_seconds' => $slot['end'] - $slot['start']]]],
                     $probe, $now->getTimestamp() + 1, true);

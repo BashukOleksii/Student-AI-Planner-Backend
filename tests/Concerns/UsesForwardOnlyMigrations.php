@@ -5,7 +5,6 @@ namespace Tests\Concerns;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 
-/** Disposable-schema tests rebuild rather than invoking unsupported production downgrades. */
 trait UsesForwardOnlyMigrations
 {
     use DatabaseMigrations;
@@ -21,7 +20,6 @@ trait UsesForwardOnlyMigrations
         });
     }
 
-    /** Reproduce an explicit historical predecessor on the already guarded disposable database. */
     protected function migrateThrough(string $lastMigration, bool $fresh = false): void
     {
         $paths = array_values(array_filter(glob(database_path('migrations/*.php')), fn ($path) => basename($path, '.php') <= $lastMigration));

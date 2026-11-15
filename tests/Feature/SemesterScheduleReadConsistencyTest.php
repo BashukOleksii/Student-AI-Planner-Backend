@@ -45,7 +45,7 @@ class SemesterScheduleReadConsistencyTest extends TestCase
             }
             $armed = false;
             $this->assertSame(1, DB::transactionLevel());
-            // This independent connection represents a concurrent committed writer.
+
             $writer->transaction(function () use ($writer, $owner, $subject, $rule, $snapshot): void {
                 $writer->table('users')->where('id', $owner->id)->update(['timezone' => 'UTC']);
                 $writer->table('subjects')->where('id', $subject->id)->update(['name' => 'After']);

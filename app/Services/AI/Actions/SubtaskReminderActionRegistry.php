@@ -5,7 +5,6 @@ namespace App\Services\AI\Actions;
 use App\Enums\ReminderAnchor;
 use App\Enums\ReminderStatus;
 
-/** H3b's fixed additions; H1 and H3a registries remain unchanged. */
 class SubtaskReminderActionRegistry
 {
     public const NAMES = ['propose_subtask_create', 'propose_subtask_update', 'propose_subtask_complete', 'propose_subtask_reopen',

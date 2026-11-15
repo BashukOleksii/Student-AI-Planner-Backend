@@ -19,7 +19,6 @@ class ReminderEmailService
 {
     public function __construct(private ReminderDeliveryRules $payloads) {}
 
-    /** Called once by the owner-locked inbox writer, before its transaction commits. */
     public function recordIntent(User $owner, DatabaseNotification $notification): void
     {
         if (DB::transactionLevel() === 0) {
@@ -55,7 +54,7 @@ class ReminderEmailService
         if (! $queue instanceof DatabaseQueue || $queue->getDatabase() !== DB::connection()) {
             throw new LogicException('Reminder email requires the same transactional database connection.');
         }
-        // Immediate INSERT, not an after-commit callback. InnoDB hides it until commit.
+
         $id = $queue->push($job->beforeCommit());
         if ($id === null || $id === false) {
             throw new LogicException('Reminder email intent could not be saved.');
@@ -79,7 +78,6 @@ class ReminderEmailService
         $mailer = $this->smtpMailer();
         $message = new StudyReminderMail($payload['message']);
 
-        // Fresh autocommit read immediately before SMTP; no network I/O under a DB lock.
         $owner = User::find($ownerId);
         if ($owner === null || ! $owner->reminder_email_enabled || ! $owner->hasVerifiedEmail()
             || ! hash_equals($recipientFingerprint, $this->recipientFingerprint($owner))) {
@@ -108,7 +106,6 @@ class ReminderEmailService
 
     private function smtpMailer(): Mailer
     {
-        // Explicit SMTP avoids the content-logging default/failover mailers.
         if (config('mail.mailers.smtp.transport') !== 'smtp') {
             throw new LogicException('Reminder email requires an SMTP transport.');
         }

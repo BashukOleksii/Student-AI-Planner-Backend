@@ -38,7 +38,6 @@ class AiTaskActionController extends Controller
         try {
             $outcome = $service->decide($request->user(), $conversation, $action, $operation, $request->validated());
         } catch (HttpResponseException $exception) {
-            // WorkCompletionService also serves manual REST; filter only at this AI boundary.
             $response = $exception->getResponse();
             if ($response instanceof JsonResponse) {
                 $response->setData(CompletionReviewPrivacy::structured($response->getData(true)));

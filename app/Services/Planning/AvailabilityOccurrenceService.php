@@ -6,10 +6,8 @@ use DateTimeImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
 
-/** Expands recurring wall-clock membership into real half-open UTC intervals. */
 class AvailabilityOccurrenceService
 {
-    // Search padding covers IANA offsets and date-line changes, not a local day's duration.
     private const OFFSET_SEARCH_PADDING = 172800;
 
     public function __construct(private TimeIntervalService $intervals = new TimeIntervalService) {}
@@ -18,7 +16,7 @@ class AvailabilityOccurrenceService
      * @param  list<array{day_of_week: int, starts_at: string, ends_at: string}>  $windows
      * @return list<array{start: int, end: int}>
      *
-     * @throws InvalidArgumentException For malformed dates, windows or timezone names.
+     * @throws InvalidArgumentException
      */
     public function expand(array $windows, string $startDate, string $endDate, string $timezone): array
     {
@@ -27,7 +25,7 @@ class AvailabilityOccurrenceService
         if ($start > $end) {
             throw new InvalidArgumentException('The end date must not precede the start date.');
         }
-        // Match persisted region names and UTC, also allowing named fixed-offset Etc zones.
+
         if (! in_array($timezone, DateTimeZone::listIdentifiers(), true)
             && ! (str_starts_with($timezone, 'Etc/') && in_array($timezone, DateTimeZone::listIdentifiers(DateTimeZone::ALL_WITH_BC), true))) {
             throw new InvalidArgumentException('Expected an IANA timezone name.');
@@ -40,13 +38,12 @@ class AvailabilityOccurrenceService
         );
 
         $occurrences = [];
-        // UTC dates here encode nominal calendar labels only, so even skipped local dates are visited.
+
         for ($date = $start; $date <= $end; $date = $date->modify('+1 day')) {
             foreach ($byWeekday[(int) $date->format('N')] ?? [] as $window) {
                 $wallStart = $date->getTimestamp() + $window['start'];
                 $wallEnd = $date->getTimestamp() + $window['end'];
                 foreach ($segments as $segment) {
-                    // On this real segment, local label = UTC instant + constant offset.
                     $utcStart = max($segment['start'], $wallStart - $segment['offset']);
                     $utcEnd = min($segment['end'], $wallEnd - $segment['offset']);
                     if ($utcStart < $utcEnd) {

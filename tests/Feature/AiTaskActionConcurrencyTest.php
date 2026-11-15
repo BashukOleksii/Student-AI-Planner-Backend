@@ -140,7 +140,7 @@ class AiTaskActionConcurrencyTest extends TestCase
         $this->event($first, 'gate');
         [$second, , $connection] = $this->worker($owner, $conversation, $action);
         $this->waiting($connection, 'ai_conversations');
-        $this->assertDatabaseCount('tasks', 0); // Independent connection cannot see the uncommitted insert.
+        $this->assertDatabaseCount('tasks', 0);
         $gate->write("resume\n");
         $one = $this->outcome($first);
         $two = $this->outcome($second);
@@ -311,7 +311,7 @@ class AiTaskActionConcurrencyTest extends TestCase
         $prepared = $this->event($first, 'prepared_action_id')['prepared_action_id'];
         $this->event($first, 'gate');
         $this->assertDatabaseCount('ai_pending_actions', 0);
-        // Provider waiting holds no conversation lock, so another process may recover after expiry.
+
         DB::table('ai_conversation_turns')->update(['lease_expires_at' => DB::raw('DATE_SUB(UTC_TIMESTAMP(6), INTERVAL 1 SECOND)')]);
         [$successor] = $this->worker($owner, $conversation, null, ['operation' => 'chat', 'request_id' => (string) Str::uuid()]);
         $this->assertSame(200, $this->outcome($successor)['status']);

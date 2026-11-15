@@ -250,7 +250,7 @@ class SubtaskDeletionTest extends TestCase
         } catch (RuntimeException $exception) {
             $this->assertSame('Deliberate cleanup failure', $exception->getMessage());
         }
-        // Ignore estimate reads and the nested observer's reentrant owner lock.
+
         $queries = array_values(array_filter($queries, fn ($query) => str_contains($query['sql'], 'for update') && $query['level'] === $level + 1));
         $this->assertCount(5, $queries);
         foreach (['users', 'tasks', 'subtasks', 'study_sessions', 'reminders'] as $i => $table) {

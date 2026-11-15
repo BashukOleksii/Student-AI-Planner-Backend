@@ -26,8 +26,7 @@ class AiSemesterActionMigrationTest extends TestCase
     {
         $this->migrateThrough('2026_11_11_000005_add_ai_session_lifecycle_actions', true);
         $conversation = AiConversation::factory()->create();
-        // This historical test stops at the original nine-action expansion.
-        // Occurrence creation is covered by its later forward migration test.
+
         $types = array_values(array_filter(AiCapabilities::names(), fn ($name) => str_starts_with($name, 'propose_') && $name !== 'propose_semester_occurrence_create'));
         $semesterTypes = array_diff(SemesterActionRegistry::NAMES, ['propose_semester_occurrence_create']);
         $legacy = array_diff($types, $semesterTypes);

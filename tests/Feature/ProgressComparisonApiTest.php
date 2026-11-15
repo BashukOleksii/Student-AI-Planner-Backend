@@ -253,7 +253,7 @@ class ProgressComparisonApiTest extends TestCase
         $child->delete();
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.baseline.totals.subtasks_completed.total', 0);
         $child->restore();
-        $task->delete(); // Active legacy child is excluded; historical sessions still validate.
+        $task->delete();
         $data = $this->getJson($this->url())->assertOk()->assertJsonPath('data.baseline.totals.subtasks_completed.total', 0)
             ->assertJsonPath('data.baseline.totals.study_sessions.completed_actual_minutes', 25)->json('data');
         $this->reconcile($data);
@@ -289,7 +289,7 @@ class ProgressComparisonApiTest extends TestCase
     public function test_exact_union_excludes_large_interperiod_gap_and_disjoint_historical_envelope_gap(): void
     {
         $user = User::factory()->create(['timezone' => 'America/Juneau']);
-        // Both corrupt sources are outside membership and must never be loaded or validated.
+
         foreach (['1867-10-18 10:00:00', '1900-01-01 00:00:00'] as $instant) {
             StudySession::factory()->create(['user_id' => $user->id, 'starts_at' => $instant,
                 'ends_at' => CarbonImmutable::parse($instant, 'UTC')->addHour()->format('Y-m-d H:i:s')]);

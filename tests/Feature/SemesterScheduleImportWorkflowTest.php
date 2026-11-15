@@ -149,7 +149,7 @@ class SemesterScheduleImportWorkflowTest extends TestCase
     public function test_missing_catalogs_are_prepared_without_writes_and_manual_catalog_changes_require_revalidation(): void
     {
         [$user, $period, $template] = $this->context(false);
-        // Foreign matching names are never resolutions.
+
         foreach (array_unique(array_column($template['rules'], 'subject_name')) as $name) {
             Subject::factory()->create(['name' => $name]);
         }

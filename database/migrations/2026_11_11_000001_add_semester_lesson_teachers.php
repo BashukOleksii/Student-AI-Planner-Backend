@@ -28,8 +28,7 @@ return new class extends Migration
                     ->references(['id', 'user_id'])->on($parent)->cascadeOnDelete();
                 $teacher = $table->foreign(['teacher_id', 'user_id'], $prefix.'_teachers_teacher_owner_fk')
                     ->references(['id', 'user_id'])->on('teachers');
-                // Catalog-only links may disappear with an explicitly deleted teacher.
-                // Recurring rules and frozen snapshots must retain their teachers.
+
                 if ($parent === 'subjects') {
                     $teacher->cascadeOnDelete();
                 } else {
@@ -37,7 +36,7 @@ return new class extends Migration
                 }
             });
         }
-        // Backfill links only; historical import_baseline JSON and legacy Lessons stay intact.
+
         foreach (array_slice(self::LINKS, 1, null, true) as $pivot => [$parent, $key]) {
             DB::table($pivot)->insertUsing([$key, 'teacher_id', 'user_id'],
                 DB::table($parent)->select('id', 'teacher_id', 'user_id')->whereNotNull('teacher_id'));

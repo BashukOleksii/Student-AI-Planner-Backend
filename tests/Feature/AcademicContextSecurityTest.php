@@ -130,7 +130,7 @@ class AcademicContextSecurityTest extends TestCase
         $lessons = [];
         foreach ([false, true] as $trashed) {
             $task = Task::factory()->for($user)->for($subject)->create();
-            // The Teacher's Lessons intentionally use a different Subject.
+
             $lesson = Lesson::factory()->for($user)->for($teacher)->create();
             if ($trashed) {
                 $task->delete();
@@ -303,7 +303,7 @@ class AcademicContextSecurityTest extends TestCase
         $this->patchJson('/api/subjects/'.$subject->id, ['color' => ''])->assertUnprocessable()->assertJsonValidationErrors('color');
         $this->assertSame('#a1B2c3', $subject->refresh()->color);
         $this->patchJson('/api/subjects/'.$subject->id, ['color' => null])->assertOk()->assertJsonPath('data.color', null);
-        // Empty Subject code remains a string, as allowed by the current contract.
+
         $this->patchJson('/api/subjects/'.$subject->id, ['code' => ''])->assertOk()->assertJsonPath('data.code', '');
         $this->patchJson('/api/teachers/'.$teacher->id, ['education_institution_id' => ''])->assertOk()->assertJsonPath('data.education_institution_id', null);
         $this->patchJson('/api/academic-periods/'.$period->id, ['education_institution_id' => ''])->assertOk()->assertJsonPath('data.education_institution_id', null);

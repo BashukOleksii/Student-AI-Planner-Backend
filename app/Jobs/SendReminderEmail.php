@@ -17,7 +17,6 @@ class SendReminderEmail implements ShouldBeEncrypted, ShouldQueue
 
     public int $timeout = 60;
 
-    // Explicit default also keeps serialized jobs from before this extension readable.
     public ?int $automaticReminderId = null;
 
     public function __construct(public int $ownerId, public string $notificationId, public string $recipientFingerprint) {}
@@ -38,7 +37,6 @@ class SendReminderEmail implements ShouldBeEncrypted, ShouldQueue
 
             return;
         } catch (Throwable) {
-            // Never pass SMTP/SQL details, message content or secrets to worker logs/failed_jobs.
         }
 
         throw new RuntimeException('Reminder email delivery failed.');

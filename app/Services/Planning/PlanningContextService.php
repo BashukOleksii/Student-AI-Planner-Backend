@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Collection;
 use InvalidArgumentException;
 use UnexpectedValueException;
 
-/** Shared read-only C9 source assembly for C10 and projected study planning. */
 class PlanningContextService
 {
     private const PREFERENCE_FIELDS = [
@@ -24,7 +23,6 @@ class PlanningContextService
         private FreeTimeService $freeTime,
     ) {}
 
-    /** Dates are inclusive local labels; an optional anchor envelope preserves C10's exact selection. */
     public function load(User $user, string $startDate, string $endDate, ?array $anchorEnvelope = null, bool $includeSources = false): array
     {
         $this->validateDates($startDate, $endDate);
@@ -93,7 +91,6 @@ class PlanningContextService
         }
     }
 
-    /** UTC envelope of inclusive local-date membership; null for a wholly skipped date. */
     public function dateRange(string $startDate, string $endDate, string $timezone): ?array
     {
         $coverage = $this->dateIntervals($startDate, $endDate, $timezone);
@@ -101,7 +98,6 @@ class PlanningContextService
         return $coverage === [] ? null : ['start' => $coverage[0]['start'], 'end' => $coverage[count($coverage) - 1]['end']];
     }
 
-    /** Exact membership, including disjoint occurrences across historical date-line reversals. */
     public function dateIntervals(string $startDate, string $endDate, string $timezone): array
     {
         $this->validateDates($startDate, $endDate);
@@ -118,7 +114,6 @@ class PlanningContextService
         return $this->availability->expand($windows, $startDate, $endDate, $timezone);
     }
 
-    /** Full local ISO-week membership, without resolving ambiguous/skipped local midnights. */
     private function workloadBounds(string $startDate, string $endDate, string $timezone): array
     {
         $first = $this->calendarDate($startDate);
@@ -130,7 +125,6 @@ class PlanningContextService
         return [$this->queryTimestamp($coverage[0]['start']), $this->queryTimestamp($coverage[count($coverage) - 1]['end'])];
     }
 
-    /** Batch validation includes soft-deleted work history, without loading foreign data. */
     public function validateSessionReferences(User $user, Collection $sessions): void
     {
         if ($sessions->isEmpty()) {

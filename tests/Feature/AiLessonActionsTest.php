@@ -54,7 +54,6 @@ class AiLessonActionsTest extends TestCase
         return compact('owner', 'conversation', 'subject', 'teacher', 'period', 'lesson');
     }
 
-    /** Retained records from before retirement, not a request to the disabled writer. */
     private function historicalReplacement(array $f, bool $deleted = false): Lesson
     {
         return Lesson::factory()->for($f['owner'])->create(['replaces_lesson_id' => $f['lesson']->id,
@@ -491,7 +490,7 @@ class AiLessonActionsTest extends TestCase
     public function test_retained_replacement_pending_action_is_rejected_but_executed_receipt_still_replays(): void
     {
         $f = $this->fixture();
-        // Seed an old pending action using a current graph hash and representative old arguments.
+
         $prepared = app(LessonActionService::class)->prepare($f['owner'], 'propose_lesson_update', $this->args($f, 'propose_lesson_update'), 'historical');
         $turn = DB::table('ai_conversation_turns')->insertGetId(['conversation_id' => $f['conversation']->id,
             'request_id' => (string) Str::uuid(), 'input_hash' => hash('sha256', 'historical'), 'result' => '{}']);
@@ -505,7 +504,6 @@ class AiLessonActionsTest extends TestCase
         $this->assertSame('pending', $action->fresh()->status);
         $this->assertNull($action->fresh()->receipt);
 
-        // An already executed historical receipt bypasses domain execution, as before.
         $f['lesson']->update(['status' => 'replaced']);
         $replacement = $this->historicalReplacement($f);
         $presenter = app(LessonActionPresenter::class);
@@ -514,7 +512,7 @@ class AiLessonActionsTest extends TestCase
             'original' => $presenter->lesson($f['owner'], $f['lesson']->fresh())];
         $action->update(['status' => 'executed', 'resolved_at' => now(), 'receipt' => $receipt]);
         $stored = $action->fresh()->getAttributes();
-        $receipt = $action->fresh()->receipt; // MySQL normalizes JSON object key order.
+        $receipt = $action->fresh()->receipt;
         $before = $this->snapshot();
         $this->getJson($this->url($f, $action->id))->assertOk()->assertJsonPath('data.receipt', $receipt);
         $this->decide($f, $action->id)->assertOk()->assertJsonPath('replayed', true)->assertJsonPath('data.receipt', $receipt);

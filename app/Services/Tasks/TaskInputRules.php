@@ -6,7 +6,6 @@ use App\Enums\TaskPriority;
 use Closure;
 use Illuminate\Validation\Rule;
 
-/** Shared REST/AI wire validation. Ownership and candidate constraints stay in TaskService. */
 class TaskInputRules
 {
     public static function rules(bool $create, array $values = []): array
@@ -16,7 +15,6 @@ class TaskInputRules
         return [
             'title' => [...$presence, 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string', function (string $attribute, mixed $value, Closure $fail): void {
-                // MySQL TEXT capacity is measured in bytes, including UTF-8 text.
                 if (is_string($value) && strlen($value) > 65535) {
                     $fail('Опис не може перевищувати 65535 байтів.');
                 }

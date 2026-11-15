@@ -23,7 +23,7 @@ class LessonFactory extends Factory
             'replaces_lesson_id' => null,
             'type' => LessonType::Lecture,
             'room' => null,
-            // Whole-second UTC fixtures; product scheduling defaults are not defined here.
+
             'starts_at' => '2026-10-05 06:00:00',
             'ends_at' => '2026-10-05 07:30:00',
             'status' => LessonStatus::Active,

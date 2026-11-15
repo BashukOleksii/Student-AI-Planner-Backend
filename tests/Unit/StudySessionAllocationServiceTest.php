@@ -129,7 +129,7 @@ class StudySessionAllocationServiceTest extends TestCase
         $context['range'] = ['start' => $start, 'end' => $end];
         $expected = [];
         $constraints = new PlanningConstraintService;
-        // Exhaustive seconds are intentionally confined to this 180-second test oracle.
+
         for ($point = $start; $point + 60 <= $end; $point++) {
             if ($constraints->evaluate(['start' => $point, 'end' => $point + 60], $context['free_intervals'], [],
                 $context['workload_sessions'], 'UTC', $context['preferences']) === []) {
@@ -173,7 +173,6 @@ class StudySessionAllocationServiceTest extends TestCase
     #[DataProvider('largestDurationBudgets')]
     public function test_earliest_start_and_largest_duration_match_exhaustive_oracle_at_day_and_week_boundary(int $before, int $after, bool $weekly): void
     {
-        // Sunday → Monday exercises both local-day and ISO-week capacity changes.
         $start = self::ts('2026-10-11T23:59:00Z');
         $end = self::ts('2026-10-12T00:02:00Z');
         $sources = [];
@@ -222,7 +221,7 @@ class StudySessionAllocationServiceTest extends TestCase
         $context['range'] = ['start' => 0, 'end' => 2678400];
         $context['workload_sessions'] = [['start' => 0, 'end' => 600]];
         $constraints = $this->createMock(PlanningConstraintService::class);
-        // One input-validation call and one accepted-candidate validation; no second-by-second oracle search.
+
         $constraints->expects($this->exactly(2))->method('evaluate')->willReturn([]);
         $result = (new StudySessionAllocationService(new TimeIntervalService, $constraints))->allocate([self::work(1, 1800)], $context, 0);
         $this->assertSame(1800, $result['summary']['allocated_seconds']);
@@ -288,7 +287,7 @@ class StudySessionAllocationServiceTest extends TestCase
             $this->assertGreaterThanOrEqual($cutoff, $session['start']);
             $others = array_map(fn ($other): array => ['start' => $other['start'], 'end' => $other['end']], array_values(array_filter($result['sessions'], fn ($other, $key): bool => $key !== $index, ARRAY_FILTER_USE_BOTH)));
             $item = $attribution[$session['task_id'].':'.($session['subtask_id'] ?? 'task')];
-            // Revalidate against the complete batch, excluding only the candidate itself.
+
             $this->assertSame([], $constraints->evaluate($candidate, $context['free_intervals'],
                 [...$context['break_anchors'], ...$others], [...$context['workload_sessions'], ...$others],
                 $context['timezone'], $context['preferences'], $item['effective_deadline_utc']));

@@ -165,7 +165,7 @@ class AvailabilityOccurrenceServiceTest extends TestCase
                 $this->assertSame($this->utcIntervals([
                     ['2026-10-25T00:15:00Z', '2026-10-25T00:45:00Z'], ['2026-10-25T01:15:00Z', '2026-10-25T01:45:00Z'],
                 ]), $service->expand([self::window(7, '03:15:00', '03:45:00')], '2026-10-25', '2026-10-25', 'Europe/Kyiv'));
-                // Server-local parsing would incorrectly skip this otherwise valid UTC Friday.
+
                 $this->assertSame($this->utcIntervals([['2011-12-30T09:00:00Z', '2011-12-30T12:00:00Z']]),
                     $service->expand([self::window(5)], '2011-12-30', '2011-12-30', 'UTC'));
             }
@@ -187,7 +187,6 @@ class AvailabilityOccurrenceServiceTest extends TestCase
         return ['day_of_week' => $weekday, 'starts_at' => $start, 'ends_at' => $end];
     }
 
-    /** Convert explicit expected UTC endpoints to the C1 representation; no local timezone resolution. */
     private function utcIntervals(array $pairs): array
     {
         return array_map(fn (array $pair): array => [

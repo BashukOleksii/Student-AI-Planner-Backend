@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
-// CLI fixtures are confined to the runner-owned, freshly initialized server.
 if (PHP_SAPI !== 'cli' || getenv('PLANNER_SYSTEM_TEST') !== '1') {
     exit(2);
 }

@@ -4,7 +4,6 @@ namespace App\Services\AI\Actions;
 
 use App\Exceptions\AiAgentException;
 
-/** Pure transition policy. Expiry is computed by MySQL after acquiring writer locks. */
 class TaskActionState
 {
     public function next(string $status, bool $expired, string $operation): string

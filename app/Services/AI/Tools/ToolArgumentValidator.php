@@ -6,7 +6,6 @@ use App\Services\Planning\PlanningContextService;
 use App\Services\Progress\ProgressComparisonService;
 use InvalidArgumentException;
 
-/** Validates only the registry's small scalar schema vocabulary; never coerces JSON values. */
 class ToolArgumentValidator
 {
     public function __construct(private PlanningContextService $context, private ProgressComparisonService $comparison) {}

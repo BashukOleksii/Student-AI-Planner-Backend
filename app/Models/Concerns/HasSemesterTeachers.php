@@ -9,11 +9,10 @@ trait HasSemesterTeachers
         $this->append('teacher_ids');
     }
 
-    /** Complete historical links for integrity checks/baselines; teacher_id stays canonical. */
     public function getTeacherIdsAttribute(): array
     {
         $ids = $this->teachers->modelKeys();
-        // Keep single-teacher records created through older application consumers readable.
+
         if ($this->teacher_id !== null) {
             $ids[] = $this->teacher_id;
         }

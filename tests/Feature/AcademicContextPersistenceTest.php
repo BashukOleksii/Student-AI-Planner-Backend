@@ -258,8 +258,7 @@ class AcademicContextPersistenceTest extends TestCase
     public function test_simple_institution_fk_does_not_enforce_same_owner(string $model): void
     {
         $institution = EducationInstitution::factory()->create();
-        // BR-GEN-001 requires same-owner validation in the future application layer.
-        // The approved simple FK checks existence only; this is not a valid domain operation.
+
         $record = $model::factory()->for($institution)->create();
 
         $this->assertNotSame($institution->user_id, $record->user_id);

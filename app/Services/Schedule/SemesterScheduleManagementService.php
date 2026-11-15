@@ -175,7 +175,6 @@ class SemesterScheduleManagementService
         });
     }
 
-    /** Change one effective occurrence while preserving every other lesson on that date. */
     public function changeOccurrence(User $user, SemesterSchedule $schedule, string $date, string $identity,
         array $patch, bool $cancelled, array $values, bool $previewOnly = false): array
     {
@@ -214,7 +213,6 @@ class SemesterScheduleManagementService
         });
     }
 
-    /** Append one date-only lesson to the effective day, without replacing saved rows. */
     public function createOccurrence(User $user, SemesterSchedule $schedule, string $date, array $values, bool $previewOnly = false): array
     {
         return $this->write($user, $schedule, $values, function ($owner, $graph, bool $previewOnly) use ($date, $values) {
@@ -237,7 +235,7 @@ class SemesterScheduleManagementService
                     'source_weekly_rule_id' => $rule->id, 'is_added' => false];
             }, $effective);
             $lessons[] = $added;
-            // Use the same full projected-semester validation as manual date edits.
+
             $candidate = $this->saveSnapshot($owner, $graph, $date, $existing?->kind ?? 'replacement',
                 $existing?->copied_weekday, $lessons, $existing, previewOnly: true);
             if ($previewOnly) {
@@ -246,7 +244,7 @@ class SemesterScheduleManagementService
             if ($existing === null) {
                 return $this->saveSnapshot($owner, $graph, $date, 'replacement', null, $lessons);
             }
-            // Existing snapshot identities, timestamps, teacher links and Saturday metadata are untouched.
+
             $lesson = new ScheduleDateExceptionLesson(['user_id' => $owner->id, 'semester_schedule_id' => $graph['schedule']->id,
                 'schedule_date_exception_id' => $existing->id, ...Arr::except($added, ['teacher_ids'])]);
             $this->check($lesson->save());
@@ -331,7 +329,7 @@ class SemesterScheduleManagementService
 
                 return $this->saveSnapshot($owner, $graph, $date, 'working_saturday', $values['copied_weekday'], $lessons, sourceWeekParity: $parity, previewOnly: $previewOnly);
             }
-            // Compatibility mode copies the effective source date, including replacements/cancellation.
+
             [$monday] = $this->calculator->weekDates($date);
             $source = (new DateTimeImmutable($monday.' UTC'))->modify('+'.($values['copied_weekday'] - 1).' days')->format('Y-m-d');
             $this->within($graph, $source);
@@ -384,8 +382,7 @@ class SemesterScheduleManagementService
         if (! $exception->exists) {
             $this->check($exception->save());
         }
-        // Bounded full-day rewrite permits pair swaps under the unique pair FK/index.
-        // Retained row IDs and created_at values come only from this owned snapshot.
+
         foreach ($graph['lessons']->where('schedule_date_exception_id', $exception->id) as $old) {
             $this->check($old->delete());
         }
@@ -426,7 +423,6 @@ class SemesterScheduleManagementService
 
     private function mergeLessonFields(array $before, array $patch): array
     {
-        // Scalar teacher_id is canonical; discard only an omitted, cached compatibility list.
         if (array_key_exists('teacher_id', $patch) && ! array_key_exists('teacher_ids', $patch)) {
             unset($before['teacher_ids']);
         }

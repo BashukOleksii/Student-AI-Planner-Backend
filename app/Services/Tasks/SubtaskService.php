@@ -27,7 +27,6 @@ class SubtaskService
             $task = $this->lockParent($user, $task);
             $subtask = $task->subtasks()->lockForUpdate()->findOrFail($subtask->getKey());
             if (! $task->subtasks()->where('id', '!=', $subtask->getKey())->exists()) {
-                // Preserve the last derived estimate, including for an unsynchronized legacy parent.
                 $this->estimates->synchronize($task);
             }
             $this->cleanup->cancel($user, $task, [$subtask->getKey()]);
@@ -132,7 +131,7 @@ class SubtaskService
     {
         return DB::transaction(function () use ($user, $task, $subtaskIds): Collection {
             $task = $this->lockParent($user, $task);
-            // Only identity/position is needed for validation; avoid hydrating full models here.
+
             $active = $task->subtasks()->orderBy('id')->lockForUpdate()->toBase()->get(['id', 'position'])->keyBy('id');
             if ($active->count() > 65535) {
                 throw ValidationException::withMessages(['subtask_ids' => ['Забагато активних підзавдань для призначення позицій.']]);
@@ -159,7 +158,6 @@ class SubtaskService
         });
     }
 
-    /** Read-only candidate checks. Position allocation remains exclusively in create(). */
     public function prepare(Task $task, array $values, ?Subtask $subtask = null): array
     {
         $candidate = $subtask === null ? ['description' => null, 'estimated_minutes' => null, 'deadline_at' => null]

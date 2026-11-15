@@ -293,8 +293,7 @@ class StudyReplanningPreviewTest extends TestCase
         $valid = StudySession::factory()->for($task)->create(['starts_at' => '2026-10-19 09:00:00', 'ends_at' => '2026-10-19 10:00:00']);
         $second = StudySession::factory()->for($task)->create(['starts_at' => '2026-10-19 12:00:00', 'ends_at' => '2026-10-19 13:00:00']);
         PlanningPreference::factory()->for($user)->create(['min_session_minutes' => 60, 'preferred_break_minutes' => 15]);
-        // The configured break already makes the 09:00 valid candidate conflict with the original 10:00 session.
-        // Separate it by moving the protected session earlier; availability begins at 08:00.
+
         $valid->update(['starts_at' => '2026-10-19 08:00:01', 'ends_at' => '2026-10-19 09:00:01']);
         $user->studyAvailabilityWindows()->update(['starts_at' => '08:00:00']);
         Lesson::factory()->for($user)->create(['starts_at' => '2026-10-19 10:30:00', 'ends_at' => '2026-10-19 12:30:00']);
@@ -526,8 +525,7 @@ class StudyReplanningPreviewTest extends TestCase
         $other = Task::factory()->for($user)->create(['estimated_minutes' => 60]);
         $valid = StudySession::factory()->for($other)->create(['starts_at' => '2026-10-19 12:00:00', 'ends_at' => '2026-10-19 13:00:00']);
         PlanningPreference::factory()->for($user)->create(['max_daily_study_minutes' => 60]);
-        // Each existing candidate sees the whole two-hour day, so both are affected by the limit.
-        // Restrict analysis to the first task: the outside-scope reservation is protected.
+
         $data = $this->preview(['task_id' => $task->id]);
         $this->assertSame(1, $data['summary']['affected_sessions']);
         $this->assertSame(0, $data['summary']['proposed_replacements']);

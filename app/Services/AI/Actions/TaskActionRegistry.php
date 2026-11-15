@@ -4,7 +4,6 @@ namespace App\Services\AI\Actions;
 
 use App\Enums\TaskPriority;
 
-/** Fixed proposal allowlist. These definitions never authorize business writes. */
 class TaskActionRegistry
 {
     public const NAMES = ['propose_task_create', 'propose_task_update', 'propose_task_complete', 'propose_task_reopen'];
@@ -43,8 +42,6 @@ class TaskActionRegistry
 
     private function definition(string $name, string $description, array $fields, array $required): array
     {
-        // Responses strict mode makes every property required and loses absent versus clearing-null semantics.
-        // Explicit non-strict provider schemas preserve that distinction; server validation is always strict.
         return ['name' => $name, 'description' => $description, 'strict' => false, 'parameters' => [
             'type' => 'object', 'properties' => $fields, 'required' => $required, 'additionalProperties' => false,
         ]];

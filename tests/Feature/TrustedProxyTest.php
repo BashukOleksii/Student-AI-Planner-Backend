@@ -17,7 +17,6 @@ class TrustedProxyTest extends TestCase
     {
         parent::setUp();
 
-        // Test-only endpoint observes the real global middleware stack.
         Route::get('/_testing/proxy-context', fn (Request $request) => response()->json([
             'ip' => $request->ip(), 'secure' => $request->isSecure(), 'scheme' => $request->getScheme(),
             'host' => $request->getHost(), 'port' => $request->getPort(),

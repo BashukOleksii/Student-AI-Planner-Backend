@@ -30,7 +30,6 @@ class StudySessionReschedulingService
         return $this->mutation->runWithinTransaction($user, $id, $this->action($startsAt, $endsAt));
     }
 
-    /** Preliminary checks only: final effort and C10 feasibility are checked after source retirement. */
     public function preview(User $user, string $id, mixed $startsAt, mixed $endsAt): array
     {
         $candidate = ['start' => $this->rules->timestamp($startsAt), 'end' => $this->rules->timestamp($endsAt)];
@@ -67,7 +66,7 @@ class StudySessionReschedulingService
             $transition = $this->preflight($source, $task, $child, $interval, $now, $chain, $candidate, $duration);
             $originalSeconds = $interval['end'] - $interval['start'];
             $reminders = $this->reminders->scheduledForSession($owner, $source);
-            // Release only inside this transaction. All later failures restore the old reservation.
+
             if (! $source->update($transition)) {
                 throw new LogicException('The source session could not be retired.');
             }
@@ -90,15 +89,14 @@ class StudySessionReschedulingService
                 throw new LogicException('The replacement session could not be saved.');
             }
             $this->reminders->cancel($reminders);
-            // Report Stage A's current post-insert total, including reservations that may have
-            // elapsed during this operation, rather than equating it to the transferred shortfall.
+
             $current = $this->selection->select($owner, $source->task_id, $source->subtask_id);
             $unit = collect([...$current['work_items'], ...$current['excluded_items']])->first(fn ($item) => $item['task_id'] === $source->task_id && $item['subtask_id'] === $source->subtask_id);
             if ($unit === null || $unit['effort'] === null) {
                 throw new StudySessionConflictException;
             }
             $summary['unallocated_work_seconds'] = $unit['effort']['unallocated_work_seconds'];
-            // A slow insert/event must not leave a replacement already started at commit.
+
             if (! $this->fields->startsAreFuture([$candidate], CarbonImmutable::now('UTC'))) {
                 throw new StudySessionConflictException;
             }

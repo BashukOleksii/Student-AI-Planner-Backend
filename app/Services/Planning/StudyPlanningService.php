@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use InvalidArgumentException;
 use UnexpectedValueException;
 
-/** Read-only Stage A → shared C9 context → deterministic projected plan orchestration. */
 class StudyPlanningService
 {
     public function __construct(
@@ -19,15 +18,11 @@ class StudyPlanningService
     ) {}
 
     /**
-     * Dates are exact inclusive local calendar labels, at most 31, in the persisted timezone.
-     * IDs are null or positive PHP integers; a subtask requires its explicit parent.
-     * Sessions remain advisory arrays, emitted in Stage A work order and then slot order.
-     *
      * @return array{as_of_utc: string, start_date: string, end_date: string, timezone: string, sessions: list<array>, work_results: list<array>, excluded_items: list<array>, warnings: list<array>, summary: array}
      *
-     * @throws InvalidArgumentException For malformed inputs, configuration or unrepresentable arithmetic.
-     * @throws ModelNotFoundException For missing, foreign, deleted or incorrectly nested work.
-     * @throws UnexpectedValueException For incompatible owned source relationships, without private details.
+     * @throws InvalidArgumentException
+     * @throws ModelNotFoundException
+     * @throws UnexpectedValueException
      */
     public function plan(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null, mixed $notBeforeUtc = null): array
     {

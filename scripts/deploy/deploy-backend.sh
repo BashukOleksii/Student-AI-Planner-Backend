@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Reviewed root-owned installation, executed as ubuntu with the exact CI-verified SHA.
 set -Eeuo pipefail
 umask 022
 export GIT_TERMINAL_PROMPT=0
@@ -19,11 +18,9 @@ previous=unknown
 
 say() { printf '%s\n' "$*"; }
 fail() { say "REFUSED: $*" >&2; exit 1; }
-# Suppress tool output: Artisan/Composer exceptions can contain credentials or SQL bindings.
 run() { "$@" >/dev/null 2>&1; }
 svc() { run sudo -n "$control" "$1"; }
 restore_gate() {
-    # Independent of vendor/bootstrap; saved before any in-place changes.
     cp "$state/down" storage/framework/down &&
         cp "$state/maintenance.php" storage/framework/maintenance.php &&
         chmod 660 storage/framework/down storage/framework/maintenance.php
@@ -36,7 +33,6 @@ finish() {
             if (( mutated )); then
                 gate=restored queue_stop=ok scheduler_stop=ok fpm_stop=ok
                 restore_gate || gate=failed
-                # Contain first, report afterwards, even if the SSH output channel is lost.
                 svc stop-queue || queue_stop=failed
                 svc stop-scheduler || scheduler_stop=failed
                 svc stop-fpm || fpm_stop=failed
@@ -45,7 +41,6 @@ finish() {
                 fi
                 say 'RECOVERY REQUIRED: maintenance restoration and service shutdown attempted; verify state; no automatic rollback.'
             else
-                # Only pre-mutation failures can safely reopen the previous installation.
                 if (( maintenance )); then
                     run php8.4 artisan up || result=1
                 fi
@@ -83,18 +78,15 @@ esac
 checkout_status=$(git status --porcelain --untracked-files=all) || fail 'Could not inspect checkout.'
 [[ -z $checkout_status ]] || fail 'Dirty checkout.'
 [[ $(stat -c '%a:%G' bootstrap/cache) == 2770:www-data ]] || fail 'bootstrap/cache must be setgid 2770 with group www-data.'
-# Ignored runtime files must never become tracked by a deployment.
 run git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main || fail 'Fetch failed.'
 [[ $(git rev-parse "$requested^{commit}") == "$requested" ]] || fail 'SHA mismatch or missing commit.'
 run git merge-base --is-ancestor "$requested" refs/remotes/origin/main || fail 'SHA is not on origin/main.'
 previous=$(git rev-parse HEAD)
 run git merge-base --is-ancestor "$previous" "$requested" || fail 'Checkout is ahead of or diverged from tested SHA.'
-# Only newly added migration files may change in an unattended release.
 changed_migrations=$(git diff --no-renames --name-only --diff-filter=DMRTUXB "$previous" "$requested" -- database/migrations) || fail 'Could not inspect migration changes.'
 [[ -z $changed_migrations ]] || fail 'Editing or removing existing migration files requires manual review.'
 runtime_entries=$(git ls-tree -r --name-only "$requested" -- .env vendor storage bootstrap/cache | sed '/^storage\/.*\.gitignore$/d; /^bootstrap\/cache\/\.gitignore$/d') || fail 'Could not inspect runtime file protection.'
 [[ -z $runtime_entries ]] || fail 'Commit tracks server-owned runtime files.'
-# Record env metadata/content in memory only; never copy it to Actions or display it.
 [[ -f .env && ! -L .env && $(stat -c '%a:%U:%G' .env) == 640:ubuntu:www-data ]] || fail 'Expected .env mode/owner 640 ubuntu:www-data.'
 env_fingerprint=$(sha256sum .env)
 [[ ! -e storage/framework/down && ! -e storage/framework/maintenance.php ]] || fail 'Existing maintenance mode requires operator review.'
@@ -107,7 +99,6 @@ svc health || fail 'Backend services are not initially active.'
 phase=maintenance
 printf 'previous=%s\nrequested=%s\n' "$previous" "$requested" > "$state/in-progress"
 started=1
-# File maintenance driver is required; the config inspection prints no config values.
 run php8.4 -r 'require "vendor/autoload.php"; $app = require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); if (config("app.maintenance.driver") !== "file") exit(1); foreach (["getCachedConfigPath" => "config.php", "getCachedServicesPath" => "services.php", "getCachedPackagesPath" => "packages.php", "getCachedRoutesPath" => "routes-v7.php", "getCachedEventsPath" => "events.php"] as $method => $file) { if ($app->$method() !== getcwd()."/bootstrap/cache/".$file) exit(1); }' || fail 'File maintenance driver and standard bootstrap cache paths required.'
 maintenance=1
 (umask 007; run php8.4 artisan down --render=errors::503 --retry=60) || fail 'Maintenance bootstrap failed.'
@@ -119,20 +110,15 @@ svc stop-queue || fail 'Queue stop failed.'
 svc stop-fpm || fail 'PHP-FPM stop failed.'
 
 phase=git-update
-# From this point on, any failure needs controlled recovery, including a partial merge/install.
 mutated=1
 run git -c core.sharedRepository=false merge --ff-only --no-edit --no-overwrite-ignore "$requested" || fail 'Fast-forward failed.'
 [[ $(git rev-parse HEAD) == "$requested" ]] || fail 'Updated checkout SHA mismatch.'
 phase=composer
-# No plugins/scripts, root execution, dependency updates or key generation.
 run composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader --no-scripts --no-plugins || fail 'Locked dependency install failed.'
 run composer check-platform-reqs --no-dev --no-plugins || fail 'Production platform requirements failed.'
 phase=laravel-caches
-# These are generated framework caches only. Old provider classes may no longer
-# exist after install --no-dev; remove their manifests before booting Artisan.
 run rm -f -- bootstrap/cache/config.php bootstrap/cache/services.php \
     bootstrap/cache/packages.php bootstrap/cache/routes-v7.php bootstrap/cache/events.php || fail 'Could not remove stale bootstrap caches.'
-# The directory must be setgid ubuntu:www-data; sensitive config stays 640/660.
 (
     umask 007
     run php8.4 artisan config:clear &&
@@ -149,12 +135,9 @@ chmod 640 bootstrap/cache/config.php
 phase=permissions
 svc audit || fail 'Final www-data permission audit failed.'
 phase=migrations
-# Use the verified checkout and production config while all services are stopped.
-# Run on every deploy: Laravel skips migrations already recorded in the database.
 run php8.4 artisan migrate --force --no-interaction || fail 'Database migration failed; operator recovery required.'
 phase=services
 svc start-fpm || fail 'PHP-FPM start failed.'
-# Workers and scheduler restart only after smoke checks so they cannot process new jobs prematurely.
 run php8.4 artisan up || fail 'Could not leave maintenance mode.'
 phase=smoke
 smoke=failed
@@ -177,7 +160,6 @@ say 'SMOKE php-fpm=active queue=active scheduler-timer=active'
 checkout_status=$(git status --porcelain --untracked-files=all) || fail 'Final checkout inspection failed.'
 [[ $(git rev-parse HEAD) == "$requested" && -z $checkout_status ]] || fail 'Final checkout verification failed.'
 smoke=passed
-# Marker removed last: cancellation/power loss always requires inspection rather than blind retry.
 printf '%s\n' "$requested" > "$state/last-successful-sha"
 rm -f "$state/in-progress"
 say "DEPLOYMENT SUCCESS deployed=$requested checkout=$requested previous=$previous smoke=$smoke"

@@ -71,7 +71,6 @@ trait AssertsMysqlPersistence
         } catch (QueryException $exception) {
             $this->assertSame($error, $exception->errorInfo[1]);
             if ($constraint !== null) {
-                // A value can violate multiple CHECKs; MySQL's evaluation order is not a contract.
                 $this->assertTrue(collect((array) $constraint)->contains(
                     fn (string $name) => str_contains($exception->getMessage(), "Check constraint '".$name."'")
                         || str_contains($exception->getMessage(), $name) && $error !== 3819,

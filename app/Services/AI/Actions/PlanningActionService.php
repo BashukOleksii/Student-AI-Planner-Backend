@@ -30,7 +30,6 @@ use InvalidArgumentException;
 use Throwable;
 use UnexpectedValueException;
 
-/** Fixed domain adapters. No planning algorithms or independent confirmation state machine. */
 class PlanningActionService
 {
     public function __construct(private PlanningActionArgumentValidator $validator, private StudyPlanPersistenceService $plans,
@@ -122,7 +121,7 @@ class PlanningActionService
                         'propose_session_mark_missed' => 'Лише після підтвердження наявну сесію буде позначено пропущеною. Залежні заплановані нагадування буде скасовано. Сама сесія та її історія збережуться; заміна не створюється.',
                         default => 'Лише після підтвердження наявну сесію буде завершено з указаними фактичними хвилинами. Залежні заплановані нагадування буде скасовано. Сама сесія та її історія збережуться; заміна не створюється.',
                     }]];
-                // Never trim a material effect. An oversized review cannot become confirmable.
+
                 $this->limits->json($preview, $this->limits->get('max_tool_result_bytes'));
                 if (! $actionable) {
                     return ['proposal' => null, 'result' => ['ok' => true, 'tool' => $name,
@@ -148,7 +147,6 @@ class PlanningActionService
         }
     }
 
-    /** Pure protected-token checks; persistence additionally compares this deadline to MySQL UTC. */
     public function expiration(User $owner, array $proposal): ?string
     {
         if ($proposal['type'] === 'propose_session_reschedule' || $this->isLifecycleAction($proposal['type'])) {
@@ -168,7 +166,6 @@ class PlanningActionService
                 'task_id' => $arguments['task_id'] ?? null, 'subtask_id' => $arguments['subtask_id'] ?? null];
             $parameters = $payload['parameters'];
             if ($proposal['type'] === 'propose_study_plan_create') {
-                // This validated token parameter is server-owned, never a model/tool argument.
                 unset($parameters['not_before_utc']);
             }
             if (! $this->planTokens->matches($expected, $parameters)
@@ -182,7 +179,6 @@ class PlanningActionService
         return gmdate('Y-m-d H:i:s', $payload['expires_at']);
     }
 
-    /** Called exclusively under H3's conversation/action/owner lock prefix. Never commits. */
     public function execute(User $owner, AiPendingAction $action, array $consent): array
     {
         if (DB::transactionLevel() === 0) {
@@ -244,7 +240,6 @@ class PlanningActionService
         } catch (StudySessionConflictException) {
             throw new AiAgentException('action_conflict');
         } catch (UnexpectedValueException) {
-            // Invalid persisted attribution/history also invalidates the reviewed operation.
             throw new AiAgentException('action_stale');
         } catch (ValidationException $exception) {
             $safe = array_intersect_key($exception->errors(), array_flip(['accept_partial', 'accept_unplaced_cancellation', 'accept_split_replacements']));

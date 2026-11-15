@@ -8,7 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // No historical backfill: existing encrypted jobs remain the only intent for old deliveries.
         Schema::create('reminder_email_intents', function (Blueprint $table) {
             $table->engine('InnoDB');
             $table->id();
@@ -18,7 +17,7 @@ return new class extends Migration
             $table->char('recipient_fingerprint', 64);
             $table->unsignedInteger('attempts')->default(0);
             $table->dateTime('next_attempt_at');
-            // Queue acceptance only; never a claim of successful SMTP delivery.
+
             $table->dateTime('queued_at')->nullable();
             $table->timestamps();
             $table->index(['queued_at', 'next_attempt_at', 'id'], 'reminder_email_intents_due_index');

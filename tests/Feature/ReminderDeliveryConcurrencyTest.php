@@ -235,7 +235,7 @@ class ReminderDeliveryConcurrencyTest extends TestCase
             if ($notification->notifiable_id === $ownerA->id) {
                 $worker = $this->worker($ownerB, ['action' => 'dispatch', 'reminder_id' => $sourceB->id]);
                 $this->readyConnection($worker);
-                // Parent still holds owner A and its uncommitted notification. B must finish now.
+
                 $this->assertSame('sent', $this->outcome($worker)['status']);
             }
         });

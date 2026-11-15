@@ -21,7 +21,6 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
 
-/** Thin semester adapters using management's identical projection/validation and existing H3 receipts. */
 class SemesterActionService
 {
     public function __construct(private SemesterActionArgumentValidator $validator,
@@ -60,7 +59,6 @@ class SemesterActionService
         }
     }
 
-    /** The existing confirmation service owns conversation/action/owner locks and receipt durability. */
     public function execute(User $owner, AiPendingAction $action): array
     {
         if (DB::transactionLevel() === 0) {
@@ -78,7 +76,7 @@ class SemesterActionService
                 throw new AiAgentException('action_stale');
             }
             $saved = $this->apply($owner, $graph, $action->type, $arguments, $token, false);
-            // Re-read from persistence rather than trusting model event return values.
+
             $persisted = $this->state->load($owner, $graph['period']->id, true);
             $after = $this->describe($persisted, $action->type, $arguments, true, $owner->timezone, $graph);
             if ($this->semantic($preview['after']) !== $this->semantic($after)) {
@@ -184,7 +182,6 @@ class SemesterActionService
         return json_decode(json_encode($row, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
     }
 
-    /** Generated identities differ between an unsaved projection and the verified saved result. */
     private function semantic(?array $value): string
     {
         $strip = function (mixed $item) use (&$strip): mixed {

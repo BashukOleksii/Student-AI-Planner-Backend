@@ -226,7 +226,7 @@ class WorkloadAdviceApiTest extends TestCase
         $user = User::factory()->create(['timezone' => $zone]);
         StudyAvailabilityWindow::factory()->for($user)->create(['day_of_week' => $day, 'starts_at' => '00:00:00', 'ends_at' => '24:00:00']);
         Task::factory()->for($user)->create(['estimated_minutes' => $minutes]);
-        // A stale caller timezone is not a substitute for persisted IANA settings.
+
         $user->timezone = 'Pacific/Honolulu';
         $data = app(WorkloadAdviceService::class)->analyze($user, $date, $date);
         $this->assertSame($zone, $data['timezone']);

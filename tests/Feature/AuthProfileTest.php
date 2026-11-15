@@ -289,7 +289,6 @@ class AuthProfileTest extends TestCase
 
     public function test_csrf_cookie_flow_enforces_csrf_and_allows_credentialed_cors(): void
     {
-        // Laravel normally skips CSRF validation during tests; enable it for this browser contract.
         $this->app['env'] = 'local';
         try {
             $csrf = $this->getJson('/sanctum/csrf-cookie')->assertNoContent()

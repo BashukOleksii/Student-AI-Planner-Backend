@@ -119,7 +119,7 @@ class EffectiveScheduleServiceTest extends TestCase
         $this->snapshot($exception, $rule);
         $owner = $schedule->user;
         $owner->timezone = 'America/New_York';
-        // Never trust loaded client-selected relationships either.
+
         $schedule->setRelation('weeklyLessonRules', collect());
         $tables = ['users', 'academic_periods', 'semester_schedules', 'weekly_lesson_rules', 'schedule_date_exceptions',
             'schedule_date_exception_lessons', 'lessons', 'subjects', 'teachers', 'schedule_import_batches', 'schedule_import_rows'];
@@ -165,7 +165,7 @@ class EffectiveScheduleServiceTest extends TestCase
         $teacher = Teacher::factory()->for($other->user)->create();
         $batch = ScheduleImportBatch::factory()->for($other->user)->for($other->academicPeriod)->create();
         $record = ['schedule' => $schedule, 'rule' => $rule, 'exception' => $exception, 'snapshot' => $snapshot][$target];
-        // Isolate the child-side owner FK from unrelated parent-side RESTRICTs.
+
         if ($target !== 'snapshot') {
             $snapshot->delete();
         }
@@ -252,7 +252,7 @@ class EffectiveScheduleServiceTest extends TestCase
         foreach ([$rule, $teacher, $rule->subject, $schedule->academicPeriod] as $record) {
             $this->assertMysqlRejects(fn () => DB::table($record->getTable())->where('id', $record->id)->delete(), 1451);
         }
-        // Provenance is nullable: detaching it never changes the saved lesson data.
+
         $exception->lessons()->update(['source_weekly_rule_id' => null]);
         $rule->delete();
         $this->assertSame($teacher->id, app(EffectiveScheduleService::class)->date($schedule->user, $schedule, '2026-09-08')[0]['teacher_id']);

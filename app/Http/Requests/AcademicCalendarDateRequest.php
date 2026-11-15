@@ -15,7 +15,6 @@ class AcademicCalendarDateRequest extends ScheduleDateRequest
                 return;
             }
             try {
-                // Also reject week labels whose Monday/Sunday cannot be represented.
                 if ($this->routeIs('academic-calendar.week')) {
                     app(EffectiveScheduleCalculator::class)->weekDates($this->input('date'));
                 } else {

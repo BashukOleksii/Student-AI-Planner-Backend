@@ -239,7 +239,7 @@ class ProgressStatisticsApiTest extends TestCase
         $deletedChild->delete();
         StudySession::factory()->for($task)->create(['subtask_id' => $child->id, 'status' => 'completed',
             'completed_at' => '2026-10-05 10:00:00', 'actual_minutes' => 25]);
-        $task->delete(); // Deliberately leave an active child under a deleted parent.
+        $task->delete();
         $this->actingAs($user, 'web')->getJson($this->url())->assertOk()->assertJsonPath('data.tasks.current.total', 1)
             ->assertJsonPath('data.tasks.completed_in_period.total', 0)->assertJsonPath('data.subtasks.current.total', 0)
             ->assertJsonPath('data.subtasks.completed_in_period.total', 0)->assertJsonPath('data.study_sessions.started_in_period.completed.count', 1)

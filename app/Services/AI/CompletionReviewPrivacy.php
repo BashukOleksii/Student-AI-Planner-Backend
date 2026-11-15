@@ -4,7 +4,6 @@ namespace App\Services\AI;
 
 use stdClass;
 
-/** Strip consent keys from structured AI output, never from arbitrary message text. */
 class CompletionReviewPrivacy
 {
     public static function structured(mixed $value): mixed

@@ -7,19 +7,18 @@ use DateTimeZone;
 use Generator;
 use InvalidArgumentException;
 
-/** Sums caller-selected scheduled workload, without merging distinct session records. */
 class WorkloadConstraintService
 {
     public function __construct(private TimeIntervalService $intervals = new TimeIntervalService) {}
 
     /**
      * @param  array{start: int, end: int}  $candidate
-     * @param  list<array{start: int, end: int}>  $existingSessions  Each intended record once, excluding the candidate.
+     * @param  list<array{start: int, end: int}>  $existingSessions
      * @param  ?int  $maxDailyMinutes
      * @param  ?int  $maxWeeklyMinutes
      * @return list<'daily_study_limit_exceeded'|'weekly_study_limit_exceeded'>
      *
-     * @throws InvalidArgumentException For invalid intervals, limits, timezone or unrepresentable arithmetic.
+     * @throws InvalidArgumentException
      */
     public function evaluate(array $candidate, array $existingSessions, string $timezone, mixed $maxDailyMinutes = null, mixed $maxWeeklyMinutes = null): array
     {
@@ -42,9 +41,6 @@ class WorkloadConstraintService
     }
 
     /**
-     * Residual budgets for a planning range, using the same C7 calendar portions and additive totals.
-     * Null means unconfigured; exhausted/overloaded periods have zero additional capacity.
-     *
      * @return array{segments: list<array{start: int, end: int, day: string, week: string, seconds: int}>, days: array<string, ?int>, weeks: array<string, ?int>}
      */
     public function availableCapacity(array $range, array $existingSessions, string $timezone, mixed $maxDailyMinutes = null, mixed $maxWeeklyMinutes = null): array
@@ -60,7 +56,6 @@ class WorkloadConstraintService
         ];
     }
 
-    /** Actual selected workload only: the range seeds calendar labels but contributes no seconds. */
     public function existingViolations(array $range, array $existingSessions, string $timezone, mixed $maxDailyMinutes = null, mixed $maxWeeklyMinutes = null): array
     {
         $zone = $this->validateInputs($range, $existingSessions, $timezone, $maxDailyMinutes, $maxWeeklyMinutes);
@@ -123,7 +118,6 @@ class WorkloadConstraintService
         }
         foreach ($existingSessions as $session) {
             foreach ($this->portions($session, $zone) as $portion) {
-                // Only periods receiving candidate workload can acquire a new violation.
                 if (isset($days[$portion['day']])) {
                     $days[$portion['day']] = $this->addSeconds($days[$portion['day']], $portion['seconds']);
                 }
@@ -147,11 +141,10 @@ class WorkloadConstraintService
             $cursor = $transition['ts'];
             $end = $transitions[$index + 1]['ts'] ?? $interval['end'];
             while ($cursor < $end) {
-                // Encode local calendar labels in a UTC DateTime on this constant-offset segment.
                 $wall = $this->shiftByOffset($cursor, $transition['offset']);
                 $date = new DateTimeImmutable('@'.$wall);
                 $midnight = $date->setTime(0, 0)->modify('+1 day')->getTimestamp();
-                // A wrapped next-midnight timestamp lies beyond the representable timeline.
+
                 $remaining = $midnight > $wall ? $midnight - $wall : PHP_INT_MAX;
                 $seconds = min($end - $cursor, $remaining);
                 yield ['start' => $cursor, 'end' => $cursor + $seconds, 'day' => $date->format('Y-m-d'), 'week' => $date->format('o-W'), 'seconds' => $seconds];

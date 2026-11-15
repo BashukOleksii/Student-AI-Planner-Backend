@@ -9,9 +9,6 @@ use Tests\TestCase;
 #[Group('security')]
 class ApplicationBootstrapTest extends TestCase
 {
-    /**
-     * A basic test example.
-     */
     public function test_public_bootstrap_is_healthy_and_personal_resources_require_authentication(): void
     {
         $response = $this->get('/');

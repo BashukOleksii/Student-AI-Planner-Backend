@@ -19,10 +19,6 @@ class ScheduleOccurrenceResolver
     public function __construct(private ScheduleImportFingerprint $fingerprint) {}
 
     /**
-     * Read-only resolution of the ScheduleOccurrenceMaterializer contract.
-     * Preserve occurrence order/provenance; errors do not classify preview rows.
-     * Invalid fingerprint inputs throw InvalidArgumentException rather than being hashed.
-     *
      * @param  array{group: string, source: array, occurrences: list<array>}  $materialized
      * @return array{
      *   group: string, source: array, academic_period_id: int,
@@ -37,7 +33,6 @@ class ScheduleOccurrenceResolver
      */
     public function resolve(User $user, AcademicPeriod $academicPeriod, array $materialized): array
     {
-        // Reload through the owner: stale or forged in-memory ownership is insufficient.
         $period = $user->academicPeriods()->whereKey($academicPeriod->getKey())->first();
         if ($period === null) {
             throw ValidationException::withMessages(['academic_period_id' => ['Вибраний навчальний період недоступний.']]);
@@ -74,10 +69,6 @@ class ScheduleOccurrenceResolver
         ];
     }
 
-    /** Read-only semester resolution against the already loaded, owned catalogs.
-     * Negative reference IDs are internal preview identities, never persisted record IDs.
-     * Legacy dated import resolution below intentionally remains exact and unchanged.
-     */
     public function resolveSemesterNames(array $subjectNames, array $teacherNames, Collection $subjects, Collection $teachers): array
     {
         $result = ['subjects' => [], 'teachers' => []];
@@ -123,7 +114,6 @@ class ScheduleOccurrenceResolver
     {
         $name = mb_strtolower(str_replace(['’', 'ʼ', '`'], "'", $this->displayName($name)));
 
-        // Whitespace around initials is presentation, not identity.
         return preg_replace('/\s*\.\s*/u', '.', $name);
     }
 
@@ -137,14 +127,11 @@ class ScheduleOccurrenceResolver
             return preg_match('/^[\p{L}\p{M}\p{N}\p{Zs}.,:()\[\]’ʼ\x{0027}"&+\/\-–—]+$/u', $name) === 1;
         }
 
-        // A surname alone, a full name, or surname + initials. Two unsplit people fail.
         return preg_match('/^[\p{L}\p{M}’ʼ\x{0027}-]{2,}(?:\s+[\p{L}\p{M}’ʼ\x{0027}-]{2,}){0,2}$/u', $name) === 1
             || preg_match('/^[\p{L}\p{M}’ʼ\x{0027}-]{2,}\s+(?:\p{L}\.\s*){1,3}$/u', $name) === 1;
     }
 
     /**
-     * Batched exact owned names shared by initial resolution and unmapped preview refresh.
-     *
      * @return array{subjects: array<string, array{id: ?int, errors: list<string>}>, teachers: array<string, array{id: ?int, errors: list<string>}>}
      */
     public function resolveNames(User $user, array $subjectNames, array $teacherNames, bool $lock = false): array
@@ -155,7 +142,6 @@ class ScheduleOccurrenceResolver
         $teachers = [];
         if ($subjectNames !== []) {
             foreach ($user->subjects()->whereIn('name', $subjectNames)->when($lock, fn ($q) => $q->lockForUpdate())->get(['id', 'name']) as $subject) {
-                // MySQL collation may return similar names; PHP equality decides the match.
                 if (in_array($subject->name, $subjectNames, true)) {
                     $subjects[$subject->name] = $subject->getKey();
                 }

@@ -11,7 +11,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
-/** Explicit local fixtures for an existing owner. Never changes settings or existing work. */
 class PlanningDemoService
 {
     public function __construct(private DemoDatabaseGuard $guard, private TaskService $tasks,
@@ -43,7 +42,6 @@ class PlanningDemoService
         }
 
         return DB::transaction(function () use ($user, $dryRun): array {
-            // The write path starts with the same owner lock used by normal domain writers.
             $owner = User::whereKey($user->id)->when(! $dryRun, fn ($q) => $q->lockForUpdate())->firstOrFail();
             $now = CarbonImmutable::now('UTC');
             $local = $now->setTimezone($owner->timezone);
@@ -89,7 +87,6 @@ class PlanningDemoService
                     'deadline_at' => $task !== null ? $task->getRawOriginal('deadline_at') : $deadline?->setTimezone('UTC')->format('Y-m-d H:i:s'),
                     'subtask_ids' => [], 'sessions' => [], 'preview_summary' => null, 'note' => null];
                 if ($task !== null && $key === 'C') {
-                    // Only initialize a new parent; never append to or repair a user's modified fixture.
                     if ($created) {
                         foreach ([30, 45, 60] as $index => $minutes) {
                             $this->subtasks->create($owner, $task, ['title' => '[DEMO-PLANNING] C.'.($index + 1).' — Навчальний крок', 'estimated_minutes' => $minutes]);
@@ -100,12 +97,10 @@ class PlanningDemoService
                 }
                 if ($task !== null && ! $task->trashed()) {
                     if (in_array($key, ['F', 'G', 'H'], true)) {
-                        // Preserve all history on repeat, even if the user completed/cancelled a fixture.
                         $existing = $owner->studySessions()->where('task_id', $task->id)->exists();
                         if (! $dryRun && ! $existing) {
                             $desired = $estimate * 60;
-                            // Select a later feasible start for this demonstration, without changing
-                            // the greedy allocator or any persisted user constraints.
+
                             $slots = $this->diagnostics->analyze($owner, $start, $end)['slots'];
                             $candidate = collect($slots)->first(fn ($slot) => $slot['can_schedule']
                                 && $slot['candidate']['start'] >= $cutoff

@@ -90,7 +90,7 @@ class ReminderDeliveryTest extends TestCase
             $this->assertSame(ReminderStatus::Scheduled, $reminder->fresh()->status);
         }
         $relative = $service->create($owner, ['task_id' => $task->id, 'anchor' => 'task_deadline', 'offset_minutes' => -15]);
-        // Deadline synchronization must keep, not cancel, a missed Task's eligible target.
+
         $this->patchJson('/api/tasks/'.$task->id, ['deadline_at' => '2026-10-22T12:00:00Z'])->assertOk();
         $this->assertSame(ReminderStatus::Scheduled, $relative->fresh()->status);
         $this->assertSame('2026-10-22 11:45:00', $relative->fresh()->getRawOriginal('trigger_at'));
@@ -289,7 +289,7 @@ class ReminderDeliveryTest extends TestCase
             $this->assertSame(1062, $exception->errorInfo[1]);
         }
         $this->assertDatabaseCount('notifications', 1);
-        $reminder->delete(); // Guarded test of physical FK behavior; there is no public hard-purge API.
+        $reminder->delete();
         $this->assertNull($notification->fresh()->reminder_id);
         $this->assertSame($payload, $notification->fresh()->data);
         foreach (range(1, 2) as $unused) {
@@ -327,7 +327,7 @@ class ReminderDeliveryTest extends TestCase
     public function test_command_isolates_failure_reports_nonzero_and_scheduler_runs_every_minute(): void
     {
         [$owner] = $this->fixture();
-        Reminder::factory()->for($owner)->create(); // Invalid general message.
+        Reminder::factory()->for($owner)->create();
         Reminder::factory()->for($owner)->create(['message' => 'Valid']);
         $this->artisan('reminders:dispatch-due')->expectsOutput('{"selected":2,"sent":1,"cancelled":0,"skipped":0,"failed":1}')->assertExitCode(1);
         foreach (['0', '-1', '1001', '1.0', 'true', ' 1', '01'] as $limit) {

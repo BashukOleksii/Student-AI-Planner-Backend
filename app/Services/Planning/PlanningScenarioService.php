@@ -4,7 +4,6 @@ namespace App\Services\Planning;
 
 use InvalidArgumentException;
 
-/** Pure identity-based projection of a trusted PF1/C9 snapshot. No database or clock. */
 class PlanningScenarioService
 {
     private const SOURCES = ['blocking_lessons', 'blocking_sessions', 'lesson_anchors', 'session_anchors', 'workload_records'];
@@ -23,7 +22,6 @@ class PlanningScenarioService
         }
     }
 
-    /** Exclusions remove planned session identities, never equal intervals or Lesson identities. */
     public function without(array $snapshot, array $ids = []): array
     {
         self::validateIds($ids);
@@ -97,7 +95,6 @@ class PlanningScenarioService
             'workload_sessions' => array_values(array_map($this->interval(...), $workload))];
     }
 
-    /** Merge calendar chunks by identity: workload records are never merged by interval equality. */
     public function combine(array $snapshots): array
     {
         if ($snapshots === [] || ! array_is_list($snapshots)) {

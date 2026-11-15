@@ -11,7 +11,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-/** Current-state orchestration of existing deterministic recovery, allocation and workload services. */
 class LearningRecoveryAnalysisService
 {
     public const REVIEW_LEAD_SECONDS = 900;
@@ -23,7 +22,6 @@ class LearningRecoveryAnalysisService
         private StudyPlanConfirmationService $planTokens, private StudyReplanningConfirmationService $replanningTokens,
         private PlanningWorkSelectionService $selection) {}
 
-    /** Read-only, one consistent snapshot. Protected tokens are only for the persistence adapter. */
     public function analyze(User $user, string $start, string $end): array
     {
         return DB::transaction(function () use ($user, $start, $end): array {
@@ -69,7 +67,7 @@ class LearningRecoveryAnalysisService
                     $required[] = 'accept_split_replacements';
                 }
             }
-            // A review expires before any source/replacement it would need to move or create starts.
+
             $starts = $kind === 'create_plan' ? array_column($recovery['study_plan']['plan']['sessions'], 'start') : [];
             if ($kind === 'replan') {
                 foreach ($this->replanningTokens->affected($adaptive) as $row) {

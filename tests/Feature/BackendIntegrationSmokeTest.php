@@ -20,7 +20,6 @@ use Tests\Concerns\InteractsWithSpaBrowser;
 use Tests\Support\AiCapabilities;
 use Tests\TestCase;
 
-/** Offline H4 smoke. Every fixture mutation and readback uses the authenticated REST API. */
 #[Group('mysql')]
 #[Group('workflow')]
 class BackendIntegrationSmokeTest extends TestCase
@@ -30,7 +29,7 @@ class BackendIntegrationSmokeTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->travelTo(CarbonImmutable::parse(DB::selectOne('SELECT UTC_TIMESTAMP(6) AS clock')->clock, 'UTC')); // Align with database-owned AI leases.
+        $this->travelTo(CarbonImmutable::parse(DB::selectOne('SELECT UTC_TIMESTAMP(6) AS clock')->clock, 'UTC'));
         config(['ai.provider' => 'openai', 'ai.openai_key' => 'h4-fake-transport-key', 'ai.model' => 'gpt-5.4-mini', 'ai.requests_per_minute' => 60]);
         Http::preventStrayRequests();
         $this->beforeApplicationDestroyed(fn () => $this->truncateTablesForAllConnections());
@@ -128,7 +127,7 @@ class BackendIntegrationSmokeTest extends TestCase
         }
         if (in_array($name, ['propose_session_mark_missed', 'propose_session_complete'], true)) {
             $this->travelTo($f['day']->addDay());
-            // Advancing beyond the session also expires the browser login; authenticate normally again.
+
             $this->browser('GET', '/sanctum/csrf-cookie')->assertNoContent();
             $this->browser('POST', '/api/auth/login', ['email' => $f['student']['email'], 'password' => 'integration-password'])->assertOk();
         }

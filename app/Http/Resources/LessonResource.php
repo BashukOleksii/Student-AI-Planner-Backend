@@ -35,7 +35,6 @@ class LessonResource extends JsonResource
 
     private function utcTimestamp(string $field): string
     {
-        // DATETIME stores UTC wall-clock values; never infer their zone from PHP's default.
         return CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $this->resource->getRawOriginal($field), 'UTC')
             ->format('Y-m-d\TH:i:s\Z');
     }

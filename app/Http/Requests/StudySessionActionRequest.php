@@ -10,7 +10,6 @@ class StudySessionActionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Resolve ownership before validating action fields; the Service reloads under locks.
         $session = $this->user()->studySessions()->whereKey($this->route('studySession'))->firstOrFail();
         Gate::authorize('update', $session);
 

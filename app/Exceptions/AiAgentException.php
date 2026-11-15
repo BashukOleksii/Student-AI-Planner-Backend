@@ -4,7 +4,6 @@ namespace App\Exceptions;
 
 use RuntimeException;
 
-/** Only fixed public errors; never constructed from upstream messages. */
 class AiAgentException extends RuntimeException
 {
     public function __construct(public readonly string $errorCode)

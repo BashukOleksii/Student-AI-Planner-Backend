@@ -11,7 +11,6 @@ class TaskEstimateService
     /** @return array{has_subtasks: bool, estimated_minutes: ?int} */
     public function resolve(Task $task): array
     {
-        // The relation excludes soft-deleted children, but includes completed ones.
         $totals = $task->subtasks()->selectRaw(
             'COUNT(*) AS total, COUNT(estimated_minutes) AS known, SUM(estimated_minutes) AS minutes',
         )->toBase()->first();
@@ -29,7 +28,6 @@ class TaskEstimateService
         return ['has_subtasks' => $hasSubtasks, 'estimated_minutes' => $estimate];
     }
 
-    /** The caller must hold the owner and parent locks in the mutation transaction. */
     public function synchronize(Task $task): void
     {
         $resolved = $this->resolve($task);

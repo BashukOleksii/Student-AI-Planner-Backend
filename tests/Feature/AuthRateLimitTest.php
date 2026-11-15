@@ -183,7 +183,7 @@ class AuthRateLimitTest extends TestCase
         $this->assertThrottled($this->login(), 5, 60);
         $this->withHeader('X-Forwarded-For', '198.51.100.11');
         $this->login()->assertUnprocessable();
-        // Nginx appending the real peer defeats a client-supplied leftmost address.
+
         $this->withHeader('X-Forwarded-For', '203.0.113.99, 198.51.100.10');
         $this->assertThrottled($this->login(), 5, 60);
     }

@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Gate;
 use LogicException;
 use UnexpectedValueException;
 
-/** Shared transaction and dependency locking for single-session mutations. */
 class StudySessionMutationContextService
 {
     public function __construct(private PlanningContextService $context, private StudySessionLifecycleRules $rules) {}
@@ -31,13 +30,12 @@ class StudySessionMutationContextService
         if (DB::transactionLevel() === 0) {
             throw new LogicException('Study session execution requires an existing owner-first transaction.');
         }
-        // The first read is a current read, before establishing any RR snapshot.
+
         $owner = User::whereKey($user->getKey())->lockForUpdate()->firstOrFail(['id', 'timezone']);
 
         return $this->inspect($owner, $id, $action, true);
     }
 
-    /** SELECT-only source context; callers may share a read snapshot, never a writer. */
     public function read(User $user, string $id, Closure $action): mixed
     {
         $owner = User::whereKey($user->getKey())->firstOrFail(['id', 'timezone']);
@@ -55,18 +53,16 @@ class StudySessionMutationContextService
         if ($task === null || ($source->subtask_id !== null && $child === null)) {
             throw new UnexpectedValueException('Invalid study session source relationships.');
         }
-        // Discover both directions without filtering owners: a foreign edge must fail closed.
-        // Visited IDs guarantee termination even on a corrupt cycle. Lock the component by ID.
+
         $locked = $this->chainRecords($owner, [$source->id], $source, $lock);
         $source = $locked[$source->id];
         $interval = ['start' => $this->context->utcSeconds($source->getRawOriginal('starts_at')),
             'end' => $this->context->utcSeconds($source->getRawOriginal('ends_at'))];
-        $now = CarbonImmutable::now('UTC'); // Capture after contention, retain full precision.
+        $now = CarbonImmutable::now('UTC');
 
         return $action($owner, $source, $task, $child, $interval, $now, $locked);
     }
 
-    /** Owner and work locks must already be held. Discover both directions, lock once by ID. */
     public function lockChainRecords(User $owner, array $sourceIds, ?StudySession $attribution = null): Collection
     {
         if (DB::transactionLevel() === 0) {
@@ -84,8 +80,6 @@ class StudySessionMutationContextService
             $batch = StudySession::whereIn('id', $pending)->orWhereIn('rescheduled_from_session_id', $pending)->get();
             $next = [];
             foreach ($batch as $row) {
-                // Preserve Stage D's pre-lock integrity boundary; never lock a foreign graph.
-                // E2 supports multiple units and validates each owned component after locking.
                 if ($row->user_id !== $owner->id || ($attribution !== null
                     && ($row->task_id !== $attribution->task_id || $row->subtask_id !== $attribution->subtask_id))) {
                     throw new UnexpectedValueException('Invalid study session source relationships.');
@@ -112,7 +106,6 @@ class StudySessionMutationContextService
         ])->all(), $sourceId);
     }
 
-    /** Read the entire connected history, including siblings outside the requested horizon. */
     public function readChainRecords(User $owner, array $ids): Collection
     {
         return $this->chainRecords($owner, $ids, null, false);

@@ -386,7 +386,7 @@ class AgentOrchestratorTest extends TestCase
         $this->assertSame($name, $result['tools'][0]['name']);
         $this->assertSame($prepared, $result['tools'][0]['ok']);
         $this->assertSame($prepared ? null : 'invalid_arguments', $result['tools'][0]['error_code']);
-        $this->assertCount(2, $requests); // No additional translation call.
+        $this->assertCount(2, $requests);
     }
 
     public function test_ukrainian_is_a_provider_instruction_not_a_text_filter_and_names_remain_unchanged(): void
@@ -403,7 +403,7 @@ class AgentOrchestratorTest extends TestCase
         $this->assertStringContainsString('Always respond and ask clarification questions in Ukrainian, even if the user writes in another language.', $requests[0]['instructions']);
         $this->assertStringContainsString('Do not automatically translate subject names, personal names or user-provided data.', $requests[0]['instructions']);
         $this->assertSame('Answer in English about Advanced Algebra and John Smith.', $requests[0]['history'][0]['content']);
-        $this->assertSame($text, $result['answer']); // A fake verifies delivery, not live-model compliance.
+        $this->assertSame($text, $result['answer']);
         $this->assertArrayNotHasKey('server_message', $result);
         $this->assertArrayNotHasKey('server_message', $result['messages'][1]);
         $this->assertCount(1, $requests);

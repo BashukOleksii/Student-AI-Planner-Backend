@@ -37,7 +37,7 @@ class AiConversationRequest extends FormRequest
             }
             if ($this->isMethod('POST')) {
                 $raw = $this->getContent();
-                // An absent create body is equivalent to an empty object. Sending content always needs JSON.
+
                 if ((! $this->isJson() && $this->request->count() !== 0)
                     || ($raw !== '' && (! $this->isJson() || ! json_decode($raw) instanceof stdClass || json_last_error() !== JSON_ERROR_NONE))
                     || $this->query->count() !== 0) {

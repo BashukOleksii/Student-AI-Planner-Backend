@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# GitHub runner only. Never invoke locally with production credentials for testing.
 set -Eeuo pipefail
 umask 077
 readonly host=63.184.35.171
@@ -19,7 +18,6 @@ printf '%s\n' "$LIGHTSAIL_BACKEND_KNOWN_HOSTS" > "$work/known_hosts"
 unset LIGHTSAIL_BACKEND_SSH_PRIVATE_KEY LIGHTSAIL_BACKEND_KNOWN_HOSTS
 ssh-keygen -y -P '' -f "$work/key" > /dev/null 2>&1 || fail 'invalid or encrypted deployment key.'
 ssh-keygen -F "$host" -f "$work/known_hosts" > /dev/null 2>&1 || fail 'no pinned host entry for deployment address.'
-# No agent, forwarding, ambient SSH config, TOFU, response bodies or cookies in output.
 ssh -F /dev/null -T -i "$work/key" \
     -o IdentitiesOnly=yes -o IdentityAgent=none -o ForwardAgent=no \
     -o ClearAllForwardings=yes -o BatchMode=yes -o PasswordAuthentication=no \

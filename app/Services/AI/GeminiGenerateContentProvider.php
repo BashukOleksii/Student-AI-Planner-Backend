@@ -31,7 +31,7 @@ class GeminiGenerateContentProvider implements LlmProvider
             || ! is_string($model) || ! preg_match('/\Agemini-[a-zA-Z0-9._-]{1,90}\z/', $model)) {
             throw new AiAgentException('ai_unavailable');
         }
-        // Google documents automatic rerouting/billing changes from this date. Require explicit reconfiguration.
+
         if ($model === 'gemini-2.5-flash' && CarbonImmutable::now('UTC')->greaterThanOrEqualTo('2026-12-01T00:00:00Z')) {
             throw new AiAgentException('ai_unavailable');
         }
@@ -68,7 +68,6 @@ class GeminiGenerateContentProvider implements LlmProvider
                     },
                 ])->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent');
         } catch (ConnectionException|TransferException $exception) {
-            // Guzzle can wrap an on_headers limit exception. Do not surface transport messages.
             for ($cause = $exception; $cause !== null; $cause = $cause->getPrevious()) {
                 if ($cause instanceof AiAgentException) {
                     throw new AiAgentException($cause->errorCode);
@@ -120,7 +119,6 @@ class GeminiGenerateContentProvider implements LlmProvider
         }
     }
 
-    /** Keep each signed part exactly as received. Never retain thought summaries. */
     private function parseContent(mixed $content, string $model, ?array $internalIds = null): array
     {
         if (! $content instanceof stdClass || ($content->role ?? null) !== 'model'
@@ -166,7 +164,7 @@ class GeminiGenerateContentProvider implements LlmProvider
                 throw new AiAgentException('invalid_provider_response');
             }
             $ids[$id] = true;
-            // Keep nested JSON objects as objects; the current validators decide business validity.
+
             $calls[] = ['id' => $id, 'name' => $call->name, 'arguments' => (array) $call->args];
         }
         if (($internalIds !== null && count($internalIds) !== count($calls)) || count($calls) > $this->limits->get('max_tool_calls')) {
@@ -198,7 +196,7 @@ class GeminiGenerateContentProvider implements LlmProvider
                 $function = $pending[$id];
                 $part = ['functionResponse' => ['name' => $function->name, 'response' => $result,
                     ...(isset($function->id) ? ['id' => $function->id] : [])]];
-                // Parallel results share one user content, in the model's original call order.
+
                 $pending[$id] = ['part' => $part];
                 if (count(array_filter($pending, fn ($value) => is_array($value))) === count($pending)) {
                     $contents[] = ['role' => 'user', 'parts' => array_column($pending, 'part')];
@@ -212,14 +210,14 @@ class GeminiGenerateContentProvider implements LlmProvider
             }
             if ($event['role'] === 'assistant' && ($event['state']['provider'] ?? null) === 'gemini') {
                 $state = $event['state'];
-                // A JSON string preserves object/list boundaries through Eloquent's array cast.
+
                 if (! is_string($state['content'] ?? null) || ! is_array($state['call_ids'] ?? null)
                     || ! array_is_list($state['call_ids'])) {
                     throw new AiAgentException('invalid_provider_response');
                 }
                 $content = json_decode($state['content'], false, 64, JSON_THROW_ON_ERROR);
                 $parsed = $this->parseContent($content, $model, $state['call_ids'] ?? []);
-                // Compare the Laravel-persisted projection; replay uses the original typed signed content.
+
                 if ($this->persistedCalls($parsed['calls']) !== $this->persistedCalls($event['calls'] ?? [])) {
                     throw new AiAgentException('invalid_provider_response');
                 }
@@ -253,7 +251,6 @@ class GeminiGenerateContentProvider implements LlmProvider
         return $this->canonical(json_decode(json_encode($calls, JSON_THROW_ON_ERROR), true, 64, JSON_THROW_ON_ERROR));
     }
 
-    /** MySQL JSON objects may reorder keys; comparison must still preserve scalar types. */
     private function canonical(mixed $value): mixed
     {
         if ($value instanceof stdClass) {
@@ -270,7 +267,6 @@ class GeminiGenerateContentProvider implements LlmProvider
         return $value;
     }
 
-    /** Google's documented GenerateContent 400 credential error; never classify by free-form message. */
     private function invalidApiKey(string $body): bool
     {
         try {
@@ -285,7 +281,6 @@ class GeminiGenerateContentProvider implements LlmProvider
                 }
             }
         } catch (JsonException) {
-            // Malformed error documents remain a generic provider failure.
         }
 
         return false;
@@ -296,7 +291,6 @@ class GeminiGenerateContentProvider implements LlmProvider
         try {
             Log::notice('AI provider request failed.', ['provider' => 'gemini', ...$context]);
         } catch (Throwable) {
-            // Observability must preserve the fixed public failure contract.
         }
     }
 

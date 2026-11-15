@@ -4,7 +4,6 @@ namespace App\Services\AI\Actions;
 
 use Illuminate\Validation\ValidationException;
 
-/** Client-only fields: never part of provider definitions or stored action arguments. */
 class PlanningActionConsent
 {
     public static function fields(string $type): array

@@ -6,7 +6,6 @@ use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
 use Tests\Support\TestDatabase;
 
-/** Independent clients inside one sequential suite; proves real InnoDB waits, never sleeps as proof. */
 trait InteractsWithMysqlWorkers
 {
     private function startMysqlWorker(string $script, array $input, array $arguments = []): Process

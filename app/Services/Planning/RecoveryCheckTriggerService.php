@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Throwable;
 
-/** Durable per-owner dirty state; analysis is never executed in a mutation response. */
 class RecoveryCheckTriggerService
 {
     public const DEBOUNCE_SECONDS = 3;
@@ -35,7 +34,7 @@ class RecoveryCheckTriggerService
                 'requested_at' => CarbonImmutable::now('UTC')->format('Y-m-d H:i:s.u'),
                 'last_error_code' => null, 'last_error_at' => null,
             ]);
-            // One callback per owner/transaction, including large semester imports.
+
             $this->scheduled[$ownerId] = true;
             DB::afterRollBack(function () use ($ownerId): void {
                 unset($this->scheduled[$ownerId]);
@@ -47,7 +46,6 @@ class RecoveryCheckTriggerService
         });
     }
 
-    /** A failed dispatch leaves durable dirty state for the existing bounded Scheduler scan. */
     public function dispatch(int $ownerId): void
     {
         $token = null;
@@ -71,20 +69,17 @@ class RecoveryCheckTriggerService
                 return $token;
             });
             if ($token !== null) {
-                // Explicit durable database connection, even when the application's default is sync.
                 Queue::connection('database')->later(self::DEBOUNCE_SECONDS, new AnalyzeOwnerPlan($ownerId, $token));
             }
         } catch (Throwable) {
             try {
                 $this->fail($ownerId, 'queue_unavailable', $token);
             } catch (Throwable) {
-                // Never turn a successful business commit into an HTTP error.
             }
             Log::warning('Owner plan check could not be queued.', ['owner_id' => $ownerId]);
         }
     }
 
-    /** Return a release delay, null for stale/no-op delivery, or zero to analyze now. */
     public function start(int $ownerId, string $token): ?int
     {
         return DB::transaction(function () use ($ownerId, $token): ?int {

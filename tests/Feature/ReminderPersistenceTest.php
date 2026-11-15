@@ -97,7 +97,7 @@ class ReminderPersistenceTest extends TestCase
         $this->assertModelExists($reminder);
         $this->assertNull($reminder->refresh()->$column);
         $this->assertNull($reminder->$relation);
-        // FK SET NULL leaves relative metadata; future purge reconciliation must clean it up.
+
         $this->assertSame(ReminderAnchor::from($anchor), $reminder->anchor);
         $this->assertSame($offset, $reminder->offset_minutes);
         $reminder->update(['anchor' => null, 'offset_minutes' => null]);
@@ -163,12 +163,12 @@ class ReminderPersistenceTest extends TestCase
         $subtask = Subtask::factory()->create();
         $session = StudySession::factory()->for($subtask->task)->for($subtask)->create();
         $reminder = Reminder::factory()->for($session->user)->create();
-        // Deliberately invalid domain data: max-one-target cannot be a SET NULL FK CHECK.
+
         $reminder->update(['task_id' => $session->task_id, 'subtask_id' => $subtask->id, 'study_session_id' => $session->id]);
         $this->assertSame($session->task_id, $reminder->refresh()->task_id);
         $this->assertSame($subtask->id, $reminder->subtask_id);
         $this->assertSame($session->id, $reminder->study_session_id);
-        // Mismatched anchor/target and missing target must be rejected by future Reminder Service.
+
         $reminder->update(['subtask_id' => null, 'study_session_id' => null, 'anchor' => ReminderAnchor::SessionStart, 'offset_minutes' => -60]);
         $this->assertNull($reminder->refresh()->study_session_id);
         $this->assertSame(ReminderAnchor::SessionStart, $reminder->anchor);

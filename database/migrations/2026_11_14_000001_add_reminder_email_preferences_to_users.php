@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->boolean('reminder_email_enabled')->default(false);
-            // Invalidates queued mail even if the user later restores an earlier address.
+
             $table->unsignedBigInteger('reminder_email_version')->default(0);
         });
     }

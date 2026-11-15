@@ -1,6 +1,5 @@
 <?php
 
-// Independent PDO/process; never migrate, truncate, or print configuration secrets.
 use App\Exceptions\StudyPlanConflictException;
 use App\Exceptions\StudySessionConflictException;
 use App\Models\Task;

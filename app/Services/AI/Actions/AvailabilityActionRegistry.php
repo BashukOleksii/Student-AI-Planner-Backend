@@ -4,7 +4,6 @@ namespace App\Services\AI\Actions;
 
 use App\Services\Planning\StudyAvailabilityInputRules;
 
-/** Fixed proposal allowlist. Only authenticated REST confirmation can execute a writer. */
 class AvailabilityActionRegistry
 {
     public const NAMES = ['propose_availability_create', 'propose_availability_update', 'propose_availability_delete'];
@@ -38,7 +37,6 @@ class AvailabilityActionRegistry
 
     private function definition(string $name, string $description, array $properties, array $required): array
     {
-        // Preserve true omission for partial edits; unlike read schemas, null has no omission meaning.
         return ['name' => $name, 'description' => $description, 'strict' => false, 'parameters' => [
             'type' => 'object', 'properties' => $properties, 'required' => $required, 'additionalProperties' => false,
         ]];

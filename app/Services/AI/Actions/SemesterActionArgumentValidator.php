@@ -5,7 +5,6 @@ namespace App\Services\AI\Actions;
 use App\Services\Schedule\EffectiveScheduleCalculator;
 use InvalidArgumentException;
 
-/** Strict recursive JSON transport validation; calendar/business validity stays in management. */
 class SemesterActionArgumentValidator
 {
     public function __construct(private SemesterActionRegistry $registry, private EffectiveScheduleCalculator $calculator) {}
@@ -47,7 +46,6 @@ class SemesterActionArgumentValidator
 
     private function value(mixed $value, array $schema): mixed
     {
-        // Native provider adapters retain nested JSON objects. Normalize only schema-declared objects.
         if ($schema['type'] === 'object' && $value instanceof \stdClass) {
             $value = (array) $value;
         }

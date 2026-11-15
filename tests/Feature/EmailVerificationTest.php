@@ -244,7 +244,7 @@ class EmailVerificationTest extends TestCase
             $worker->start();
             $this->assertTrue($worker->waitUntil(fn ($type, $output) => str_contains($output, '"ready":true')));
             $ready = json_decode(strtok($worker->getOutput(), "\n"), true, flags: JSON_THROW_ON_ERROR);
-            // Prove the independent connection is waiting for our actual MySQL row lock.
+
             $blocked = false;
             $deadline = microtime(true) + 5;
             do {

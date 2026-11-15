@@ -8,7 +8,6 @@ use App\Models\WeeklyLessonRule;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
-/** Shared single-teacher validation; pivot history is never automatically repaired. */
 class SemesterLessonTeacherService
 {
     public function teacherId(array $row): int
@@ -31,7 +30,6 @@ class SemesterLessonTeacherService
         }
     }
 
-    /** Include scalar references in every semester, even if a historical catalog pivot is absent. */
     public function catalogAssignments(User $owner, Collection $subjects, bool $lock = false): array
     {
         $assignments = [];
@@ -62,7 +60,6 @@ class SemesterLessonTeacherService
         return $assignments;
     }
 
-    /** Return a conflict on every affected row, including both sides of an incoming disagreement. */
     public function assignmentErrors(array $rows, array $assignments): array
     {
         $bySubject = [];
@@ -88,7 +85,6 @@ class SemesterLessonTeacherService
         return $errors;
     }
 
-    /** Called after owner-locked preflight, inside the same transaction as the lesson write. */
     public function sync(WeeklyLessonRule|ScheduleDateExceptionLesson $lesson, int $teacherId): void
     {
         $this->teacherId(['teacher_id' => $lesson->teacher_id]);

@@ -129,7 +129,7 @@ class OpenAiResponsesProvider implements LlmProvider
                     if (($item['status'] ?? 'completed') !== 'completed' || ! $this->identifier($item['id'] ?? null) || ! is_string($item['encrypted_content'] ?? null) || $item['encrypted_content'] === '') {
                         throw new AiAgentException('invalid_provider_response');
                     }
-                    // Keep only encrypted continuation. Never store raw chain-of-thought or summaries.
+
                     $items[] = ['type' => 'reasoning', 'id' => $item['id'], 'summary' => [], 'encrypted_content' => $item['encrypted_content']];
                     break;
                 default:
@@ -146,7 +146,6 @@ class OpenAiResponsesProvider implements LlmProvider
         return ['text' => $text === '' ? null : $text, 'calls' => $calls, 'state' => $state];
     }
 
-    /** Reject verbatim transport credentials in arguments, identifiers and continuation as well as text. */
     private function rejectCredentialEcho(mixed $value, string $key): void
     {
         if (is_string($value) && str_contains($value, $key)) {

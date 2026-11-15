@@ -16,9 +16,6 @@ class ScheduleWorkbookParser
     private const PAIRS = ['1-2', '3-4', '5-6', '7-8'];
 
     /**
-     * Parse the supported five-day, four-pair dialect without application state.
-     * Times are local wall-clock values; source rows are inclusive and 1-based.
-     *
      * @return array{
      *   group: string,
      *   source: array{worksheet: string, range: string},
@@ -33,7 +30,6 @@ class ScheduleWorkbookParser
     public function parse(string $path, bool $semester = false): array
     {
         try {
-            // Keep merges; never calculate formulas or use formatted cell values.
             $workbook = (new Xlsx)->load($path);
         } catch (\Exception $exception) {
             throw new ScheduleWorkbookParserException('Не вдалося прочитати файл розкладу XLSX. Перевірте формат і цілісність файлу.', 0, $exception);
@@ -43,7 +39,7 @@ class ScheduleWorkbookParser
             $regions = [];
             foreach ($workbook->getWorksheetIterator() as $sheet) {
                 $merges = array_map(Coordinate::rangeBoundaries(...), array_values($sheet->getMergeCells()));
-                // Search only for structural headers, never for lesson-looking text.
+
                 foreach ($sheet->getCellCollection()->getCoordinates() as $coordinate) {
                     [$column, $row] = Coordinate::indexesFromString($coordinate);
                     if ($column >= 3 && $this->text($this->rawValue($sheet, $column, $row)) === 'Група') {
@@ -114,7 +110,7 @@ class ScheduleWorkbookParser
             if ($end[0] < $left || $start[0] > $left + 5 || $end[1] < $top || $start[1] > $top + 80) {
                 continue;
             }
-            // Vertical merging is reserved for weekday/pair labels; content merges are horizontal.
+
             $structural = ($start[0] === $left && $end[0] === $left)
                 || ($start[0] === $left + 1 && $end[0] === $left + 1);
             $content = $start[0] === $left + 3 && $end[0] <= $left + 5 && $start[1] === $end[1];
@@ -166,7 +162,6 @@ class ScheduleWorkbookParser
             }
         }
         $lessons = match ($occupied) {
-            // Semester definitions permit a blank teacher cell; legacy parsing stays strict.
             [0], [0, 1] => $semester ? [[$row, 'numerator']]
                 : $this->fail($sheet, $left + 3, $row, 'Непідтримувана структура рядків предмета та викладача'),
             [2], [2, 3] => $semester ? [[$row + 2, 'denominator']]
@@ -176,7 +171,7 @@ class ScheduleWorkbookParser
                 : $this->fail($sheet, $left + 3, $row, 'Непідтримувана структура рядків предмета та викладача'),
             [] => [],
             [1, 2] => [[$row + 1, 'all']],
-            // A four-row pair containing two subject/teacher rows is upper/lower parity.
+
             [0, 1, 2, 3] => [[$row, 'numerator'], [$row + 2, 'denominator']],
             default => $this->fail($sheet, $left + 3, $row, 'Непідтримувана структура рядків предмета та викладача'),
         };
@@ -214,7 +209,6 @@ class ScheduleWorkbookParser
         return $rules;
     }
 
-    /** Split before whitespace normalization; never split periods inside initials. */
     public function teacherNames(mixed $value): array
     {
         if ($value instanceof RichText) {
@@ -226,8 +220,7 @@ class ScheduleWorkbookParser
         $names = [];
         foreach (preg_split('/\r\n|[\r\n;\x{2028}\x{2029}]/u', (string) $value) as $line) {
             $parts = preg_split('/\s*[,\/]\s*/u', $line);
-            // Commas/slashes are names only when BOTH sides identify a person.
-            // For example "Smith, John" is ambiguous and remains an invalid name.
+
             if (count($parts) > 1 && count(array_filter($parts, fn ($part) => $this->clearlyNamedTeacher($part))) !== count($parts)) {
                 $parts = [$line];
             }
@@ -249,7 +242,6 @@ class ScheduleWorkbookParser
     {
         $value = $this->rawValue($sheet, $column, $row);
         if ((is_int($value) || is_float($value)) && is_finite((float) $value) && $value >= 0 && $value < 1) {
-            // Excel stores time as a day fraction. Round away floating-point artifacts.
             $seconds = (int) round($value * 86400);
             if ($seconds < 86400) {
                 return sprintf('%02d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60);

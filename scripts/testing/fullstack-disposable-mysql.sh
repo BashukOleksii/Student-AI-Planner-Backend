@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Local, temporary MySQL only. Never discovers, migrates or drops an existing server's database.
 set -euo pipefail
 umask 077
 frontend=$(realpath "${1:?Pass the independent frontend repository path}")
@@ -69,7 +68,6 @@ export OPENAI_API_KEY=offline-test-only GEMINI_API_KEY=offline-test-only AI_LIVE
 empty=$("${mysql_cli[@]}" -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB_DATABASE'")
 [[ "$empty" == 0 ]] || { echo 'Disposable test database was not empty.' >&2; exit 2; }
 printf 'Verified freshly initialized MySQL: database=%s, datadir=%s, port=%s\n' "$DB_DATABASE" "$actual_data_dir" "$DB_PORT" >&2
-# Proof is emitted only after initialization, identity and empty-schema checks above.
 php -r '$p=new PDO("mysql:unix_socket=".getenv("DB_SOCKET").";dbname=".getenv("DB_DATABASE"),"root",""); $r=$p->query("SELECT @@datadir AS datadir, @@server_uuid AS uuid, DATABASE() AS `database`, VERSION() AS version, CURRENT_USER() AS account")->fetch(PDO::FETCH_ASSOC); $r["initial_tables"]=0; $r["initial_application_schemas"]=0; file_put_contents(getenv("PLANNER_SYSTEM_RUN")."/isolation.json",json_encode($r,JSON_PRETTY_PRINT));'
 cp "$run_dir/isolation.json" "$evidence/isolation.json"
 php artisan migrate --no-interaction > "$evidence/migrate.log" 2>&1

@@ -50,7 +50,7 @@ class AiSharedRateLimitTest extends TestCase
             $first = $result($start($owner, $conversation));
             $this->assertSame(200, $first['status']);
             $this->assertSame(1, $first['provider_requests']);
-            // Saturated same-user requests run simultaneously in separate processes.
+
             $two = $start($owner, $conversation);
             $three = $start($owner, $conversation);
             $independent = $start($other, $otherConversation);

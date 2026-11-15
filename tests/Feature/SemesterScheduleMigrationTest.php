@@ -21,7 +21,7 @@ class SemesterScheduleMigrationTest extends TestCase
     {
         $this->migrateThrough('2026_11_08_000002_add_ai_availability_actions', true);
         $migration = require database_path('migrations/2026_11_10_000001_create_semester_schedule_foundation.php');
-        // Remove the later FK overlay before testing the original foundation in isolation.
+
         $overlay = require database_path('migrations/2026_11_10_000002_create_semester_schedule_imports.php');
         $management = require database_path('migrations/2026_11_10_000003_add_semester_schedule_management_protections.php');
         $lesson = Lesson::factory()->create();

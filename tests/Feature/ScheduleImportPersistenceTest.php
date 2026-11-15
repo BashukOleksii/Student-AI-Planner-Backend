@@ -84,7 +84,6 @@ class ScheduleImportPersistenceTest extends TestCase
             $this->assertSame(0, $batch->$counter);
         }
 
-        // Omit status and counters entirely to prove these defaults come from MySQL.
         $minimal = ScheduleImportBatch::create($batch->only(['user_id', 'academic_period_id', 'original_filename', 'file_hash']))->refresh();
         $this->assertSame(ScheduleImportBatchStatus::Uploaded, $minimal->status);
         foreach (['total_rows', 'valid_rows', 'invalid_rows', 'duplicate_rows'] as $counter) {
@@ -232,8 +231,6 @@ class ScheduleImportPersistenceTest extends TestCase
         $period = $batch->academicPeriod;
         $user = $batch->user;
 
-        // MySQL encounters the period CASCADE before the batch CASCADE; the period's
-        // RESTRICT path requires ordered account purging in the future application layer.
         $this->assertMysqlRejects(
             fn () => DB::table('users')->where('id', $user->id)->delete(),
             1451,
@@ -255,13 +252,12 @@ class ScheduleImportPersistenceTest extends TestCase
     {
         $period = AcademicPeriod::factory()->create();
         $otherUser = User::factory()->create();
-        // BR-IMP-005 must be enforced by the future import Service/validation layer.
+
         $batch = ScheduleImportBatch::factory()->for($period)->for($otherUser)->create();
 
         $this->assertNotSame($period->user_id, $batch->user_id);
         $this->assertModelExists($batch);
 
-        // Isolate the user->batch CASCADE from the same-owner period RESTRICT path.
         DB::table('users')->where('id', $otherUser->id)->delete();
 
         $this->assertModelMissing($batch);
@@ -404,7 +400,6 @@ class ScheduleImportPersistenceTest extends TestCase
 
     public function test_json_preview_fields_round_trip_as_arrays(): void
     {
-        // Representative fixtures only; these do not define the importer JSON contract.
         $raw = ['cells' => ['Test subject', 'Українська'], 'metadata' => ['source_row' => 2]];
         $normalized = ['test_value' => 'Example', 'flags' => [true, false], 'optional' => null];
         $errors = [['field' => 'test_value', 'message' => 'Test diagnostic']];

@@ -30,7 +30,7 @@ def audit(root):
             for entry in dirs + files:
                 path = current / entry
                 if path == root / "public/storage":
-                    continue  # Existing Laravel public uploads link is server-owned.
+                    continue
                 if path.is_symlink():
                     raise RuntimeError("Unexpected symlink in application code")
                 accessible(path, os.R_OK | (os.X_OK if path.is_dir() else 0))

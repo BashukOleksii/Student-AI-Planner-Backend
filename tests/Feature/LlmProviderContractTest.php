@@ -21,7 +21,6 @@ use Tests\Support\AiCapabilities;
 use Tests\TestCase;
 use Tests\Unit\AgentOrchestratorTest;
 
-/** Same public result and real orchestration assertions, with native provider fixtures. */
 #[Group('mysql')]
 #[Group('ai')]
 class LlmProviderContractTest extends TestCase

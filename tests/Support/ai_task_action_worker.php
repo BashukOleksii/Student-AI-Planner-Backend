@@ -1,6 +1,5 @@
 <?php
 
-// Independent test HTTP process: guarded MySQL only, no migrations and no upstream requests.
 use App\Models\AiPendingAction;
 use App\Models\Lesson;
 use App\Models\StudyAvailabilityWindow;

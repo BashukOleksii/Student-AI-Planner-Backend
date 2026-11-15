@@ -1,6 +1,5 @@
 <?php
 
-// Test-only independent HTTP worker. Never migrate, truncate or contact an LLM.
 use App\Models\User;
 use App\Services\AI\LlmProvider;
 use Illuminate\Contracts\Console\Kernel;

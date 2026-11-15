@@ -114,7 +114,7 @@ class BreakConstraintServiceTest extends TestCase
         $cases = [];
         foreach ($invalid as $index => $interval) {
             $cases['candidate '.$index] = [$interval, []];
-            // A malformed later anchor must not be ignored after finding overlap.
+
             $cases['anchor '.$index] = [$valid, [$valid, $interval]];
         }
         foreach ([null, 'interval', 1, 1.0, false, (object) $valid] as $index => $interval) {

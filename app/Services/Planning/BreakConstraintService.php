@@ -4,18 +4,17 @@ namespace App\Services\Planning;
 
 use InvalidArgumentException;
 
-/** Pure separation checks; the caller selects which intervals are break anchors. */
 class BreakConstraintService
 {
     public function __construct(private TimeIntervalService $intervals = new TimeIntervalService) {}
 
     /**
-     * @param  array{start: int, end: int}  $candidate  Half-open UTC Unix seconds.
+     * @param  array{start: int, end: int}  $candidate
      * @param  list<array{start: int, end: int}>  $anchors
-     * @param  ?int  $breakMinutes  Null or integer minutes in 1–65535; checked without coercion.
+     * @param  ?int  $breakMinutes
      * @return list<'overlapping_break_anchor'|'insufficient_break_before'|'insufficient_break_after'>
      *
-     * @throws InvalidArgumentException For malformed intervals or invalid configured breaks.
+     * @throws InvalidArgumentException
      */
     public function evaluate(array $candidate, array $anchors, mixed $breakMinutes = null): array
     {
@@ -57,8 +56,6 @@ class BreakConstraintService
 
     private function gapIsTooShort(int $earlier, int $later, int $requiredSeconds): bool
     {
-        // Compare later - earlier < requiredSeconds without overflowing that gap
-        // or underflowing later - requiredSeconds at extreme integer endpoints.
         return $later < PHP_INT_MIN + $requiredSeconds || $earlier > $later - $requiredSeconds;
     }
 }

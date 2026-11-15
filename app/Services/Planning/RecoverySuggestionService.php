@@ -16,7 +16,6 @@ use Illuminate\Validation\ValidationException;
 use LogicException;
 use Throwable;
 
-/** Durable owner reviews around existing planning tokens; never a second allocation engine. */
 class RecoverySuggestionService
 {
     public function __construct(private RecoverySourceStateService $sources, private LearningRecoveryAnalysisService $analysis,
@@ -42,7 +41,7 @@ class RecoverySuggestionService
             } catch (Throwable $exception) {
                 $limited = $exception instanceof RecoverySuggestionException && $exception->errorCode === 'analysis_limit_exceeded';
                 $counts[$limited ? 'limited' : 'failed']++;
-                // A failed owner must not starve later owners on every bounded scheduler invocation.
+
                 try {
                     DB::transaction(function () use ($id, $limited): void {
                         $owner = User::whereKey($id)->lockForUpdate()->first();
@@ -54,7 +53,6 @@ class RecoverySuggestionService
                         }
                     });
                 } catch (Throwable) {
-                    // No exception contents, credentials or source data are emitted by this command.
                 }
             }
         }
@@ -72,7 +70,6 @@ class RecoverySuggestionService
         return DB::transaction(fn () => $this->detectWithinTransaction($ownerId, $days));
     }
 
-    /** Compose detection atomically with an owner-first application transaction; never applies a plan. */
     public function detectWithinTransaction(int $ownerId, int $days = 7): string
     {
         if (DB::transactionLevel() === 0) {
@@ -126,8 +123,6 @@ class RecoverySuggestionService
             $status = $filters['status'] ?? 'pending';
             $currentPending = null;
             if ($status === 'pending') {
-                // The unique active_owner_id + CHECK constraint bounds this set to one.
-                // Evaluate freshness before pagination/counting; history is never scanned.
                 $currentPending = $owner->recoverySuggestions()->where('active_owner_id', $owner->id)->where('status', 'pending')->get()
                     ->map(fn ($row) => $this->annotate($owner, $row))
                     ->filter(fn ($row) => $row->currentStatus === 'pending')->keyBy('id');
@@ -196,7 +191,6 @@ class RecoverySuggestionService
                 throw ValidationException::withMessages(['accept_unplaced_cancellation' => ['Згода на скасування застосовується лише до адаптивного перепланування.']]);
             }
             try {
-                // Failed writers roll back to a savepoint before terminal review metadata is recorded.
                 $receipt = DB::transaction(function () use ($owner, $row, $acceptPartial, $acceptUnplacedCancellation, $acceptSplitReplacements): array {
                     $result = $row->kind === 'replan'
                         ? $this->replanning->confirmWithinTransaction($owner, $row->protected_token, $acceptPartial, $acceptUnplacedCancellation, $acceptSplitReplacements)
@@ -255,7 +249,6 @@ class RecoverySuggestionService
         });
     }
 
-    /** Explicit fresh review, never a business mutation or silent replacement of consented content. */
     public function refresh(User $user, string $id): RecoverySuggestion
     {
         $this->outermost();
@@ -274,7 +267,6 @@ class RecoverySuggestionService
             $result = $this->analysis->analyze($owner, $start, $end);
             $this->invalidateActive($owner);
             if ($result['kind'] === null) {
-                // Explicit analysis completed under the owner lock, just like the detector.
                 $this->recordScan($owner, $result['source_hash'], 'no_need');
 
                 return ['error' => 'no_recovery_needed'];

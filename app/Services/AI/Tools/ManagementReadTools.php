@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use InvalidArgumentException;
 use Throwable;
 
-/** H3b's two fixed read adapters. The original H1 Executor and its registry are unchanged. */
 class ManagementReadTools
 {
     public function __construct(private SubtaskReminderActionRegistry $registry, private ToolArgumentValidator $validator,

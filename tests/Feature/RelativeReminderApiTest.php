@@ -205,7 +205,7 @@ class RelativeReminderApiTest extends TestCase
     public function test_deadline_synchronization_is_atomic_and_preserves_metadata(string $field, ?string $deadline, int $offset, ?string $expected): void
     {
         [$owner, $task, $child] = $this->fixture();
-        // Keep reciprocal Task/Subtask deadline validation independent of the reminder outcome.
+
         $task->update(['deadline_at' => $field === 'subtask_id' ? '9999-12-31 23:59:59' : '2026-11-20 12:00:00']);
         if ($field === 'task_id') {
             $child->update(['deadline_at' => null]);
@@ -373,7 +373,7 @@ class RelativeReminderApiTest extends TestCase
         $child->update(['deadline_at' => '2026-10-20 12:00:00']);
         $task->refresh()->update(['deadline_at' => '2026-10-21 12:00:00']);
         $live = $this->create('task_id', $task->id);
-        $task->update(['deadline_at' => null]); // Noncooperating SQL/model write: GET remains advisory.
+        $task->update(['deadline_at' => null]);
         $snapshot = $this->snapshot();
         $this->getJson('/api/reminders/'.$live)->assertOk()->assertJsonPath('data.status', 'scheduled');
         $this->getJson('/api/reminders')->assertOk();

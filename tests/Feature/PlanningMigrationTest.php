@@ -27,12 +27,11 @@ class PlanningMigrationTest extends TestCase
         ];
         $scaffoldTables = ['migrations', 'users', 'password_reset_tokens', 'sessions', 'cache', 'cache_locks', 'jobs', 'job_batches', 'failed_jobs', 'personal_access_tokens'];
         $migrationsBeforeRollback = DB::table('migrations')->orderBy('migration')->pluck('migration')->all();
-        // Laravel lists all accessible schemas unless the current database is explicit.
+
         $tablesBeforeRollback = Schema::getTableListing(schema: DB::getDatabaseName(), schemaQualified: false);
         $domainTables = array_values(array_diff($tablesBeforeRollback, $scaffoldTables));
         $domainMigrationCount = count(array_diff($migrationsBeforeRollback, $scaffoldMigrations));
 
-        // Guard the rollback boundary; future additive domain groups are counted automatically.
         $this->assertSame($scaffoldMigrations, array_slice($migrationsBeforeRollback, 0, count($scaffoldMigrations)));
         $this->assertGreaterThan(0, $domainMigrationCount);
         foreach (['planning_preferences', 'study_availability_windows', 'education_institutions', 'academic_periods', 'subjects', 'teachers', 'schedule_import_batches', 'schedule_import_rows', 'lessons', 'tasks', 'subtasks', 'study_sessions', 'reminders', 'ai_conversations', 'ai_messages', 'notifications'] as $table) {

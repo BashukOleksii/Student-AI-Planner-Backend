@@ -14,7 +14,7 @@ class StudySessionFactory extends Factory
     {
         return [
             'task_id' => Task::factory(),
-            // Derive the owner from the task, including explicitly supplied tasks.
+
             'user_id' => fn (array $attributes) => Task::findOrFail($attributes['task_id'])->user_id,
             'subtask_id' => null,
             'rescheduled_from_session_id' => null,

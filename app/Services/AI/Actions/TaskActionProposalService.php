@@ -13,7 +13,6 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Throwable;
 
-/** Only prepares an in-memory proposal. Persistence belongs exclusively to successful turn finalization. */
 class TaskActionProposalService
 {
     public function __construct(private TaskActionArgumentValidator $validator, private TaskService $tasks, private TaskActionPresenter $presenter) {}
@@ -33,7 +32,7 @@ class TaskActionProposalService
                     return $this->error($name, 'invalid_arguments');
                 }
                 $values = array_diff_key($arguments, ['task_id' => true]);
-                // Lifecycle operations preserve unrelated legacy fields, exactly as TaskService does.
+
                 $candidate = in_array($name, ['propose_task_create', 'propose_task_update'], true)
                     ? $this->tasks->prepare($owner, $values, $task) : [];
                 $changes = match ($name) {

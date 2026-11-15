@@ -31,7 +31,6 @@ class TaskActionConfirmationService
 
     public function decide(User $owner, string $conversationId, string $actionId, string $operation, array $consent = []): array
     {
-        // Durability and lock ordering require our own outermost transaction.
         if (DB::transactionLevel() !== 0) {
             throw new AiAgentException('persistence_error');
         }
@@ -39,8 +38,7 @@ class TaskActionConfirmationService
         $outcome = DB::transaction(function () use ($owner, $conversationId, $actionId, $operation, $consent): array {
             $conversation = $owner->aiConversations()->whereKey($conversationId)->lockForUpdate()->firstOrFail();
             $action = AiPendingAction::where('conversation_id', $conversationId)->whereKey($actionId)->lockForUpdate()->firstOrFail();
-            // No consistent read may establish a REPEATABLE READ snapshot before the owner wait.
-            // Reminder synchronization discovers current session dependencies using ordinary reads.
+
             if ($action->status === 'pending' && $operation === 'confirm') {
                 User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
             }
@@ -56,7 +54,7 @@ class TaskActionConfirmationService
             if ($action->status !== 'pending') {
                 return $this->outcome($action, $operation);
             }
-            // Same lock as H2 claim/finish. No decision/history event may interleave an active turn.
+
             if (DB::table('ai_conversation_turns')->where('conversation_id', $conversationId)->whereNull('result')
                 ->where('lease_expires_at', '>', DB::raw('UTC_TIMESTAMP(6)'))->exists()) {
                 throw new AiAgentException('conversation_busy');
@@ -66,8 +64,6 @@ class TaskActionConfirmationService
             if ($next === 'executed') {
                 if ($this->planningRegistry->find($action->type) !== null) {
                     try {
-                        // A savepoint rolls back a failed domain attempt while retaining the
-                        // conversation/action/owner prefix for an authoritative failure event.
                         $receipt = DB::transaction(fn () => $this->planning->execute($owner, $action, $consent));
                     } catch (AiAgentException|ValidationException $exception) {
                         $code = $exception instanceof AiAgentException ? $exception->errorCode : 'acceptance_required';
@@ -111,7 +107,7 @@ class TaskActionConfirmationService
                     $subjectId = $result->subject_id === null ? null : $owner->subjects()->whereKey($result->subject_id)->value('id');
                     $receipt = ['task' => $this->presenter->task($result, $subjectId)];
                 }
-                // Any slow dependency lock/event that crosses expiry rolls the entire business mutation back.
+
                 if ($this->elapsed($action)) {
                     throw new AiAgentException('action_expired');
                 }
@@ -134,7 +130,6 @@ class TaskActionConfirmationService
         return $outcome;
     }
 
-    /** Domain savepoint already rolled back; the same outer transaction retains all coordination locks. */
     private function recordPlanningFailure(AiConversation $conversation, AiPendingAction $action, string $code): void
     {
         $message = $conversation->messages()->create(['role' => 'assistant',

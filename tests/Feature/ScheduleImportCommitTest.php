@@ -587,7 +587,7 @@ class ScheduleImportCommitTest extends TestCase
         $this->mock(ScheduleImportPreviewRevalidator::class)->shouldReceive('refreshLocked')->once()
             ->andReturnUsing(function ($owner, $lockedBatch, $period, $rows) use ($actual, $change, $lesson, $row, $otherPeriod) {
                 $result = $actual->refreshLocked($owner, $lockedBatch, $period, $rows);
-                // Deliberately simulate an invariant violation by an uncoordinated writer.
+
                 match ($change) {
                     'update missing' => $lesson->forceDelete(),
                     'update deleted' => $lesson->delete(),
@@ -618,7 +618,7 @@ class ScheduleImportCommitTest extends TestCase
         $this->mock(ScheduleImportCandidateClassifier::class)->shouldReceive('classify')->once()
             ->andReturnUsing(function (...$arguments) use ($classifier) {
                 $result = $classifier->classify(...$arguments);
-                $result['occurrences'][2]['operation'] = 'noop'; // Valid/noop violates the operation contract.
+                $result['occurrences'][2]['operation'] = 'noop';
 
                 return $result;
             });

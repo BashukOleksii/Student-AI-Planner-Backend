@@ -1,6 +1,5 @@
 <?php
 
-// Independent guarded MySQL connection/process; no migrations or fixture cleanup.
 use App\Exceptions\StudyPlanConflictException;
 use App\Exceptions\StudySessionConflictException;
 use App\Models\User;
@@ -27,7 +26,7 @@ CarbonImmutable::setTestNow(CarbonImmutable::parse($input['now']));
 $owner = User::whereKey($input['owner_id'])->firstOrFail();
 fwrite(STDOUT, json_encode(['ready' => true, 'connection_id' => $connection->selectOne('SELECT CONNECTION_ID() AS id')->id])."\n");
 fflush(STDOUT);
-// Simulate elapsed application time specifically AFTER a real lock wait resolves.
+
 if (isset($input['now_after_lock'])) {
     DB::listen(function ($query) use ($input): void {
         if (str_contains($query->sql, 'from `users`') && str_contains($query->sql, 'for update')) {

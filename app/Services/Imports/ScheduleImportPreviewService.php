@@ -34,7 +34,7 @@ class ScheduleImportPreviewService
         $filename = $this->safeFilename($file->getClientOriginalName());
         $template = null;
         $processingError = null;
-        // Raw workbook reading deliberately precedes the owner lock/transaction.
+
         try {
             $template = $this->parser->parse($path);
         } catch (ScheduleWorkbookParserException $exception) {
@@ -110,7 +110,6 @@ class ScheduleImportPreviewService
         return mb_substr($basename ?: 'schedule.xlsx', 0, 255);
     }
 
-    /** Source data contains no Lesson type: Other is exclusively a domain fallback. */
     private function rawData(array $template, array $row): array
     {
         return [

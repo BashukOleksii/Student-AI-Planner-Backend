@@ -31,7 +31,6 @@ class StudyReplanningPersistenceService
         private ReminderDependencyService $reminders,
     ) {}
 
-    /** Lightweight HTTP adapter; the E1 application operation remains SELECT-only. */
     public function preview(User $user, string $startDate, string $endDate, mixed $taskId = null, mixed $subtaskId = null, mixed $notBeforeUtc = null): array
     {
         $review = $notBeforeUtc === null ? $this->preview->preview($user, $startDate, $endDate, $taskId, $subtaskId)
@@ -61,7 +60,6 @@ class StudyReplanningPersistenceService
         return DB::transaction(fn () => $this->confirmWithinTransaction($user, $token, $acceptPartial, $acceptUnplacedCancellation, $acceptSplitReplacements));
     }
 
-    /** Same E2 writer as REST, with commit owned by a trusted owner-first caller. */
     public function confirmWithinTransaction(User $user, string $token, mixed $acceptPartial = false, mixed $acceptUnplacedCancellation = false, mixed $acceptSplitReplacements = false): array
     {
         if (DB::transactionLevel() === 0) {
@@ -72,7 +70,7 @@ class StudyReplanningPersistenceService
                 throw ValidationException::withMessages([$field => ['Значення має бути true або false.']]);
             }
         }
-        // First read is current/locking: never establish a RR snapshot before owner contention.
+
         $owner = User::whereKey($user->getKey())->lockForUpdate()->firstOrFail(['id', 'timezone']);
         $payload = $this->decode($token, $owner);
         $parameters = $payload['parameters'];
@@ -99,7 +97,7 @@ class StudyReplanningPersistenceService
                     || $children[$source->subtask_id]->task_id !== $source->task_id))) {
                 throw new UnexpectedValueException('Invalid replanning source relationships.');
             }
-            // Each component is validated separately: independent work units need not share attribution.
+
             $component = $this->mutation->component($chains, $source->id);
             $this->mutation->validateChain($component, $source->id);
             $interval = $this->interval($source);
@@ -111,7 +109,7 @@ class StudyReplanningPersistenceService
             $sources->push($source);
         }
         $scheduled = new Collection;
-        // All session/history locks precede reminder locks, in deterministic source-ID order.
+
         foreach ($sources->sortBy('id') as $source) {
             $scheduled = $scheduled->concat($this->reminders->scheduledForSession($owner, $source));
         }
@@ -137,7 +135,7 @@ class StudyReplanningPersistenceService
         $affected = $this->confirmation->affected($current);
         $this->assertFuture($affected);
         $this->decode($token, $owner);
-        // Independently validate before any write, excluding the entire exact release set.
+
         $selection = $this->selection->select($owner, $parameters['task_id'], $parameters['subtask_id'], $ids);
         $snapshot = $this->context->load($owner, $parameters['start_date'], $parameters['end_date'], null, true);
         $this->confirmation->validateBatch($owner->id, $current, $selection['work_items'],
@@ -151,8 +149,7 @@ class StudyReplanningPersistenceService
                 throw new LogicException('A replanning source could not be retired.');
             }
         }
-        // Independent current rules after the exact release hypothesis is realized transactionally.
-        // No inserts yet; C8 sees retained planned and completed scheduled workload exactly once.
+
         $selection = $this->selection->select($owner, $parameters['task_id'], $parameters['subtask_id']);
         $context = $this->context->load($owner, $parameters['start_date'], $parameters['end_date']);
         $this->confirmation->validateBatch($owner->id, $current, $selection['work_items'], $context, CarbonImmutable::now('UTC'));

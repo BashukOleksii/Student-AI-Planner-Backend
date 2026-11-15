@@ -4,18 +4,15 @@ namespace App\Services\Planning;
 
 use InvalidArgumentException;
 
-/** Pure actual-first completed effort and separate scheduled-reservation accounting. */
 class RemainingEffortService
 {
     /**
-     * Callers select each source record once and classify valid reservations beforehand.
-     *
-     * @param  ?int  $estimatedMinutes  Explicit mixed argument prevents non-strict scalar coercion.
+     * @param  ?int  $estimatedMinutes
      * @param  list<array{scheduled_seconds: int, actual_minutes: ?int}>  $completedSessions
      * @param  list<array{scheduled_seconds: int}>  $futureReservations
      * @return array{estimated_seconds: ?int, completed_credit_seconds: int, remaining_work_seconds: ?int, future_reserved_seconds: int, unallocated_work_seconds: ?int, over_reserved_seconds: ?int}
      *
-     * @throws InvalidArgumentException For malformed inputs or unrepresentable integer arithmetic.
+     * @throws InvalidArgumentException
      */
     public function calculate(mixed $estimatedMinutes, array $completedSessions, array $futureReservations): array
     {

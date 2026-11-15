@@ -58,7 +58,7 @@ class AiToolsIntegrationTest extends TestCase
         $this->assertSame($name, $result['tool']);
         $this->assertSame($before, $arguments);
         $this->assertSame($attributes, $owner->getAttributes());
-        // No Eloquent objects, Collections, Carbon values or HTTP Resource objects escape.
+
         $this->assertSame($result, json_decode(json_encode($result, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR));
 
         return $result['data'];
@@ -226,7 +226,7 @@ class AiToolsIntegrationTest extends TestCase
         $this->persistedSession($task, '2026-10-20 06:00:00', '2026-10-20 07:00:00', ['status' => 'completed', 'completed_at' => '2026-10-20 07:00:00']);
         $this->lesson($owner, '2026-10-20 08:00:00', '2026-10-20 09:00:00', ['status' => 'cancelled']);
         $this->lesson(User::factory()->create(), '2026-10-20 08:00:00', '2026-10-20 09:00:00');
-        // PF1 free time deliberately does not claim to apply full planner workload/break constraints.
+
         PlanningPreference::factory()->for($owner)->create(['max_daily_study_minutes' => 1]);
         $count = StudySession::count();
         $data = $this->data($owner, 'find_free_study_slots', [...$this->period(), 'min_slot_minutes' => 30]);

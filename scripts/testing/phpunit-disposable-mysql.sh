@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Local, temporary MySQL only. Never discovers, migrates or drops an existing server's database.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 for tool in mysqld mysql mysqladmin php openssl; do

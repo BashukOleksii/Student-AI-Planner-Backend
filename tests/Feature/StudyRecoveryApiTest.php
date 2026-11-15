@@ -245,7 +245,6 @@ class StudyRecoveryApiTest extends TestCase
             'starts_at' => '2026-11-07 09:00:00', 'ends_at' => '2026-11-07 10:00:00', ...$values]);
     }
 
-    /** Same all-table snapshot approach as StudyPlanApiTest, optionally omitting new rows. */
     private function snapshot(array $excludedSessionIds = []): array
     {
         $snapshot = [];

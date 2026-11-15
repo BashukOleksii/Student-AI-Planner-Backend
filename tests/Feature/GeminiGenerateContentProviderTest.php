@@ -134,7 +134,7 @@ class GeminiGenerateContentProviderTest extends TestCase
         $this->assertCount(2, $first['calls']);
         $this->assertNotSame($first['calls'][0]['id'], $first['calls'][1]['id']);
         $history[] = ['role' => 'assistant', 'content' => $first['text'], 'calls' => $first['calls'], 'state' => $first['state']];
-        // Result arrival order is intentionally reversed; Gemini receives original model order.
+
         foreach (array_reverse($first['calls']) as $call) {
             $history[] = ['role' => 'tool', 'call_id' => $call['id'], 'content' => '{"ok":true,"data":{}}'];
         }

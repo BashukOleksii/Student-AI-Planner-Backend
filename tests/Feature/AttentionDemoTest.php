@@ -149,7 +149,6 @@ class AttentionDemoTest extends TestCase
             $this->assertSame(count($row['replacements']), $owner->studySessions()->where('rescheduled_from_session_id', $source->id)->count());
             $this->assertNull($source->actual_minutes);
         }
-
     }
 
     public function test_unknown_outcome_uses_real_detector_and_repeat_preserves_user_results_and_other_data(): void
@@ -203,7 +202,6 @@ class AttentionDemoTest extends TestCase
                     $preview['study_plan']['preview_token'], true);
                 $this->assertSame($attributes, $original->refresh()->getAttributes());
                 $this->assertSame('pending', Task::findOrFail($result['task_id'])->status->value);
-
             }
         }
     }
@@ -227,7 +225,7 @@ class AttentionDemoTest extends TestCase
     {
         $owner = $this->owner();
         $prepared = $this->runDemo($owner, 'B');
-        // A legitimate account edit in this disposable test removes the earlier replacement window.
+
         $window = $owner->studyAvailabilityWindows()->orderBy('id')->firstOrFail();
         app(StudyAvailabilityService::class)->delete($owner, $window);
         $before = $this->snapshot();

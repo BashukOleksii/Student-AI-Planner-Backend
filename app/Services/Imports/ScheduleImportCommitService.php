@@ -23,9 +23,6 @@ class ScheduleImportCommitService
     public function __construct(private ScheduleImportPreviewRevalidator $revalidator) {}
 
     /**
-     * Confirmation covers the stored preview. A changed refresh commits preview
-     * changes only; unchanged confirmation applies all operations atomically.
-     *
      * @return array{batch: ScheduleImportBatch, preview_changed: bool}
      */
     public function commit(User $user, ScheduleImportBatch $batch): array
@@ -48,7 +45,6 @@ class ScheduleImportCommitService
             $confirmed = $this->confirmation($batch);
             $batch = $this->revalidator->refreshLocked($owner, $batch, $period, $rows);
             if ($batch->status !== ScheduleImportBatchStatus::Validated || $confirmed !== $this->confirmation($batch)) {
-                // Returning normally preserves the refreshed preview; no Lesson has changed.
                 return ['batch' => $batch, 'preview_changed' => true];
             }
             foreach ($batch->rows as $row) {
@@ -89,7 +85,6 @@ class ScheduleImportCommitService
         ]);
     }
 
-    /** JSON object key order is not a confirmation change; scalar types/list order are. */
     private function canonical(mixed $value): mixed
     {
         if (! is_array($value)) {
@@ -119,7 +114,7 @@ class ScheduleImportCommitService
         if (in_array($operation, ['preserve', 'noop'], true)) {
             return;
         }
-        // Lookup the reserved identity, including deleted history, never a cached ID.
+
         $lesson = $owner->lessons()->withTrashed()->where('academic_period_id', $batch->academic_period_id)
             ->where('import_fingerprint', $row->fingerprint)->lockForUpdate()->first();
         if ($operation === 'create' ? $lesson !== null
@@ -153,7 +148,6 @@ class ScheduleImportCommitService
         } elseif (! $lesson->update($source)) {
             $this->invalidOperation();
         }
-        // Existing type, immutable fingerprint and replacement links are never assigned.
     }
 
     private function invalidOperation(): never

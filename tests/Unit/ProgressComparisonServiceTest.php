@@ -119,7 +119,7 @@ class ProgressComparisonServiceTest extends TestCase
                 $activity['study_sessions'][] = ['status' => $status, 'starts_at' => $date.' 23:59:59',
                     'ends_at' => substr($date, 0, 8).'02 01:00:00', 'actual_minutes' => $status === 'completed' && $index === 1 ? 25 : null];
             }
-            // Pending work is not a reconstructed historical completion even with a stale timestamp.
+
             $activity['tasks'][] = [...$completion, 'status' => 'pending'];
         }
         $before = $activity;

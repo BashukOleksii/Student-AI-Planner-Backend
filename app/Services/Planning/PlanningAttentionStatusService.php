@@ -7,7 +7,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
-/** Small response, one bounded freshness read; never runs allocation or stores review metadata. */
 class PlanningAttentionStatusService
 {
     public function __construct(private RecoverySourceStateService $sources, private RecoverySuggestionService $suggestions) {}
@@ -43,9 +42,7 @@ class PlanningAttentionStatusService
                                 $unverified--;
                             }
                         }
-                        // A finished check with an expired/stale review needs an explicit
-                        // refresh, not an imaginary running analysis. annotate is also
-                        // the freshness definition used by the pending listing.
+
                         $refreshRequired = $unverified > 0;
                     } else {
                         $start = CarbonImmutable::now($owner->timezone)->startOfDay();
@@ -53,8 +50,6 @@ class PlanningAttentionStatusService
                         if (! hash_equals($state->last_source_hash ?? '', $current['source_hash'])) {
                             $check = 'pending';
                         } elseif ($state->last_outcome !== 'no_need') {
-                            // Existing deduplication intentionally requires explicit refresh after expiry.
-                            // A completed scan must not turn that stale review into a false 'all clear'.
                             $latest = $owner->recoverySuggestions()->where('source_hash', $current['source_hash'])
                                 ->orderByDesc('created_at')->orderByDesc('id')->first(['status']);
                             $refreshRequired = in_array($latest?->status, ['expired', 'invalidated'], true);

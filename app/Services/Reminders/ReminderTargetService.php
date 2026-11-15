@@ -13,12 +13,10 @@ use Carbon\CarbonImmutable;
 use Illuminate\Validation\ValidationException;
 use UnexpectedValueException;
 
-/** Shared persisted target ownership/attribution, eligibility and exact anchor sources. */
 class ReminderTargetService
 {
     public function __construct(private ReminderRules $rules, private ReminderDependencyService $dependencies) {}
 
-    /** Shared scheduled Reminder structure; eligibility is a separate caller decision. */
     public function forReminder(User $owner, Reminder $reminder, bool $lock): array
     {
         $targets = $this->rules->targets($reminder->getAttributes());
@@ -36,7 +34,6 @@ class ReminderTargetService
         return $this->resolve($owner, $targets, $lock, false);
     }
 
-    /** Structural checks for reads/history; callers opt into creation/offset-edit eligibility. */
     public function resolve(User $owner, array $data, bool $lock, bool $create): array
     {
         $targets = $this->rules->targets($data);

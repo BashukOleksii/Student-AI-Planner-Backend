@@ -5,7 +5,6 @@ namespace Tests\Concerns;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Testing\TestResponse;
 
-/** A cookie-only browser: real stateful middleware, encrypted cookies and enabled CSRF. */
 trait InteractsWithSpaBrowser
 {
     private array $browserCookies = [];
@@ -15,7 +14,7 @@ trait InteractsWithSpaBrowser
         config(['sanctum.stateful' => ['localhost:5173'], 'cors.allowed_origins' => ['http://localhost:5173'],
             'session.driver' => 'database']);
         $this->app['session']->forgetDrivers();
-        $this->app['env'] = 'local'; // Laravel otherwise disables CSRF in tests; DB guard already ran.
+        $this->app['env'] = 'local';
         $this->withHeader('Origin', 'http://localhost:5173')->withCredentials();
         $this->beforeApplicationDestroyed(function (): void {
             $this->app['env'] = 'testing';

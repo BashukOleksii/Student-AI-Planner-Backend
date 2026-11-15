@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Services\Imports\SemesterScheduleImportPlanner;
 use Illuminate\Validation\ValidationException;
 
-/** Shared authoritative graph for consistent management reads and owner-locked writes. */
 class SemesterScheduleStateService
 {
     public function __construct(private SemesterScheduleImportPlanner $planner, private SemesterLessonTeacherService $lessonTeachers) {}

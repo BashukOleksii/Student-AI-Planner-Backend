@@ -14,7 +14,6 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Crypt;
 use Throwable;
 
-/** Shared reviewed cancellation; callers serialize writes with the owner/work locks. */
 class WorkCompletionService
 {
     public function __construct(private ReminderDependencyService $reminders) {}
@@ -40,7 +39,6 @@ class WorkCompletionService
             try {
                 $expected = Crypt::decryptString($token);
             } catch (Throwable) {
-                // Invalid consent has the same safe review response as stale consent.
             }
         }
         $material = $this->material($owner, $task, $child, $sessions);

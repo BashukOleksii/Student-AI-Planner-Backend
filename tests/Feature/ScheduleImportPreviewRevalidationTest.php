@@ -303,7 +303,6 @@ class ScheduleImportPreviewRevalidationTest extends TestCase
         $batch = $this->upload($user, $period);
         $originalTimezone = date_default_timezone_get();
         try {
-            // This label exists in the source Kyiv timezone, but not in Apia.
             date_default_timezone_set('Pacific/Apia');
             $this->refreshPreview($user, $batch)->assertOk()->assertJsonPath('data.status', 'validated')
                 ->assertJsonPath('data.total_rows', 2)->assertJsonPath('data.rows.0.local_date', '2011-12-30');
@@ -515,7 +514,7 @@ class ScheduleImportPreviewRevalidationTest extends TestCase
             $this->assertStringContainsString('`'.$table.'`', $locks[$index]);
         }
         $referenceQueries = array_filter($queries, fn ($sql) => preg_match('/^select .* from `(subjects|teachers)`/', $sql));
-        // Two ID checks; mapped rows are never resolved again by their imported names.
+
         $this->assertCount(2, $referenceQueries);
         $this->assertSame($level, DB::transactionLevel());
     }
@@ -545,7 +544,6 @@ class ScheduleImportPreviewRevalidationTest extends TestCase
         return ScheduleImportBatch::findOrFail($response->json('data.id'));
     }
 
-    /** Every HTTP revalidation asserts full Lesson/catalog snapshots and immutable row source. */
     private function refreshPreview(User $user, ScheduleImportBatch $batch, array $body = []): TestResponse
     {
         $before = $this->snapshot(['lessons', 'subjects', 'teachers']);

@@ -11,7 +11,6 @@ use App\Models\WeeklyLessonRule;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
-/** Bounded source snapshot and review fingerprint, not another scheduling algorithm. */
 class RecoverySourceStateService
 {
     public function __construct(private PlanningContextService $context) {}
@@ -21,7 +20,7 @@ class RecoverySourceStateService
         $now = ($asOfUtc ?? CarbonImmutable::now('UTC'))->utc();
         $this->context->validateDates($start, $end);
         $owner = User::findOrFail($user->id);
-        // Never truncate planning inputs: fail explicitly before invoking services that need complete history.
+
         $tasks = $this->bounded($owner->tasks()->withTrashed()->getQuery(), 200);
         $children = $this->bounded(Subtask::withTrashed()->whereIn('task_id', $tasks->modelKeys()), 500);
         $sessions = $this->bounded($owner->studySessions()->getQuery(), 1000);
@@ -55,11 +54,11 @@ class RecoverySourceStateService
         foreach (['break_anchors', 'workload_sessions'] as $key) {
             usort($context[$key], fn ($a, $b) => [$a['start'], $a['end']] <=> [$b['start'], $b['end']]);
         }
-        // Source state changes on a session start/end boundary, not on every ticking second.
+
         $states = $sessions->filter(fn ($session) => $session->status->value === 'planned')->values()->map(fn ($session) => ['id' => $session->id,
             'started' => $session->getRawOriginal('starts_at') <= $now->format('Y-m-d H:i:s'),
             'ended' => $session->getRawOriginal('ends_at') <= $now->format('Y-m-d H:i:s')])->all();
-        // Existing adaptive analysis can expand to full original intervals. Keep automatic analysis inside its period.
+
         if ($context['range'] !== null) {
             foreach ($sessions as $session) {
                 if ($session->status->value !== 'planned') {
@@ -77,7 +76,7 @@ class RecoverySourceStateService
             'deadline_elapsed' => $row->getRawOriginal('deadline_at') === null ? null
                 : $row->getRawOriginal('deadline_at') <= $now->format('Y-m-d H:i:s')])->all();
         $attributes = fn ($rows) => $rows->map->getRawOriginal()->all();
-        // Invalidate pending reviews created under the former session-start outcome rule.
+
         $hash = $this->hash(['recovery_policy_version' => 3, 'review_lead_seconds' => LearningRecoveryAnalysisService::REVIEW_LEAD_SECONDS, 'owner_id' => $owner->id, 'timezone' => $owner->timezone, 'start_date' => $start, 'end_date' => $end,
             'tasks' => $attributes($tasks), 'subtasks' => $attributes($children), 'sessions' => $attributes($sessions),
             'scheduled_reminders' => $attributes($reminders), 'time_states' => $states,

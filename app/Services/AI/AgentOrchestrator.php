@@ -71,7 +71,6 @@ class AgentOrchestrator
             }
             $this->limits->json($response);
             foreach (explode("\n", $instructions) as $line) {
-                // Reject verbatim instruction disclosure; clocks/timezones themselves may be explained.
                 if (strlen($line) > 40 && ! str_starts_with($line, 'Current local date/time:') && str_contains($response['text'] ?? '', $line)) {
                     throw new AiAgentException('invalid_provider_response');
                 }
@@ -80,7 +79,7 @@ class AgentOrchestrator
             if (count($tools) + count($calls) > $this->limits->get('max_tool_calls')) {
                 throw new AiAgentException('execution_limit_reached');
             }
-            // Validate the whole batch before executing any call, including duplicate IDs across rounds.
+
             foreach ($calls as $call) {
                 if (! is_string($call['id'] ?? null) || ! preg_match('/\A[a-zA-Z0-9_-]{1,128}\z/', $call['id']) || isset($seen[$call['id']])
                     || ! is_string($call['name'] ?? null) || ! preg_match('/\A[a-zA-Z0-9_-]{1,64}\z/', $call['name']) || ! is_array($call['arguments'] ?? null)) {
@@ -106,7 +105,7 @@ class AgentOrchestrator
                         : 'Пропозицію підготовлено до підтвердження. Зміни ще не виконано.';
                     $serverMessage = $proposal === null ? ['kind' => 'proposal_not_created']
                         : ['kind' => 'proposal_ready', 'action_id' => $proposal['id']];
-                    // Provider text cannot manufacture successful mutation history, including intermediate rounds.
+
                     foreach ($events as &$event) {
                         if ($event['role'] === 'assistant') {
                             $event['content'] = null;
@@ -117,7 +116,7 @@ class AgentOrchestrator
                     }
                     unset($event);
                     $events[array_key_last($events)]['content'] = $answer;
-                    // Replaying final provider state must replay the server-controlled wording too.
+
                     $events[array_key_last($events)]['state'] = [];
                     $events[array_key_last($events)]['server_message'] = $serverMessage;
                 }
@@ -169,12 +168,11 @@ class AgentOrchestrator
                     'error_code' => $result['error']['code'] ?? null,
                     ...ToolResultPresenter::errorReason($call['name'], $result['ok'], $result['error']['code'] ?? null, $result['error']['reason'] ?? null)];
                 $this->limits->json([$instructions, $definitions, $history, $events]);
-                // Only a complete first batch for a self-contained single-date read qualifies.
-                // A schedule read used as context for a proposal or a mixed request never enters here.
+
                 if ($scheduleDate !== null && $round === 0 && count($calls) === 1 && count($tools) === 1 && $proposalCalls === 0
                     && $call['name'] === 'get_schedule_for_date' && $call['arguments'] === ['date' => $scheduleDate]) {
                     $answer = $this->scheduleAnswers->render($result, $scheduleDate, $owner->timezone);
-                    // Keep call/result history but remove model prose and native message items.
+
                     foreach ($events as &$event) {
                         if ($event['role'] === 'assistant') {
                             $event['content'] = null;

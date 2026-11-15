@@ -9,7 +9,6 @@ use DateTimeZone;
 use InvalidArgumentException;
 use UnexpectedValueException;
 
-/** Pure whole-second intervals with full-precision comparisons to the supplied clock. */
 class StudySessionLifecycleRules
 {
     public function actualMinutes(mixed $value, bool $required = false): void
@@ -48,7 +47,6 @@ class StudySessionLifecycleRules
             'actual_minutes' => $action === 'complete' ? $actualMinutes : null];
     }
 
-    /** Read-only permission check does not require a reported actual duration. */
     public function assertAllowed(string $action, StudySessionStatus $status, array $interval, DateTimeImmutable $now): void
     {
         (new TimeIntervalService)->durationSeconds($interval);
@@ -63,10 +61,8 @@ class StudySessionLifecycleRules
         if ($status !== StudySessionStatus::Planned || ! $allowed) {
             throw new StudySessionConflictException;
         }
-
     }
 
-    /** Connected records discovered by the application, keyed by integer ID. No input mutation. */
     public function validateChain(array $records, int $sourceId): void
     {
         $source = $records[$sourceId] ?? null;

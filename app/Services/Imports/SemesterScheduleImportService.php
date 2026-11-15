@@ -79,7 +79,6 @@ class SemesterScheduleImportService
         });
     }
 
-    /** Confirmation returns a durable receipt, or refreshes ONLY the stale preview. */
     public function commit(User $user, SemesterScheduleImport $import, string $token): array
     {
         return DB::transaction(function () use ($user, $import, $token): array {
@@ -103,7 +102,7 @@ class SemesterScheduleImportService
             if ($this->hasErrors($review)) {
                 $this->invalid('Цей огляд імпорту ще не готовий до застосування.');
             }
-            // Only after locked revalidation and token comparison may catalog writes begin.
+
             [$catalog, $identities] = $this->commitCatalog($owner, $review['catalog'], $graph['period']->education_institution_id);
             $schedule = $graph['schedule'];
             $values = $review['impact']['schedule']['after'];
@@ -113,7 +112,7 @@ class SemesterScheduleImportService
             } elseif ($review['impact']['schedule']['before'] !== $values) {
                 $this->check($schedule->update($values));
             }
-            // Remove reviewed old identities first, without losing independent snapshots.
+
             foreach ($review['operations'] as $operation) {
                 if ($operation['operation'] !== 'delete') {
                     continue;
@@ -172,7 +171,6 @@ class SemesterScheduleImportService
         }
         $teacherNames = [];
         foreach ($template['rules'] as &$raw) {
-            // Old saved templates retain their original shape and are upgraded only in memory.
             $raw['teacher_names'] ??= $this->parser->teacherNames($raw['teacher_name'] ?? null);
             array_push($teacherNames, ...$raw['teacher_names']);
         }

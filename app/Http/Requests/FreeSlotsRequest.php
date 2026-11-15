@@ -24,7 +24,6 @@ class FreeSlotsRequest extends FormRequest
     {
         $date = ['bail', 'required', 'string', 'regex:/\A[0-9]{4}-[0-9]{2}-[0-9]{2}\z/',
             function (string $attribute, mixed $value, Closure $fail): void {
-                // Validate calendar components without parsing in the server's local timezone.
                 if (! checkdate((int) substr($value, 5, 2), (int) substr($value, 8, 2), (int) substr($value, 0, 4))) {
                     $fail('Поле «'.__('validation.attributes.'.$attribute).'» має містити коректну календарну дату.');
                 }

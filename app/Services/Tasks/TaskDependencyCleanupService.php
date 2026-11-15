@@ -18,14 +18,13 @@ class TaskDependencyCleanupService
 {
     public function __construct(private ReminderDependencyService $reminderDependencies) {}
 
-    /** Called after the deleter locks the owner, owned parent and scoped children. */
     public function cancel(User $user, Task $task, array $subtaskIds, bool $wholeTask = false): void
     {
         if (DB::transactionLevel() === 0) {
             throw new LogicException('Dependency cleanup requires the deletion transaction.');
         }
         $now = CarbonImmutable::now('UTC')->format('Y-m-d H:i:s.u');
-        // Intentionally inspect all owners: filtering unsafe foreign references out would hide blockers.
+
         $sessions = StudySession::query()->where('status', StudySessionStatus::Planned)->where('starts_at', '>=', $now)
             ->where(function ($query) use ($task, $subtaskIds, $wholeTask): void {
                 $query->whereIn('subtask_id', $subtaskIds);
@@ -52,7 +51,7 @@ class TaskDependencyCleanupService
                 $this->unsafeDependency();
             }
         }
-        // Complete preflight before the first mutation; the caller's transaction also rolls back write failures.
+
         foreach ($sessions as $session) {
             $session->update(['status' => StudySessionStatus::Cancelled, 'completed_at' => null, 'actual_minutes' => null]);
         }

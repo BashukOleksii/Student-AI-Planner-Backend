@@ -38,7 +38,6 @@ class LessonService
             try {
                 $lesson->update($candidate);
             } catch (UniqueConstraintViolationException) {
-                // Only changing the period can collide with immutable persisted fingerprint history.
                 throw ValidationException::withMessages(['academic_period_id' => ['Вибраний навчальний період конфліктує з історією занять.']]);
             }
 
@@ -83,7 +82,6 @@ class LessonService
         $this->invalidReplacement();
     }
 
-    /** Shared deterministic preflight. It never invokes a writer or saves a speculative model. */
     public function prepare(User $user, array $values, ?Lesson $lesson = null, bool $lock = false): array
     {
         $candidate = array_replace($lesson === null
@@ -185,15 +183,11 @@ class LessonService
                 throw ValidationException::withMessages(['schedule' => ['Заняття перетинається з наявним активним заняттям.']]);
             }
 
-            // The writer already holds the owner lock shared with semester writers.
-            // Keep bounded reads for the calendar service, even for a long dated lesson.
             $end = $candidate['ends_at']->getTimestamp();
             try {
                 for ($start = $candidate['starts_at']->getTimestamp(); $start < $end; $start = $until) {
                     $until = min($end, $start + 120 * 86400);
                     foreach ($this->calendar->between($user, $start, $until) as $interval) {
-                        // All dated Lessons (including the edited row's exclusions) were
-                        // checked above; calendar selection also handles semester exceptions.
                         if ($interval['source_type'] === 'semester_occurrence') {
                             throw ValidationException::withMessages(['schedule' => ['Заняття перетинається з чинним семестровим заняттям.']]);
                         }

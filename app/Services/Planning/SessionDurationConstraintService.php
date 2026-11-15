@@ -4,18 +4,17 @@ namespace App\Services\Planning;
 
 use InvalidArgumentException;
 
-/** Pure duration-only checks for one candidate study session; no defaults or mutations. */
 class SessionDurationConstraintService
 {
     public function __construct(private TimeIntervalService $intervals = new TimeIntervalService) {}
 
     /**
-     * @param  array{start: int, end: int}  $interval  Half-open UTC Unix seconds.
-     * @param  ?int  $minimumMinutes  Null or integer minutes in 1–65535; runtime checked without coercion.
-     * @param  ?int  $maximumMinutes  Null or integer minutes in 1–65535; runtime checked without coercion.
+     * @param  array{start: int, end: int}  $interval
+     * @param  ?int  $minimumMinutes
+     * @param  ?int  $maximumMinutes
      * @return list<'below_minimum_session_duration'|'above_maximum_session_duration'>
      *
-     * @throws InvalidArgumentException For invalid intervals, duration overflow or invalid configured bounds.
+     * @throws InvalidArgumentException
      */
     public function evaluate(array $interval, mixed $minimumMinutes = null, mixed $maximumMinutes = null): array
     {

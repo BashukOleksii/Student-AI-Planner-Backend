@@ -80,7 +80,7 @@ class SplitReplanningTest extends TestCase
         $this->assertSame('rescheduled', $child->fresh()->status->value);
         $this->assertCount(1, $child->fresh()->rescheduledToSessions);
         $this->assertSame('planned', $children->last()->fresh()->status->value);
-        $this->preview(); // validates the complete tree, including the sibling branch
+        $this->preview();
         $other = User::factory()->create();
         $this->actingAs($other)->postJson('/api/planning/replanning/confirm', $body)->assertUnprocessable();
         $this->assertDatabaseCount('study_sessions', 4);

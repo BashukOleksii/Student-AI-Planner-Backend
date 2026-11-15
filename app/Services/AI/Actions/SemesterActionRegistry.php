@@ -4,7 +4,6 @@ namespace App\Services\AI\Actions;
 
 use App\Enums\LessonType;
 
-/** Explicit semester operations; occurrence identities are never numeric legacy Lesson IDs. */
 class SemesterActionRegistry
 {
     public const NAMES = ['propose_semester_rule_create', 'propose_semester_rule_update', 'propose_semester_rule_delete',

@@ -14,7 +14,6 @@ use LogicException;
 use Throwable;
 use UnexpectedValueException;
 
-/** Automatic session-only delivery; manual Reminder rows and recovery sources stay independent. */
 class AutomaticSessionReminderService
 {
     public const TYPE = 'automatic_session_reminder';
@@ -23,7 +22,6 @@ class AutomaticSessionReminderService
 
     public function __construct(private ReminderTargetService $targets, private ReminderEmailService $email, private ReminderRules $rules) {}
 
-    /** Synchronous created observer: current application writers already hold the owner transaction. */
     public function schedule(StudySession $session): void
     {
         DB::transaction(function () use ($session): void {
@@ -56,7 +54,6 @@ class AutomaticSessionReminderService
             ->whereIn('status', ['scheduled', 'queued'])->update(['status' => 'cancelled']);
     }
 
-    /** Profile writer owns the User lock. Re-enabling never resurrects cancelled records. */
     public function cancelDisabledChannels(User $owner): void
     {
         foreach (['in_app', 'email'] as $channel) {
@@ -84,7 +81,7 @@ class AutomaticSessionReminderService
                     if ($source === null || $source->status !== 'scheduled') {
                         return 'skipped';
                     }
-                    // Shared target validation follows the application's owner/work/session lock order.
+
                     $context = $this->targets->resolve($owner, ['study_session_id' => $source->study_session_id], true, false);
                     $row = AutomaticSessionReminder::whereKey($source->id)->lockForUpdate()->firstOrFail();
                     $now = CarbonImmutable::now('UTC');
@@ -117,7 +114,6 @@ class AutomaticSessionReminderService
                 });
                 $counts[$result]++;
             } catch (Throwable) {
-                // Only counts leave the dispatcher; the candidate transaction rolled back.
                 $counts['failed']++;
             }
         }
@@ -125,7 +121,6 @@ class AutomaticSessionReminderService
         return $counts;
     }
 
-    /** Fresh, nontransactional check immediately before SMTP, also on every retry. */
     public function emailDelivery(int $ownerId, int $id): ?array
     {
         if (DB::transactionLevel() !== 0) {
@@ -168,7 +163,6 @@ class AutomaticSessionReminderService
     private function assertBeforeStart(AutomaticSessionReminder $row): void
     {
         if ($row->session_starts_at <= CarbonImmutable::now('UTC')) {
-            // Roll back a slow inbox/job write; a later dispatch will cancel the expired intent.
             throw new LogicException('Automatic reminder session already started.');
         }
     }
@@ -181,7 +175,6 @@ class AutomaticSessionReminderService
 
     private function manualCollision(User $owner, AutomaticSessionReminder $row): bool
     {
-        // A manual reminder owns inbox and, with current general consent, its optional email channel.
         return Reminder::where('user_id', $owner->id)->where('study_session_id', $row->study_session_id)
             ->where('trigger_at', $row->getRawOriginal('trigger_at'))->whereIn('status', ['scheduled', 'sent'])->exists();
     }
@@ -192,7 +185,6 @@ class AutomaticSessionReminderService
             'study_session_id' => $row->study_session_id, 'trigger_at' => $row->trigger_at->utc()->format('Y-m-d\TH:i:s\Z')];
     }
 
-    /** Immutable inbox snapshot, independent of later session deletion or mutation. */
     public function stored(mixed $data): array
     {
         $fields = ['reminder_id', 'message', 'task_id', 'subtask_id', 'study_session_id', 'trigger_at'];

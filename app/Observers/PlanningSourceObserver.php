@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Services\Planning\RecoveryCheckTriggerService;
 use Illuminate\Database\Eloquent\Model;
 
-/** Observe only planning inputs, never scan state, suggestions, jobs or receipts. */
 class PlanningSourceObserver
 {
     public function saved(Model $model): void

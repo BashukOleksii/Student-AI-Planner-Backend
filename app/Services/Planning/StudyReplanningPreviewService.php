@@ -10,7 +10,6 @@ use DateTimeZone;
 use Illuminate\Database\Eloquent\Collection;
 use UnexpectedValueException;
 
-/** SELECT-only adaptive analysis; never retires a source or authorizes later persistence. */
 class StudyReplanningPreviewService
 {
     public function __construct(
@@ -27,7 +26,7 @@ class StudyReplanningPreviewService
         $this->context->validateDates($startDate, $endDate);
         $owner = $user->newQuery()->whereKey($user->getKey())->firstOrFail(['id', 'timezone']);
         $now = CarbonImmutable::now('UTC');
-        // Stage A validates strict scope/ownership and uses exactly this supplied clock.
+
         $selection = $this->selection->select($owner, $taskId, $subtaskId, [], $now);
         $coverage = $this->context->dateIntervals($startDate, $endDate, $owner->timezone);
         $sessions = $coverage === [] ? new Collection : $owner->studySessions()->where('status', StudySessionStatus::Planned)
@@ -69,8 +68,7 @@ class StudyReplanningPreviewService
                 'effective_deadline_utc' => $unit['effective_deadline_utc'] ?? null, 'priority' => $task->priority->value,
                 'effort' => $unit['effort'] ?? null, 'policy_reason_codes' => array_values($codes)];
         }
-        // Load shared context by calendar chunks, including full originals crossing requested boundaries.
-        // This expands detection only; proposed sessions still use exactly the requested coverage.
+
         [$first, $last] = $this->analysisDates($sources, $owner->timezone, $startDate, $endDate, $now);
         $snapshots = [];
         $cursor = new DateTimeImmutable($first, new DateTimeZone('UTC'));
@@ -91,7 +89,6 @@ class StudyReplanningPreviewService
             'timezone' => $owner->timezone, ...$proposal, 'excluded_items' => $selection['excluded_items'], 'warnings' => $selection['warnings']];
     }
 
-    /** Batch ancestor reads grow with history depth, not with independent source count. No locks. */
     private function validateHistory(User $owner, Collection $sources): void
     {
         if ($sources->isEmpty()) {

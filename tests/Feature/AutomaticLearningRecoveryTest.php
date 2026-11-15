@@ -17,7 +17,6 @@ use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\InteractsWithLearningRecovery;
 use Tests\TestCase;
 
-/** Deferred disposable-MySQL verification of the automatic review workflow, not a live scheduler test. */
 #[Group('mysql')]
 #[Group('recovery')]
 class AutomaticLearningRecoveryTest extends TestCase

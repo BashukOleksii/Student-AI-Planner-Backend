@@ -136,7 +136,7 @@ class StudySessionPersistenceTest extends TestCase
         $successor = StudySession::factory()->for($original->task)->create(['rescheduled_from_session_id' => $original->id]);
         $this->assertTrue($original->rescheduledToSessions->first()->is($successor));
         $this->assertTrue($successor->rescheduledFromSession->is($original));
-        // Persisting a link does not perform the future Service lifecycle transition.
+
         $this->assertSame(StudySessionStatus::Planned, $original->refresh()->status);
         $unlinked = StudySession::factory()->for($original->task)->create();
         $unlinked->update(['rescheduled_from_session_id' => $original->id]);
@@ -150,7 +150,7 @@ class StudySessionPersistenceTest extends TestCase
     public function test_database_permits_self_reference_but_future_service_must_reject_it(): void
     {
         $session = StudySession::factory()->create();
-        // Invalid domain state: MySQL cannot enforce the self CHECK (3818/3823).
+
         DB::table('study_sessions')->where('id', $session->id)->update(['rescheduled_from_session_id' => $session->id]);
         $this->assertTrue($session->refresh()->rescheduledFromSession->is($session));
         $this->assertTrue($session->rescheduledToSessions->first()->is($session));
@@ -179,7 +179,7 @@ class StudySessionPersistenceTest extends TestCase
         $task->delete();
         foreach ($sessions as $session) {
             $this->assertModelExists($session);
-            // Cancellation of future planned rows requires the future Task Service.
+
             $this->assertSame($session->status, $session->refresh()->status);
         }
         $task->forceDelete();
@@ -202,7 +202,7 @@ class StudySessionPersistenceTest extends TestCase
         $session = StudySession::factory()->create();
         $otherSubtask = Subtask::factory()->create();
         $otherOriginal = StudySession::factory()->create();
-        // Invalid domain references: the simple FKs enforce existence only.
+
         $session->update(['subtask_id' => $otherSubtask->id, 'rescheduled_from_session_id' => $otherOriginal->id]);
         $this->assertNotSame($session->task_id, $otherSubtask->task_id);
         $this->assertNotSame($session->user_id, $otherSubtask->task->user_id);

@@ -29,7 +29,6 @@ class ScheduleService
 
     private function range(User $user, string $startDate, string $endDate): array
     {
-        // Resolve both local midnights independently, including zones with midnight DST jumps.
         $start = CarbonImmutable::createFromFormat('!Y-m-d', $startDate, $user->timezone);
         $end = CarbonImmutable::createFromFormat('!Y-m-d', $endDate, $user->timezone);
         $lessons = $user->lessons()->where('status', LessonStatus::Active)

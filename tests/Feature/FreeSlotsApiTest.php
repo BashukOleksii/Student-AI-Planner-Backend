@@ -85,7 +85,7 @@ class FreeSlotsApiTest extends TestCase
     public function test_noncanonical_or_out_of_range_minimum_query_values_are_rejected(mixed $minimum): void
     {
         $this->actingAs(User::factory()->create(['timezone' => 'UTC']), 'web');
-        // http_build_query omits [], so encode an explicit empty query-array element.
+
         $url = $minimum === [] ? $this->url().'&min_slot_minutes[]=' : $this->url(['min_slot_minutes' => $minimum]);
         $this->getJson($url)->assertUnprocessable()->assertJsonValidationErrors('min_slot_minutes');
         $this->assertDatabaseCount('study_sessions', 0);
@@ -117,7 +117,7 @@ class FreeSlotsApiTest extends TestCase
             'one minute minus a second' => ['1', '09:00:00', '09:00:59', []],
             'thirty minutes equal' => ['30', '09:00:00', '09:30:00', [['starts_at' => '2026-10-12T09:00:00Z', 'ends_at' => '2026-10-12T09:30:00Z', 'duration_seconds' => 1800]]],
             'thirty minutes minus a second' => ['30', '09:00:00', '09:29:59', []],
-            // A full day exceeds 65535 seconds but not 65535 minutes: catches a missing * 60.
+
             'maximum accepted minimum' => ['65535', '00:00:00', '24:00:00', []],
         ];
     }

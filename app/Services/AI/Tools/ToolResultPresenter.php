@@ -9,10 +9,8 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 
-/** HTTP-independent equivalents of the approved Task/ScheduleLesson Resource fields. */
 class ToolResultPresenter
 {
-    /** Only this operation's allowlisted preparation failures have a public reason. */
     public static function errorReason(string $name, mixed $ok, mixed $code, mixed $reason): array
     {
         return $name === 'propose_semester_occurrence_create' && $ok === false && $code === 'invalid_arguments'

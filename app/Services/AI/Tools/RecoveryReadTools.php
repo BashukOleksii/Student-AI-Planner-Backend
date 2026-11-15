@@ -14,7 +14,6 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Throwable;
 
-/** Three read-only adapters. No suggestion confirmation, refresh or business writer is exposed to the model. */
 class RecoveryReadTools
 {
     public function __construct(private ToolArgumentValidator $validator, private RecoverySuggestionService $suggestions,

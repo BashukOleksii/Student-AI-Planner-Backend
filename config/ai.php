@@ -1,6 +1,5 @@
 <?php
 
-// Preserve invalid input as null so AgentLimits can fail closed; never coerce "30oops" to 30.
 $integer = static function (string $name, int $default): ?int {
     $value = env($name, $default);
     if (is_int($value)) {

@@ -81,7 +81,7 @@ class SemesterScheduleImportConcurrencyTest extends TestCase
             $first = $this->outcome($workers[0]);
             $second = $this->outcome($workers[1]);
             $this->assertFalse($first['changed']);
-            // MySQL JSON object key order is not part of the receipt contract.
+
             $canonical = function ($value) use (&$canonical) {
                 if (! is_array($value)) {
                     return $value;

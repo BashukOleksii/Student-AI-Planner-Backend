@@ -36,7 +36,6 @@ class AiAvailabilityActionMigrationTest extends TestCase
 
     public function test_forward_upgrade_preserves_all_legacy_actions_receipts_and_unrelated_constraints(): void
     {
-        // Restore the 18-type predecessor only on this guarded disposable test schema.
         (require database_path('migrations/2026_11_02_000001_add_ai_lesson_actions.php'))->up();
         $old = [...TaskActionRegistry::NAMES, ...SubtaskReminderActionRegistry::NAMES,
             'propose_study_plan_create', 'propose_adaptive_replanning', 'propose_session_reschedule', ...LessonActionRegistry::NAMES];

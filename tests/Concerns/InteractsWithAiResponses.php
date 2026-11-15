@@ -15,7 +15,6 @@ trait InteractsWithAiResponses
         return ['type' => 'function_call', 'id' => 'fc_'.$id, 'call_id' => $id, 'name' => $name, 'arguments' => $arguments, 'status' => 'completed'];
     }
 
-    /** Portable assertion view for the shared action regression suite. */
     private function aiInput($request): array
     {
         if (config('ai.provider') === 'openai') {

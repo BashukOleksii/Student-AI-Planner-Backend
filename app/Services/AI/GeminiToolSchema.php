@@ -4,7 +4,6 @@ namespace App\Services\AI;
 
 use App\Exceptions\AiAgentException;
 
-/** Gemini's JSON Schema field preserves omission, clearing-null and numeric enums. */
 class GeminiToolSchema
 {
     public function definitions(array $definitions): array
@@ -19,7 +18,6 @@ class GeminiToolSchema
 
     private function validate(array $schema, int $depth = 0): void
     {
-        // Fail closed on future keywords rather than silently weakening their semantics.
         if ($depth > 16 || array_diff(array_keys($schema), ['type', 'description', 'properties', 'required',
             'additionalProperties', 'items', 'enum', 'format', 'pattern', 'minimum', 'maximum',
             'minLength', 'maxLength', 'minItems', 'maxItems']) !== []) {

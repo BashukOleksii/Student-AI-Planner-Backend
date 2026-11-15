@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use UnexpectedValueException;
 
-/** Compares visible persisted activity, never reconstructing historical populations. */
 class ProgressComparisonService
 {
     public function __construct(
@@ -40,7 +39,6 @@ class ProgressComparisonService
     {
         $this->validatePeriods($baselineStart, $baselineEnd, $currentStart, $currentEnd);
 
-        // The fresh owner SELECT establishes one nonlocking MySQL REPEATABLE READ snapshot.
         return DB::transaction(function () use ($user, $baselineStart, $baselineEnd, $currentStart, $currentEnd): array {
             $owner = $user->newQuery()->whereKey($user->getKey())->firstOrFail(['id', 'timezone']);
             $now = CarbonImmutable::now('UTC');
@@ -61,7 +59,6 @@ class ProgressComparisonService
         });
     }
 
-    /** Pure factual comparison of independently reduced activity totals. */
     public function compare(array $baseline, array $current): array
     {
         $delta = $this->delta($baseline, $current);
@@ -79,7 +76,6 @@ class ProgressComparisonService
         ];
     }
 
-    /** Pure checked subtraction; canonical shape also fixes output order independently of input order. */
     public function delta(array $baseline, array $current): array
     {
         $shape = $this->statistics->activityMetrics(['tasks' => [], 'subtasks' => [], 'study_sessions' => []], []);
@@ -100,8 +96,6 @@ class ProgressComparisonService
                 }
                 $shape[$key] = $this->subtract($value, $baseline[$key], $current[$key]);
             } else {
-                // Both operands lie in [0, PHP_INT_MAX], so their difference always fits
-                // in [-PHP_INT_MAX, PHP_INT_MAX]. Reject overflowed floats before arithmetic.
                 if (! is_int($baseline[$key]) || ! is_int($current[$key]) || $baseline[$key] < 0 || $current[$key] < 0) {
                     throw new UnexpectedValueException('Comparison metrics exceed the nonnegative integer range.');
                 }
