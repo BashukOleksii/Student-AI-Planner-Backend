@@ -1,5 +1,5 @@
 {
-    "target": 660,
+    "target": 697,
     "maximum": 700,
     "classes": {
         "Tests\\Unit\\CompactTimeIntervalServiceTest": {
@@ -328,6 +328,9 @@
         },
         "Tests\\Feature\\CompactRecoverySuggestionPersistenceTest": {
             "category": "migration"
+        },
+        "Tests\\Feature\\ShowcasePrepareTest": {
+            "category": "workflow"
         },
         "Tests\\Feature\\CompactSmokeTest": {
             "category": "smoke"

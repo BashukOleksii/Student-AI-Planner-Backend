@@ -3,12 +3,14 @@
 namespace App\Services\Imports;
 
 use App\Exceptions\ScheduleWorkbookParserException;
+use App\Models\AcademicPeriod;
 use App\Models\SemesterScheduleImport;
 use App\Models\User;
 use App\Services\Schedule\EffectiveScheduleCalculator;
 use App\Services\Schedule\SemesterLessonTeacherService;
 use App\Services\Schedule\SemesterScheduleStateService;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +28,20 @@ class SemesterScheduleImportService
         private SemesterScheduleStateService $state,
         private SemesterLessonTeacherService $lessonTeachers,
     ) {}
+
+    /** Read-only review using exactly the same rules as a new owner's import. */
+    public function inspectNewPeriod(string $path, string $startsOn, string $endsOn, string $timezone): array
+    {
+        $template = $this->parser->parse($path, semester: true);
+        $owner = new User(['timezone' => $timezone]);
+        $period = new AcademicPeriod(['starts_on' => $startsOn, 'ends_on' => $endsOn]);
+        $graph = ['period' => $period, 'schedule' => null, 'teacherAssignments' => []];
+        foreach (['subjects', 'teachers', 'rules', 'exceptions', 'lessons', 'suppressions'] as $key) {
+            $graph[$key] = new Collection;
+        }
+
+        return ['template' => $template, 'review' => $this->reviewTemplate($owner, $template, $graph)];
+    }
 
     public function create(User $user, array $options, UploadedFile $file): SemesterScheduleImport
     {
@@ -163,10 +179,20 @@ class SemesterScheduleImportService
     private function buildReview(User $owner, SemesterScheduleImport $import): array
     {
         $graph = $this->state->load($owner, $import->academic_period_id, true, replacement: true);
+        $template = $import->template;
+        $review = $this->reviewTemplate($owner, $template, $graph);
+        $context = $this->state->hash(['strategy' => 'replace', 'template' => $template,
+            'options' => $review['impact']['schedule']['after'],
+            'graph' => $this->state->fingerprint($owner, $graph)]);
+
+        return [$review, $context, $graph];
+    }
+
+    private function reviewTemplate(User $owner, ?array &$template, array $graph): array
+    {
         ['period' => $period, 'subjects' => $subjects, 'teachers' => $teachers, 'schedule' => $schedule,
             'rules' => $rules, 'exceptions' => $exceptions, 'lessons' => $lessons,
             'suppressions' => $suppressions] = $graph;
-        $template = $import->template;
         if (! is_array($template) || ! is_string($template['group'] ?? null) || ! is_array($template['rules'] ?? null)) {
             $this->invalidGraph();
         }
@@ -239,10 +265,8 @@ class SemesterScheduleImportService
                 'deleted_suppressed_slots' => $suppressions->map->only(['id', 'weekday', 'pair_number', 'week_pattern'])->all(),
                 'teacher_assignment_changes' => array_values($assignmentChanges),
                 'preserved_rule_ids' => [], 'preserved_exception_dates' => [], 'suppressed_slots' => [], 'detached_snapshot_references' => []]];
-        $context = $this->state->hash(['strategy' => 'replace', 'template' => $template, 'options' => $after,
-            'graph' => $this->state->fingerprint($owner, $graph)]);
 
-        return [$review, $context, $graph];
+        return $review;
     }
 
     private function commitCatalog(User $owner, array $catalog, int $institutionId): array

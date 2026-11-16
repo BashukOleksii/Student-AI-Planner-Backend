@@ -19,9 +19,22 @@ class RecoveryCheckTriggerService
 
     private array $scheduled = [];
 
+    private int $suspensions = 0;
+
+    /** Bulk preparation validates its final plan itself; do not enqueue intermediate states. */
+    public function withoutRequests(callable $callback): mixed
+    {
+        $this->suspensions++;
+        try {
+            return $callback();
+        } finally {
+            $this->suspensions--;
+        }
+    }
+
     public function request(int $ownerId): void
     {
-        if (isset($this->scheduled[$ownerId])) {
+        if ($this->suspensions > 0 || isset($this->scheduled[$ownerId])) {
             return;
         }
         DB::transaction(function () use ($ownerId): void {
